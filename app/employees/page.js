@@ -1,0 +1,196 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { createClient } from '../../lib/supabaseClient';
+import { computeSalarySplit } from '../../lib/salarySplit';
+
+const empty = {
+  employee_id: '', name: '', phone: '', email: '', designation: '',
+  department: '', employment_type: 'full-time', date_of_joining: '',
+  reporting_manager_id: '',
+  pf_applicable: false, esi_applicable: false, accommodation_provided: false,
+  uniform_deposit_applicable: true,
+  current_fixed_salary: '', current_variable_salary: ''
+};
+
+export default function EmployeesPage() {
+  const supabase = createClient();
+  const [employees, setEmployees] = useState([]); // active + on-notice only, for display + add form
+  const [allEmployees, setAllEmployees] = useState([]); // every status, for manager lookups + reassignment check
+  const [form, setForm] = useState(empty);
+  const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState('');
+
+  async function load() {
+    const [visible, all] = await Promise.all([
+      supabase.from('employees').select('*').in('status', ['active', 'on-notice']).order('name'),
+      supabase.from('employees').select('*')
+    ]);
+    if (visible.error) setError(visible.error.message);
+    else setEmployees(visible.data);
+    setAllEmployees(all.data || []);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    setError('');
+    const { uniform_deposit_applicable, ...employeeFields } = form;
+    const payload = { ...employeeFields, reporting_manager_id: form.reporting_manager_id || null };
+    const { error } = await supabase.from('employees').insert([payload]);
+    if (error) { setError(error.message); return; }
+
+    // Snapshot whichever deposits apply, using CURRENT rates — this never
+    // changes later even if the rates in Settings are updated afterward.
+    const { data: rates } = await supabase.from('deposit_settings').select('*').eq('id', 1).single();
+    const depositRows = [];
+    if (uniform_deposit_applicable && rates) {
+      depositRows.push({ employee_id: form.employee_id, deposit_type: 'uniform', amount: rates.uniform_deposit_amount });
+    }
+    if (form.accommodation_provided && rates) {
+      depositRows.push({ employee_id: form.employee_id, deposit_type: 'accommodation', amount: rates.accommodation_deposit_amount });
+    }
+    if (depositRows.length > 0) {
+      await supabase.from('employee_deposits').insert(depositRows);
+    }
+
+    if (form.current_fixed_salary || form.current_variable_salary) {
+      const { data: settings } = await supabase.from('payroll_settings').select('*').eq('id', 1).single();
+      const split = computeSalarySplit(form.current_fixed_salary, settings);
+      await supabase.from('salary_history').insert([{
+        employee_id: form.employee_id,
+        fixed: form.current_fixed_salary || 0,
+        variable: form.current_variable_salary || 0,
+        ...split,
+        effective_from: form.date_of_joining || new Date().toISOString().slice(0, 10),
+        reason: 'Starting salary'
+      }]);
+    }
+    setForm(empty);
+    setShowForm(false);
+    load();
+  }
+
+  async function reassign(employeeId, newManagerId) {
+    await supabase.from('employees').update({ reporting_manager_id: newManagerId || null }).eq('employee_id', employeeId);
+    load();
+  }
+
+  const exitedIds = new Set(allEmployees.filter(e => e.status === 'exited').map(e => e.employee_id));
+  const needsReassignment = allEmployees.filter(e =>
+    e.status !== 'exited' && e.reporting_manager_id && exitedIds.has(e.reporting_manager_id)
+  );
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1>Employees</h1>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <a href="/employees/all" style={{ alignSelf: 'center' }}>View all (incl. past) →</a>
+          <button onClick={() => setShowForm(s => !s)} style={{ padding: '8px 16px' }}>
+            {showForm ? 'Cancel' : '+ Add employee'}
+          </button>
+        </div>
+      </div>
+      <p style={{ color: '#777', marginTop: -8 }}>Showing active and on-notice employees only.</p>
+
+      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+
+      {needsReassignment.length > 0 && (
+        <div style={{ background: '#fff3cd', border: '1px solid #ffe08a', borderRadius: 8, padding: 16, marginBottom: 20 }}>
+          <strong>⚠ Needs reassignment — {needsReassignment.length} employee(s) report to someone who has exited</strong>
+          <ul style={{ marginTop: 10 }}>
+            {needsReassignment.map(e => (
+              <li key={e.employee_id} style={{ marginBottom: 6 }}>
+                {e.name} — new manager:{' '}
+                <select defaultValue="" onChange={ev => reassign(e.employee_id, ev.target.value)}>
+                  <option value="">Choose manager…</option>
+                  {employees.filter(m => m.employee_id !== e.employee_id).map(m => (
+                    <option key={m.employee_id} value={m.employee_id}>{m.name}</option>
+                  ))}
+                </select>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {showForm && (
+        <form onSubmit={handleAdd} style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+          background: 'white', padding: 16, borderRadius: 8, marginBottom: 20
+        }}>
+          <input placeholder="Employee ID (e.g. EMP-0001)" required value={form.employee_id}
+            onChange={e => setForm({ ...form, employee_id: e.target.value })} />
+          <input placeholder="Name" required value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })} />
+          <input placeholder="Phone" value={form.phone}
+            onChange={e => setForm({ ...form, phone: e.target.value })} />
+          <input placeholder="Email" value={form.email}
+            onChange={e => setForm({ ...form, email: e.target.value })} />
+          <input placeholder="Designation" value={form.designation}
+            onChange={e => setForm({ ...form, designation: e.target.value })} />
+          <input placeholder="Department" value={form.department}
+            onChange={e => setForm({ ...form, department: e.target.value })} />
+          <label>Date of joining
+            <input type="date" value={form.date_of_joining}
+              onChange={e => setForm({ ...form, date_of_joining: e.target.value })} />
+          </label>
+          <select value={form.employment_type}
+            onChange={e => setForm({ ...form, employment_type: e.target.value })}>
+            <option value="full-time">Full-time</option>
+            <option value="part-time">Part-time</option>
+            <option value="contract">Contract</option>
+            <option value="probation">Probation</option>
+          </select>
+          <label>Reporting manager
+            <select value={form.reporting_manager_id}
+              onChange={e => setForm({ ...form, reporting_manager_id: e.target.value })}>
+              <option value="">None (top of hierarchy)</option>
+              {employees.map(m => (
+                <option key={m.employee_id} value={m.employee_id}>{m.name}</option>
+              ))}
+            </select>
+          </label>
+          <input placeholder="Fixed salary" type="number" value={form.current_fixed_salary}
+            onChange={e => setForm({ ...form, current_fixed_salary: e.target.value })} />
+          <input placeholder="Variable salary" type="number" value={form.current_variable_salary}
+            onChange={e => setForm({ ...form, current_variable_salary: e.target.value })} />
+          <label><input type="checkbox" checked={form.pf_applicable}
+            onChange={e => setForm({ ...form, pf_applicable: e.target.checked })} /> PF applicable</label>
+          <label><input type="checkbox" checked={form.esi_applicable}
+            onChange={e => setForm({ ...form, esi_applicable: e.target.checked })} /> ESI applicable</label>
+          <label><input type="checkbox" checked={form.accommodation_provided}
+            onChange={e => setForm({ ...form, accommodation_provided: e.target.checked })} /> Company accommodation</label>
+          <label><input type="checkbox" checked={form.uniform_deposit_applicable}
+            onChange={e => setForm({ ...form, uniform_deposit_applicable: e.target.checked })} /> Uniform deposit applicable</label>
+          <button type="submit" style={{ gridColumn: 'span 2', padding: 10 }}>Save employee</button>
+        </form>
+      )}
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white' }}>
+        <thead>
+          <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd' }}>
+            <th style={{ padding: 8 }}>Name</th>
+            <th>Designation</th>
+            <th>Department</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {employees.map(emp => (
+            <tr key={emp.employee_id} style={{ borderBottom: '1px solid #eee' }}>
+              <td style={{ padding: 8 }}>{emp.name}</td>
+              <td>{emp.designation}</td>
+              <td>{emp.department}</td>
+              <td>{emp.status}</td>
+              <td><a href={`/employees/${emp.employee_id}`}>View / edit →</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {employees.length === 0 && <p style={{ color: '#777' }}>No active employees — add one above, or check "View all" for past employees.</p>}
+    </div>
+  );
+}
