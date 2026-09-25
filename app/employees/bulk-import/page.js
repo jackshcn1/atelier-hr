@@ -36,6 +36,34 @@ function isBlank(v) {
   return v === undefined || v === null || String(v).trim() === '';
 }
 
+// Excel stores dates as serial numbers (days since 1900-01-01, with a
+// Lotus-123-inherited bug that treats 1900 as a leap year).  The xlsx
+// library sometimes hands us those raw numbers instead of formatted
+// strings.  This converts them to 'YYYY-MM-DD' so Supabase accepts them.
+const DATE_FIELDS = ['date_of_joining', 'dob'];
+
+function excelSerialToDate(v) {
+  if (isBlank(v)) return '';
+  // Already a recognisable date string — leave it alone.
+  if (typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v)) return v;
+  const n = Number(v);
+  if (!isFinite(n) || n < 1) return v;               // not a serial number
+  // Excel epoch: 1 = 1900-01-01; adjust for the phantom Feb 29 1900.
+  const msPerDay = 86400000;
+  const excelEpoch = new Date(Date.UTC(1899, 11, 30)); // Dec 30 1899
+  const date = new Date(excelEpoch.getTime() + n * msPerDay);
+  const yyyy = date.getUTCFullYear();
+  const mm   = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd   = String(date.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function fixDateFields(row) {
+  const fixed = { ...row };
+  DATE_FIELDS.forEach(f => { if (f in fixed) fixed[f] = excelSerialToDate(fixed[f]); });
+  return fixed;
+}
+
 function downloadTemplate() {
   const example = {
     employee_id: 'the Petpooja code for this person', name: 'Full name', phone: '', email: '',
@@ -88,7 +116,7 @@ export default function BulkImport() {
       const wb = XLSX.read(evt.target.result, { type: 'binary' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      setRows(json.map(r => ({ ...r, _errors: [] })));
+      setRows(json.map(r => ({ ...fixDateFields(r), _errors: [] })));
     };
     reader.readAsBinaryString(file);
   }
