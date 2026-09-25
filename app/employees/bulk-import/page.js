@@ -97,6 +97,7 @@ export default function BulkImport() {
   const [rows, setRows] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [existingIds, setExistingIds] = useState(new Set());
+  const [deletedEmployees, setDeletedEmployees] = useState(new Map()); // Map<employee_id, {name, deleted_at}>
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -108,8 +109,22 @@ export default function BulkImport() {
 
     const { data: depts } = await supabase.from('departments').select('name');
     setDepartments((depts || []).map(d => d.name));
-    const { data: existing } = await supabase.from('employees').select('employee_id');
-    setExistingIds(new Set((existing || []).map(e => e.employee_id)));
+
+    // Fetch all employees including deleted ones
+    const { data: allEmployees } = await supabase.from('employees').select('employee_id, name, deleted_at');
+    const activeIds = new Set();
+    const deletedMap = new Map();
+
+    (allEmployees || []).forEach(emp => {
+      if (emp.deleted_at) {
+        deletedMap.set(emp.employee_id, { name: emp.name, deleted_at: emp.deleted_at });
+      } else {
+        activeIds.add(emp.employee_id);
+      }
+    });
+
+    setExistingIds(activeIds);
+    setDeletedEmployees(deletedMap);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -127,17 +142,72 @@ export default function BulkImport() {
     return rows.map(r => {
       const errs = [];
       const id = String(r.employee_id || '').trim();
+      const isDeleted = id && deletedEmployees.has(id);
       const isUpdate = id && existingIds.has(id);
+
       if (!id) errs.push('Missing employee_id');
       if (id && seenIds.has(id)) errs.push('Duplicate employee_id within this file');
       seenIds.add(id);
-      if (!isUpdate && (!r.name || !String(r.name).trim())) errs.push('Missing name (required for new employees)');
-      if (r.department && !deptSet.has(String(r.department).trim())) errs.push(`Department "${r.department}" doesn't exist yet — add it in Settings first`);
-      return { ...r, _errors: errs, _mode: isUpdate ? 'update' : 'create' };
+
+      if (isDeleted) {
+        const deleted = deletedEmployees.get(id);
+        const deletedDate = new Date(deleted.deleted_at).toLocaleDateString();
+        errs.push(`Employee was deleted on ${deletedDate}. Restore first to update.`);
+      }
+
+      if (!isUpdate && !isDeleted && (!r.name || !String(r.name).trim())) {
+        errs.push('Missing name (required for new employees)');
+      }
+
+      if (r.department && !deptSet.has(String(r.department).trim())) {
+        errs.push(`Department "${r.department}" doesn't exist yet — add it in Settings first`);
+      }
+
+      return {
+        ...r,
+        _errors: errs,
+        _mode: isDeleted ? 'deleted' : (isUpdate ? 'update' : 'create'),
+        _deletedInfo: isDeleted ? deletedEmployees.get(id) : null
+      };
     });
   }
 
   function runValidation() {
+    setRows(validate());
+  }
+
+  async function restoreAndUpdate(row) {
+    const id = String(row.employee_id).trim();
+
+    // Restore the employee (clear deleted_at)
+    const { error: restoreError } = await supabase
+      .from('employees')
+      .update({ deleted_at: null })
+      .eq('employee_id', id);
+
+    if (restoreError) {
+      setError(`Failed to restore employee ${id}: ${restoreError.message}`);
+      return;
+    }
+
+    // Log the restoration
+    const user = await supabase.auth.getUser();
+    await supabase.from('audit_log').insert([{
+      actor: user.data.user?.email || 'unknown',
+      action: 'restored employee (via bulk import)',
+      record_affected: `${id} (${row.name || row._deletedInfo?.name || 'unknown'})`
+    }]);
+
+    // Move the employee from deleted to active in our state
+    const updatedDeletedMap = new Map(deletedEmployees);
+    updatedDeletedMap.delete(id);
+    setDeletedEmployees(updatedDeletedMap);
+
+    const updatedActiveIds = new Set(existingIds);
+    updatedActiveIds.add(id);
+    setExistingIds(updatedActiveIds);
+
+    // Re-validate all rows now that this employee is restored
     setRows(validate());
   }
 
@@ -250,17 +320,45 @@ export default function BulkImport() {
           <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd' }}>
-                <th style={{ padding: 6 }}>employee_id</th><th>name</th><th>department</th><th>Mode</th><th>Issues</th>
+                <th style={{ padding: 6 }}>employee_id</th><th>name</th><th>department</th><th>Mode</th><th>Issues / Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #eee', background: r._errors?.length > 0 ? '#fff5f5' : 'white' }}>
                   <td style={{ padding: 6 }}>{r.employee_id}</td>
-                  <td>{r.name}</td>
+                  <td>{r.name || r._deletedInfo?.name}</td>
                   <td>{r.department}</td>
-                  <td>{r._mode || '—'}</td>
-                  <td style={{ color: '#c0392b' }}>{(r._errors || []).join('; ')}</td>
+                  <td>
+                    {r._mode === 'deleted' ? (
+                      <span style={{ color: '#e67e22' }}>⚠️ deleted</span>
+                    ) : (
+                      r._mode || '—'
+                    )}
+                  </td>
+                  <td>
+                    {r._mode === 'deleted' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ color: '#c0392b' }}>{(r._errors || []).join('; ')}</span>
+                        <button
+                          onClick={() => restoreAndUpdate(r)}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: 12,
+                            background: '#27ae60',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 4,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Restore & Update
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{ color: '#c0392b' }}>{(r._errors || []).join('; ')}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
