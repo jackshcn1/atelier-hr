@@ -8,6 +8,7 @@ export default function PayrollPage() {
   const supabase = createClient();
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
+  const [variablePercents, setVariablePercents] = useState({});
   const [rawRows, setRawRows] = useState([]);
   const [results, setResults] = useState([]);
   const [unmatchedCodes, setUnmatchedCodes] = useState([]);
@@ -75,9 +76,13 @@ export default function PayrollPage() {
 
       const joinedDuringPeriod = emp.date_of_joining >= periodStart && emp.date_of_joining <= periodEnd;
 
+      const variableTarget = latestSalary?.variable ?? emp.current_variable_salary ?? 0;
+
       matchedResults.push({
         employee_id: emp.employee_id, name: emp.name, fixedSalary,
-        ...calc, variablePay: 0, override: null, joinedDuringPeriod
+        ...calc, variablePay: Math.round((variablePercents[code] || 0) / 100 * variableTarget) || 0,
+        variableTarget, variablePercent: variablePercents[code] || 0,
+        override: null, joinedDuringPeriod
       });
     }
 
@@ -86,8 +91,11 @@ export default function PayrollPage() {
     setSaved(false);
   }
 
-  function updateVariablePay(employeeId, value) {
-    setResults(results.map(r => r.employee_id === employeeId ? { ...r, variablePay: Number(value) || 0 } : r));
+  function updateVariablePay(employeeId, percentValue) {
+    const pct = Number(percentValue) || 0;
+    setVariablePercents({ ...variablePercents, [employeeId]: pct });
+    // Store % for display and $ for calculation
+    setResults(results.map(r => r.employee_id === employeeId ? { ...r, variablePercent: pct, variablePay: Math.round((pct / 100) * (r.variableTarget || 0)) } : r));
   }
 
   function overrideTotalPaidDays(employeeId, value, totalDays) {
@@ -150,7 +158,7 @@ export default function PayrollPage() {
                 <th style={{ padding: 6 }}>Name</th>
                 <th>Present</th><th>Absent</th><th>Hours</th><th>Eff. days</th>
                 <th>Offs paid</th><th>Total paid days</th><th>Per-day ₹</th>
-                <th>Fixed pay</th><th>Variable pay</th><th>Total pay</th>
+                <th>Fixed pay</th><th>Var %</th><th>Var $$</th><th>Total pay</th>
               </tr>
             </thead>
             <tbody>
@@ -168,9 +176,10 @@ export default function PayrollPage() {
                   </td>
                   <td>₹{r.perDaySalary}</td>
                   <td>₹{r.fixedPay}</td>
-                  <td><input type="number" style={{ width: 80 }} value={r.variablePay}
-                    onChange={e => updateVariablePay(r.employee_id, e.target.value)} /></td>
-                  <td><strong>₹{r.fixedPay + r.variablePay}</strong></td>
+                  <td><input type="number" style={{ width: 60 }} value={r.variablePercent || 0}
+                    onChange={e => updateVariablePay(r.employee_id, Number(e.target.value))} />%</td>
+                  <td>₹{Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0))}</td>
+                  <td><strong>₹{r.fixedPay + (Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)))}</strong></td>
                 </tr>
               ))}
             </tbody>
