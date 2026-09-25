@@ -14,7 +14,8 @@ const CORE_FIELDS = [
   'current_fixed_salary', 'current_variable_salary',
   'dob', 'gender', 'blood_group', 'address',
   'emergency_contact_name', 'emergency_contact_phone', 'id_proof_type',
-  'previous_work_history', 'education_history', 'notes'
+  'previous_work_history', 'education_history', 'notes',
+  'update_salaries'  // When true, force updates of salary fields even if blank
 ];
 
 // Fields that only an admin can write — routed to employee_sensitive_info.
@@ -76,7 +77,8 @@ function downloadTemplate() {
     emergency_contact_name: '', emergency_contact_phone: '', id_proof_type: '',
     previous_work_history: '', education_history: '', notes: '',
     id_proof_number: '', pf_number: '', esi_number: '',
-    bank_account_holder_name: '', bank_ifsc_code: '', bank_name: '', bank_account_number: ''
+    bank_account_holder_name: '', bank_ifsc_code: '', bank_name: '', bank_account_number: '',
+    update_salaries: 'TRUE'  // Add this flag to force salary updates when reuploading
   };
   const notes = [
     ['Leave a cell blank to skip that field.'],
@@ -215,6 +217,7 @@ export default function BulkImport() {
     setImporting(true);
     setError('');
     const validated = validate();
+
     const importable = validated.filter(r => r._errors.length === 0);
 
     const { data: depositRates } = await supabase.from('deposit_settings').select('*').eq('id', 1).single();
@@ -262,12 +265,23 @@ export default function BulkImport() {
       } else {
         // Update mode: only include fields that actually have a value in
         // this row, so blank cells never overwrite existing data.
+        // EXCEPT when update_salaries is true, then we force salary field updates.
         const updateRow = {};
         CORE_FIELDS.forEach(f => {
-          if (f === 'employee_id' || f === 'reporting_manager_id' || isBlank(r[f])) return;
-          if (['pf_applicable', 'esi_applicable', 'accommodation_provided'].includes(f)) updateRow[f] = toBool(r[f]);
-          else if (['standard_hours_per_day', 'current_fixed_salary', 'current_variable_salary'].includes(f)) updateRow[f] = Number(r[f]);
-          else updateRow[f] = r[f];
+          if (f === 'employee_id' || f === 'reporting_manager_id') return;
+
+          // Always process salary fields if update_salaries flag is true
+          if (f === 'update_salaries' && r[f]) return; // Just a marker, don't add to updateRow
+
+          // Check if field should be updated (not blank OR force update for salary)
+          const shouldUpdate = r[f] !== undefined && r[f] !== null && r[f] !== '';
+          const isSalaryField = ['current_fixed_salary', 'current_variable_salary'].includes(f);
+
+          if (shouldUpdate || (r.update_salaries && isSalaryField)) {
+            if (['pf_applicable', 'esi_applicable', 'accommodation_provided'].includes(f)) updateRow[f] = toBool(r[f]);
+            else if (['standard_hours_per_day', 'current_fixed_salary', 'current_variable_salary'].includes(f)) updateRow[f] = Number(r[f]);
+            else updateRow[f] = r[f];
+          }
         });
         if (Object.keys(updateRow).length > 0) {
           const { error: updateError } = await supabase.from('employees').update(updateRow).eq('employee_id', id);
