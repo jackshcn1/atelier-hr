@@ -274,10 +274,12 @@ export default function BulkImport() {
           if (f === 'update_salaries' && r[f]) return; // Just a marker, don't add to updateRow
 
           // Check if field should be updated (not blank OR force update for salary)
+          // The update_salaries flag can be 'TRUE', 'YES', '1', or boolean true
+          const updateSalariesEnabled = r.update_salaries === true || r.update_salaries === 'TRUE' || r.update_salaries === 'YES' || r.update_salaries === '1';
           const shouldUpdate = r[f] !== undefined && r[f] !== null && r[f] !== '';
           const isSalaryField = ['current_fixed_salary', 'current_variable_salary'].includes(f);
 
-          if (shouldUpdate || (r.update_salaries && isSalaryField)) {
+          if (shouldUpdate || (updateSalariesEnabled && isSalaryField)) {
             if (['pf_applicable', 'esi_applicable', 'accommodation_provided'].includes(f)) updateRow[f] = toBool(r[f]);
             else if (['standard_hours_per_day', 'current_fixed_salary', 'current_variable_salary'].includes(f)) updateRow[f] = Number(r[f]);
             else updateRow[f] = r[f];
