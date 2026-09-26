@@ -4,21 +4,57 @@ import * as XLSX from 'xlsx';
 import { createClient } from '../../lib/supabaseClient';
 import { parseHours, daysInPeriod, calculateEmployeePayroll } from '../../lib/payroll';
 
+function getDefaultPayrollCycle() {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-indexed
+  const currentDate = today.getDate();
+
+  // If today is on or after the 20th of the month, cycle is 20th of prev month to 19th of current month
+  // If today is before the 20th, cycle is 20th of 2 months ago to 19th of prev month
+  let endYear = currentYear;
+  let endMonth = currentMonth;
+
+  if (currentDate < 20) {
+    endMonth -= 1;
+    if (endMonth < 0) {
+      endMonth = 11;
+      endYear -= 1;
+    }
+  }
+
+  let startYear = endYear;
+  let startMonth = endMonth - 1;
+  if (startMonth < 0) {
+    startMonth = 11;
+    startYear -= 1;
+  }
+
+  const startStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-20`;
+  const endStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-19`;
+  return { start: startStr, end: endStr };
+}
+
 export default function PayrollPage() {
   const supabase = createClient();
-  const [periodStart, setPeriodStart] = useState('');
-  const [periodEnd, setPeriodEnd] = useState('');
+  const defaultCycle = getDefaultPayrollCycle();
+
+  const [periodStart, setPeriodStart] = useState(defaultCycle.start);
+  const [periodEnd, setPeriodEnd] = useState(defaultCycle.end);
   const [variablePercents, setVariablePercents] = useState({});
   const [rawRows, setRawRows] = useState([]);
   const [results, setResults] = useState([]);
   const [unmatchedCodes, setUnmatchedCodes] = useState([]);
   const [error, setError] = useState('');
   const [savedRun, setSavedRun] = useState(null);
+  const [activeRunId, setActiveRunId] = useState(null);
   const [pastRuns, setPastRuns] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(false);
 
   useEffect(() => {
     loadPastRuns();
+    checkAndLoadExistingRun(defaultCycle.start, defaultCycle.end);
   }, []);
 
   async function loadPastRuns() {
@@ -28,6 +64,85 @@ export default function PayrollPage() {
       .order('id', { ascending: false })
       .limit(10);
     if (!error && data) setPastRuns(data);
+  }
+
+  async function checkAndLoadExistingRun(start, end) {
+    if (!start || !end) return;
+    setLoadingExisting(true);
+    const { data: runs, error } = await supabase
+      .from('payroll_runs')
+      .select('*')
+      .or(`period.eq.${start}_to_${end},and(period_start.eq.${start},period_end.eq.${end})`)
+      .order('id', { ascending: false })
+      .limit(1);
+
+    if (!error && runs && runs.length > 0) {
+      await loadRunById(runs[0].id);
+    } else {
+      setLoadingExisting(false);
+    }
+  }
+
+  async function loadRunById(runId) {
+    setLoadingExisting(true);
+    setError('');
+
+    const { data: run, error: runErr } = await supabase
+      .from('payroll_runs')
+      .select('*')
+      .eq('id', runId)
+      .single();
+
+    if (runErr || !run) {
+      setLoadingExisting(false);
+      return;
+    }
+
+    if (run.period_start) setPeriodStart(run.period_start);
+    if (run.period_end) setPeriodEnd(run.period_end);
+    setActiveRunId(run.id);
+    setSavedRun(run);
+
+    const { data: items, error: itemsErr } = await supabase
+      .from('payroll_line_items')
+      .select('*')
+      .eq('payroll_run_id', runId)
+      .order('id', { ascending: true });
+
+    if (!itemsErr && items) {
+      const { data: emps } = await supabase.from('employees').select('employee_id, name');
+      const empMap = {};
+      (emps || []).forEach(e => { empMap[e.employee_id] = e.name; });
+
+      const loadedResults = items.map(item => ({
+        id: item.id,
+        employee_id: item.employee_id,
+        name: empMap[item.employee_id] || item.employee_id,
+        daysPresent: item.days_present ?? 0,
+        daysAbsent: item.days_absent ?? 0,
+        expectedHours: item.expected_hours ?? 0,
+        totalHours: item.actual_hours ?? 0,
+        effectiveDaysFromHours: item.effective_days ?? 0,
+        offsPaid: item.offs_paid ?? 0,
+        totalPaidDays: item.total_paid_days ?? item.days_present ?? 0,
+        override: item.total_paid_days,
+        perDaySalary: item.per_day_salary ?? 0,
+        fixedSalary: item.fixed_pay ?? 0,
+        fixedPay: item.fixed_pay ?? 0,
+        variableTarget: item.variable_target ?? 0,
+        variablePercent: item.variable_percent ?? 0,
+        variablePay: item.variable_pay ?? 0,
+        bonusPay: item.bonus_pay ?? 0,
+        bonusDescription: item.bonus_description ?? '',
+        deductionAmount: item.deduction_amount ?? 0,
+        deductionReason: item.deduction_reason ?? '',
+        payslip_number: item.payslip_number ?? '',
+        payment_status: item.payment_status ?? 'pending'
+      }));
+
+      setResults(loadedResults);
+    }
+    setLoadingExisting(false);
   }
 
   function handleFile(e) {
@@ -157,7 +272,7 @@ export default function PayrollPage() {
     }));
   }
 
-  async function finalizePayroll() {
+  async function savePayrollRun() {
     setError('');
     setSaving(true);
     const period = `${periodStart}_to_${periodEnd}`;
@@ -167,24 +282,45 @@ export default function PayrollPage() {
       return sum + (r.fixedPay + varAmt + (r.bonusPay || 0) - (r.deductionAmount || 0));
     }, 0);
 
-    const { data: run, error: runError } = await supabase.from('payroll_runs').insert([{
-      period,
-      period_start: periodStart,
-      period_end: periodEnd,
-      status: 'finalized',
-      total_amount: grandTotal,
-      imported_attendance: rawRows,
-      calculation_logic_version: 'v1-confirmed-formula'
-    }]).select().single();
+    let runId = activeRunId;
 
-    if (runError) { setError(runError.message); setSaving(false); return; }
+    if (!runId) {
+      // Create new payroll run
+      const { data: newRun, error: runError } = await supabase.from('payroll_runs').insert([{
+        period,
+        period_start: periodStart,
+        period_end: periodEnd,
+        status: 'finalized',
+        total_amount: grandTotal,
+        imported_attendance: rawRows.length > 0 ? rawRows : null,
+        calculation_logic_version: 'v1-confirmed-formula'
+      }]).select().single();
 
-    const lineItems = results.map(r => {
+      if (runError) { setError(runError.message); setSaving(false); return; }
+      runId = newRun.id;
+      setActiveRunId(runId);
+      setSavedRun(newRun);
+    } else {
+      // Update existing run
+      const { data: updatedRun, error: runError } = await supabase.from('payroll_runs').update({
+        period,
+        period_start: periodStart,
+        period_end: periodEnd,
+        total_amount: grandTotal,
+        status: 'finalized'
+      }).eq('id', runId).select().single();
+
+      if (runError) { setError(runError.message); setSaving(false); return; }
+      setSavedRun(updatedRun);
+    }
+
+    // Save/Upsert line items
+    for (const r of results) {
       const varAmt = Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0));
       const totalPay = r.fixedPay + varAmt + (r.bonusPay || 0) - (r.deductionAmount || 0);
 
-      return {
-        payroll_run_id: run.id,
+      const rowData = {
+        payroll_run_id: runId,
         employee_id: r.employee_id,
         days_present: r.daysPresent,
         days_absent: r.daysAbsent,
@@ -206,15 +342,17 @@ export default function PayrollPage() {
         deductions: (r.fixedSalary - r.fixedPay) + (r.deductionAmount || 0),
         net_pay: totalPay,
         total_pay: totalPay,
-        payment_status: 'pending',
         payslip_number: r.payslip_number
       };
-    });
 
-    const { error: itemsError } = await supabase.from('payroll_line_items').insert(lineItems);
-    if (itemsError) { setError(itemsError.message); setSaving(false); return; }
+      if (r.id) {
+        await supabase.from('payroll_line_items').update(rowData).eq('id', r.id);
+      } else {
+        const { data: inserted } = await supabase.from('payroll_line_items').insert([{ ...rowData, payment_status: 'pending' }]).select().single();
+        if (inserted) r.id = inserted.id;
+      }
+    }
 
-    setSavedRun(run);
     setSaving(false);
     loadPastRuns();
   }
@@ -225,9 +363,9 @@ export default function PayrollPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ margin: '0 0 4px 0' }}>Payroll Calculation</h1>
+          <h1 style={{ margin: '0 0 4px 0' }}>Payroll Calculation & Drafts</h1>
           <p style={{ color: '#666', margin: 0 }}>
-            Calculate monthly salary from Petpooja attendance, adjust variable % / bonuses / deductions, and finalize for payment processing.
+            Calculate monthly salary from Petpooja attendance, customize variable % / bonuses / deductions on the 25th, and save to process payments on the 1st.
           </p>
         </div>
         <a
@@ -247,28 +385,55 @@ export default function PayrollPage() {
         </div>
       )}
 
-      <div style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 500 }}>
-          Period start
-          <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #ccc' }} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 500 }}>
-          Period end
-          <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #ccc' }} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 500 }}>
-          Petpooja attendance file
-          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFile} style={{ padding: '4px 0' }} />
-        </label>
-        <button
-          onClick={runCalculation}
-          style={{
-            alignSelf: 'flex-end', background: '#1f2937', color: 'white', border: 'none',
-            padding: '8px 18px', borderRadius: 6, cursor: 'pointer', fontWeight: 600
-          }}
-        >
-          Calculate
-        </button>
+      {/* Date Cycle & Upload Bar */}
+      <div style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 500 }}>
+            Period start (Auto-prefilled: 20th)
+            <input
+              type="date"
+              value={periodStart}
+              onChange={e => { setPeriodStart(e.target.value); checkAndLoadExistingRun(e.target.value, periodEnd); }}
+              style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #ccc' }}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 500 }}>
+            Period end (Auto-prefilled: 19th)
+            <input
+              type="date"
+              value={periodEnd}
+              onChange={e => { setPeriodEnd(e.target.value); checkAndLoadExistingRun(periodStart, e.target.value); }}
+              style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #ccc' }}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontWeight: 500 }}>
+            Petpooja attendance file
+            <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFile} style={{ padding: '4px 0' }} />
+          </label>
+          <button
+            onClick={runCalculation}
+            style={{
+              alignSelf: 'flex-end', background: '#1f2937', color: 'white', border: 'none',
+              padding: '8px 18px', borderRadius: 6, cursor: 'pointer', fontWeight: 600
+            }}
+          >
+            {results.length > 0 ? '🔄 Re-Calculate' : 'Calculate from File'}
+          </button>
+        </div>
+
+        {activeRunId && (
+          <div style={{ marginTop: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: 6, fontSize: 13, color: '#15803d', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>
+              📄 <strong>Loaded Saved Payroll Run #{activeRunId}</strong> for this period. You can edit bonuses/deductions below and save anytime before payment on the 1st.
+            </span>
+            <button
+              onClick={() => { setActiveRunId(null); setResults([]); }}
+              style={{ background: 'transparent', border: 'none', color: '#6b7280', textDecoration: 'underline', cursor: 'pointer', fontSize: 12 }}
+            >
+              Clear & Start Fresh
+            </button>
+          </div>
+        )}
       </div>
 
       {unmatchedCodes.length > 0 && (
@@ -280,12 +445,16 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {results.length > 0 && (
+      {loadingExisting ? (
+        <div style={{ background: 'white', padding: 40, textAlign: 'center', borderRadius: 8, color: '#6b7280' }}>
+          Checking for saved payroll data...
+        </div>
+      ) : results.length > 0 ? (
         <div style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <h2 style={{ margin: 0, fontSize: 18 }}>Calculated Payroll Summary ({results.length} Employees)</h2>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Payroll Summary ({results.length} Employees)</h2>
             <div style={{ fontSize: 16, fontWeight: 'bold', color: '#1f2937' }}>
-              Estimated Grand Total: <span style={{ color: '#059669' }}>₹{grandTotal.toLocaleString('en-IN')}</span>
+              Grand Total: <span style={{ color: '#059669' }}>₹{grandTotal.toLocaleString('en-IN')}</span>
             </div>
           </div>
 
@@ -360,26 +529,26 @@ export default function PayrollPage() {
 
           <div style={{ marginTop: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <button
-              onClick={finalizePayroll}
+              onClick={savePayrollRun}
               disabled={saving}
               style={{
                 background: '#059669', color: 'white', border: 'none', padding: '10px 24px',
                 borderRadius: 6, cursor: 'pointer', fontWeight: 'bold', fontSize: 14
               }}
             >
-              {saving ? 'Finalizing...' : '✓ Finalize & Lock Payroll'}
+              {saving ? 'Saving...' : activeRunId ? '💾 Save Updates to Payroll Run' : '💾 Save & Finalize Payroll'}
             </button>
             <span style={{ fontSize: 13, color: '#666' }}>
-              Finalizing saves all calculations and pre-generates payslip numbers for payment processing.
+              Saves all variable %, bonuses, deductions, and pre-generates payslip numbers. All data stays saved for payment processing on the 1st.
             </span>
           </div>
 
           {savedRun && (
             <div style={{ marginTop: 16, background: '#ecfdf5', border: '1px solid #10b981', padding: 16, borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <strong style={{ color: '#065f46', fontSize: 15 }}>✅ Payroll Run #{savedRun.id} Finalized Successfully!</strong>
+                <strong style={{ color: '#065f46', fontSize: 15 }}>✅ Payroll Run #{savedRun.id} Saved Successfully!</strong>
                 <p style={{ margin: '4px 0 0 0', color: '#047857', fontSize: 13 }}>
-                  Period: {savedRun.period} • Total Amount: ₹{(savedRun.total_amount || grandTotal).toLocaleString('en-IN')} • {results.length} Employees saved with pre-generated payslip IDs.
+                  Period: {savedRun.period} • Total Amount: ₹{(savedRun.total_amount || grandTotal).toLocaleString('en-IN')} • {results.length} Employees saved.
                 </p>
               </div>
               <a
@@ -394,20 +563,20 @@ export default function PayrollPage() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
       {pastRuns.length > 0 && (
         <div style={{ background: 'white', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginTop: 24 }}>
-          <h2 style={{ fontSize: 16, margin: '0 0 12px 0' }}>Recent Finalized Payroll Runs</h2>
+          <h2 style={{ fontSize: 16, margin: '0 0 12px 0' }}>Past Payroll Runs</h2>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '2px solid #eee' }}>
                 <th style={{ padding: 6 }}>Run ID</th>
                 <th>Period</th>
-                <th>Finalized On</th>
+                <th>Saved Date</th>
                 <th>Total Amount</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -422,12 +591,18 @@ export default function PayrollPage() {
                       {run.status || 'finalized'}
                     </span>
                   </td>
-                  <td>
+                  <td style={{ display: 'flex', gap: 12 }}>
+                    <button
+                      onClick={() => loadRunById(run.id)}
+                      style={{ background: 'none', border: 'none', color: '#4f46e5', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                    >
+                      ✏️ Edit Run
+                    </button>
                     <a
                       href={`/payroll/processing?runId=${run.id}`}
-                      style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}
+                      style={{ color: '#059669', fontWeight: 600, textDecoration: 'none' }}
                     >
-                      Process Payments →
+                      💳 Process Payments →
                     </a>
                   </td>
                 </tr>

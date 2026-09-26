@@ -3,6 +3,12 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../../lib/supabaseClient';
 
+function getBankNarration(payslipNumber, employeeName) {
+  const cleanPayslip = String(payslipNumber || '').replace(/[^a-zA-Z0-9]/g, '');
+  const firstName = String(employeeName || '').trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9]/g, '');
+  return `${cleanPayslip}${firstName}`;
+}
+
 function SalaryProcessingContent() {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -446,17 +452,25 @@ function SalaryProcessingContent() {
 
                   {/* Right side of row header: Payslip ID, Amount, Chevron */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginLeft: 12 }}>
-                    {/* Payslip Number badge */}
-                    <div
-                      onClick={e => { e.stopPropagation(); copyToClipboard(item.payslip_number, `header-ps-${item.id}`); }}
-                      title="Click to copy Payslip Number"
-                      style={{
-                        background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: 4,
-                        fontSize: 12, fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer'
-                      }}
-                    >
-                      📄 {item.payslip_number}
-                      <span style={{ fontSize: 10 }}>{copiedField === `header-ps-${item.id}` ? '✓ Copied' : '📋'}</span>
+                    {/* Payslip & Bank Narration badge */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <div
+                        onClick={e => {
+                          e.stopPropagation();
+                          const narration = getBankNarration(item.payslip_number, emp.name);
+                          copyToClipboard(narration, `header-ps-${item.id}`);
+                        }}
+                        title="Click to copy Bank Narration (e.g. ATLEMP00023Manai)"
+                        style={{
+                          background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: 4,
+                          fontSize: 12, fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+                          fontFamily: 'monospace'
+                        }}
+                      >
+                        📄 {getBankNarration(item.payslip_number, emp.name)}
+                        <span style={{ fontSize: 10 }}>{copiedField === `header-ps-${item.id}` ? '✓ Copied' : '📋'}</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: '#64748b' }}>Payslip: {item.payslip_number}</span>
                     </div>
 
                     {/* Amount Due */}
@@ -540,19 +554,24 @@ function SalaryProcessingContent() {
 
                       {/* Payslip Number for Narration */}
                       <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                        <div style={{ fontSize: 12, color: '#475569' }}>
-                          Bank Transfer Narration / Remark:
-                          <strong style={{ color: '#0369a1', marginLeft: 6, fontSize: 13 }}>{item.payslip_number}</strong>
+                        <div style={{ fontSize: 13, color: '#334155' }}>
+                          Bank Narration / Remarks (no special characters):
+                          <strong style={{ color: '#0369a1', marginLeft: 6, fontSize: 14, fontFamily: 'monospace', letterSpacing: 0.5 }}>
+                            {getBankNarration(item.payslip_number, emp.name)}
+                          </strong>
                         </div>
                         <button
                           type="button"
-                          onClick={() => copyToClipboard(item.payslip_number, `narration-${item.id}`)}
+                          onClick={() => {
+                            const narration = getBankNarration(item.payslip_number, emp.name);
+                            copyToClipboard(narration, `narration-${item.id}`);
+                          }}
                           style={{
                             background: '#0284c7', color: 'white', border: 'none', borderRadius: 4,
-                            padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer'
+                            padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4
                           }}
                         >
-                          {copiedField === `narration-${item.id}` ? '✓ Copied Remark' : '📋 Copy Payslip Number for Bank'}
+                          {copiedField === `narration-${item.id}` ? '✓ Copied Narration' : '📋 Copy Narration for Bank'}
                         </button>
                       </div>
                     </div>
