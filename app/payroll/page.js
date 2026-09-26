@@ -461,8 +461,27 @@ export default function PayrollPage() {
       if (r.id) {
         await supabase.from('payroll_line_items').update(rowData).eq('id', r.id);
       } else {
-        const { data: inserted } = await supabase.from('payroll_line_items').insert([{ ...rowData, payment_status: 'pending' }]).select().single();
-        if (inserted) r.id = inserted.id;
+        // Prevent duplicate insertion by checking if a line item already exists for this employee in this run
+        const { data: existing } = await supabase
+          .from('payroll_line_items')
+          .select('id, payment_status, salary_paid_date, bank_reference_number, payslip_number')
+          .eq('payroll_run_id', runId)
+          .eq('employee_id', r.employee_id)
+          .maybeSingle();
+
+        if (existing) {
+          r.id = existing.id;
+          await supabase.from('payroll_line_items').update({
+            ...rowData,
+            payment_status: existing.payment_status || 'pending',
+            salary_paid_date: existing.salary_paid_date || null,
+            bank_reference_number: existing.bank_reference_number || null,
+            payslip_number: existing.payslip_number || r.payslip_number
+          }).eq('id', existing.id);
+        } else {
+          const { data: inserted } = await supabase.from('payroll_line_items').insert([{ ...rowData, payment_status: 'pending' }]).select().single();
+          if (inserted) r.id = inserted.id;
+        }
       }
     }
 
