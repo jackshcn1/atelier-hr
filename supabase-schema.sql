@@ -106,8 +106,10 @@ create table payroll_runs (
   period text not null, -- e.g. '2026-09'
   period_start date,
   period_end date,
+  run_type text default 'regular' check (run_type in ('regular', 'adhoc', 'exit')),
   status text default 'finalized',
   total_amount numeric,
+  notes text,
   imported_attendance jsonb,
   calculation_logic_version text,
   generated_on timestamptz default now()
@@ -133,6 +135,8 @@ create table payroll_line_items (
   bonus_description text,
   deduction_amount numeric default 0,
   deduction_reason text,
+  prior_payouts_deduction numeric default 0,
+  prior_payouts_notes text,
   gross_pay numeric,
   deductions numeric,
   net_pay numeric,

@@ -593,8 +593,14 @@ function SalaryProcessingContent() {
                         <div><span style={{ color: '#64748b' }}>Variable ({item.variable_percent || 0}%):</span> <strong>₹{(item.variable_pay || 0).toLocaleString('en-IN')}</strong></div>
                         <div><span style={{ color: '#64748b' }}>Bonus:</span> <strong>₹{(item.bonus_pay || 0).toLocaleString('en-IN')}</strong> {item.bonus_description && `(${item.bonus_description})`}</div>
                         <div><span style={{ color: '#64748b' }}>Deductions:</span> <strong style={{ color: '#dc2626' }}>-₹{(item.deduction_amount || 0).toLocaleString('en-IN')}</strong> {item.deduction_reason && `(${item.deduction_reason})`}</div>
+                        {item.prior_payouts_deduction > 0 && (
+                          <div style={{ gridColumn: 'span 2', color: '#b91c1c', background: '#fef2f2', padding: '4px 8px', borderRadius: 4 }}>
+                            <span>Less Mid-term Payouts:</span> <strong>-₹{Number(item.prior_payouts_deduction).toLocaleString('en-IN')}</strong>
+                            {item.prior_payouts_notes && <span style={{ fontSize: 11, marginLeft: 6, color: '#7f1d1d' }}>({item.prior_payouts_notes})</span>}
+                          </div>
+                        )}
                         <div style={{ fontSize: 13, color: '#059669', gridColumn: 'span 2' }}>
-                          <span>Total Payout Due:</span> <strong style={{ fontSize: 15 }}>₹{dueAmount.toLocaleString('en-IN')}</strong>
+                          <span>Final Net Payout Due:</span> <strong style={{ fontSize: 16 }}>₹{dueAmount.toLocaleString('en-IN')}</strong>
                         </div>
                       </div>
                     </div>
