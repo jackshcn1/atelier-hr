@@ -21,6 +21,7 @@ export default function RootLayout({ children }) {
           <a href="/settings/document-templates" style={{ color: 'white', textDecoration: 'none' }}>Doc Templates</a>
           <a href="/export" style={{ color: 'white', textDecoration: 'none' }}>Export</a>
           <a href="/payroll" style={{ color: 'white', textDecoration: 'none' }}>Payroll</a>
+          <a href="/payroll/processing" style={{ color: '#93c5fd', textDecoration: 'none', fontWeight: 500 }}>Salary Processing</a>
           <a href="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Log in</a>
           <LogoutButton />
         </nav>

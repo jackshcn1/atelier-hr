@@ -104,6 +104,10 @@ create table training_records (
 create table payroll_runs (
   id bigint generated always as identity primary key,
   period text not null, -- e.g. '2026-09'
+  period_start date,
+  period_end date,
+  status text default 'finalized',
+  total_amount numeric,
   imported_attendance jsonb,
   calculation_logic_version text,
   generated_on timestamptz default now()
@@ -114,9 +118,31 @@ create table payroll_line_items (
   payroll_run_id bigint references payroll_runs(id) on delete cascade,
   employee_id text references employees(employee_id) on update cascade,
   days_present numeric,
+  days_absent numeric,
+  expected_hours numeric,
+  actual_hours numeric,
+  effective_days numeric,
+  offs_paid numeric,
+  total_paid_days numeric,
+  per_day_salary numeric,
+  fixed_pay numeric,
+  variable_target numeric,
+  variable_percent numeric,
+  variable_pay numeric default 0,
+  bonus_pay numeric default 0,
+  bonus_description text,
+  deduction_amount numeric default 0,
+  deduction_reason text,
   gross_pay numeric,
   deductions numeric,
-  net_pay numeric
+  net_pay numeric,
+  total_pay numeric,
+  payment_status text default 'pending' check (payment_status in ('pending', 'processed')),
+  salary_paid_date date,
+  bank_reference_number text,
+  payslip_number text,
+  processed_at timestamptz,
+  processed_by text
 );
 
 -- 9. Exit records ---------------------------------------------------------
