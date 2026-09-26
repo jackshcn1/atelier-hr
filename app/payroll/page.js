@@ -470,6 +470,35 @@ export default function PayrollPage() {
     loadPastRuns();
   }
 
+  async function deletePayrollRun(run) {
+    const isAdhoc = run.run_type === 'adhoc';
+    const periodLabel = run.period_start && run.period_end ? `${run.period_start} to ${run.period_end}` : run.period;
+    const confirmMsg = `Are you sure you want to delete ${isAdhoc ? 'Ad-hoc Payout' : 'Payroll Run'} #${run.id} (${periodLabel})?\n\nThis will permanently delete this run and all employee line items for this run.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setError('');
+    const { error: delErr } = await supabase.from('payroll_runs').delete().eq('id', run.id);
+    if (delErr) {
+      setError(`Failed to delete payroll run: ${delErr.message}`);
+      return;
+    }
+
+    const user = (await supabase.auth.getUser()).data.user?.email || 'admin';
+    await supabase.from('audit_log').insert([{
+      actor: user,
+      action: 'deleted payroll run',
+      record_affected: `Payroll Run #${run.id} (${periodLabel}, ${run.run_type || 'regular'}, ₹${run.total_amount || 0})`
+    }]);
+
+    if (activeRunId === run.id) {
+      setActiveRunId(null);
+      setSavedRun(null);
+      setResults([]);
+    }
+
+    loadPastRuns();
+  }
+
   const grandTotal = results.reduce((sum, r) => {
     const varAmt = Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0));
     return sum + (r.fixedPay + varAmt + (r.bonusPay || 0) - (r.deductionAmount || 0) - (r.priorPayoutsDeduction || 0));
@@ -842,7 +871,7 @@ export default function PayrollPage() {
                       {run.status || 'finalized'}
                     </span>
                   </td>
-                  <td style={{ display: 'flex', gap: 12 }}>
+                  <td style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <button
                       onClick={() => loadRunById(run.id)}
                       style={{ background: 'none', border: 'none', color: '#4f46e5', fontWeight: 600, cursor: 'pointer', padding: 0 }}
@@ -855,6 +884,13 @@ export default function PayrollPage() {
                     >
                       💳 Pay →
                     </a>
+                    <button
+                      onClick={() => deletePayrollRun(run)}
+                      style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                      title="Delete this payroll run"
+                    >
+                      🗑️ Delete
+                    </button>
                   </td>
                 </tr>
               ))}
