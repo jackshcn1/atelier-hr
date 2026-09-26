@@ -82,6 +82,7 @@ export default function PayrollPage() {
         employee_id: emp.employee_id, name: emp.name, fixedSalary,
         ...calc, variablePay: Math.round((variablePercents[code] || 0) / 100 * variableTarget) || 0,
         variableTarget, variablePercent: variablePercents[code] || 0,
+        bonusPay: 0, bonusDescription: '',
         override: null, joinedDuringPeriod
       });
     }
@@ -94,8 +95,15 @@ export default function PayrollPage() {
   function updateVariablePay(employeeId, percentValue) {
     const pct = Number(percentValue) || 0;
     setVariablePercents({ ...variablePercents, [employeeId]: pct });
-    // Store % for display and $ for calculation
     setResults(results.map(r => r.employee_id === employeeId ? { ...r, variablePercent: pct, variablePay: Math.round((pct / 100) * (r.variableTarget || 0)) } : r));
+  }
+
+  function updateBonusPay(employeeId, value) {
+    setResults(results.map(r => r.employee_id === employeeId ? { ...r, bonusPay: Number(value) || 0 } : r));
+  }
+
+  function updateBonusDescription(employeeId, value) {
+    setResults(results.map(r => r.employee_id === employeeId ? { ...r, bonusDescription: value } : r));
   }
 
   function overrideTotalPaidDays(employeeId, value, totalDays) {
@@ -119,9 +127,9 @@ export default function PayrollPage() {
       payroll_run_id: run.id,
       employee_id: r.employee_id,
       days_present: r.override ?? r.totalPaidDays,
-      gross_pay: r.fixedPay + r.variablePay,
+      gross_pay: r.fixedPay + Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)) + (r.bonusPay || 0),
       deductions: r.fixedSalary - r.fixedPay,
-      net_pay: r.fixedPay + r.variablePay
+      net_pay: r.fixedPay + Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)) + (r.bonusPay || 0)
     }));
     const { error: itemsError } = await supabase.from('payroll_line_items').insert(lineItems);
     if (itemsError) { setError(itemsError.message); return; }
@@ -156,9 +164,9 @@ export default function PayrollPage() {
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd' }}>
                 <th style={{ padding: 6 }}>Name</th>
-                <th>Present</th><th>Absent</th><th>Hours</th><th>Eff. days</th>
+                <th>Present</th><th>Absent</th><th>Exp. hours</th><th>Actual hours</th><th>Eff. days</th>
                 <th>Offs paid</th><th>Total paid days</th><th>Per-day ₹</th>
-                <th>Fixed pay</th><th>Var %</th><th>Var $$</th><th>Total pay</th>
+                <th>Fixed pay</th><th>Var %</th><th>Var ₹</th><th>Bonus ₹</th><th>Bonus description</th><th>Total pay</th>
               </tr>
             </thead>
             <tbody>
@@ -167,6 +175,7 @@ export default function PayrollPage() {
                   <td style={{ padding: 6 }}>{r.name}{r.joinedDuringPeriod && ' ⚠ new joinee — check manually'}</td>
                   <td>{r.daysPresent}</td>
                   <td>{r.daysAbsent}</td>
+                  <td>{r.expectedHours}</td>
                   <td>{r.totalHours}</td>
                   <td>{r.effectiveDaysFromHours}</td>
                   <td>{r.offsPaid}</td>
@@ -179,7 +188,11 @@ export default function PayrollPage() {
                   <td><input type="number" style={{ width: 60 }} value={r.variablePercent || 0}
                     onChange={e => updateVariablePay(r.employee_id, Number(e.target.value))} />%</td>
                   <td>₹{Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0))}</td>
-                  <td><strong>₹{r.fixedPay + (Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)))}</strong></td>
+                  <td><input type="number" style={{ width: 80 }} value={r.bonusPay || 0}
+                    onChange={e => updateBonusPay(r.employee_id, e.target.value)} /></td>
+                  <td><input type="text" style={{ width: 120 }} value={r.bonusDescription || ''}
+                    onChange={e => updateBonusDescription(r.employee_id, e.target.value)} placeholder="e.g. Festival bonus" /></td>
+                  <td><strong>₹{r.fixedPay + (Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0))) + (r.bonusPay || 0)}</strong></td>
                 </tr>
               ))}
             </tbody>
