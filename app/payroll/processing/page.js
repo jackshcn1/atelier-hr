@@ -653,22 +653,43 @@ function SalaryProcessingContent() {
                         </button>
 
                         {isProcessed && (
-                          <button
-                            type="button"
-                            onClick={() => handleRevertToPending(item)}
-                            disabled={processingId === item.id}
-                            style={{
-                              background: 'transparent',
-                              color: '#6b7280',
-                              border: '1px solid #d1d5db',
-                              padding: '8px 12px',
-                              borderRadius: 6,
-                              cursor: 'pointer',
-                              fontSize: 12
-                            }}
-                          >
-                            Reset to Pending
-                          </button>
+                          <>
+                            <a
+                              href={`/payslips/${encodeURIComponent(item.payslip_number || item.id)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                background: '#10b981',
+                                color: 'white',
+                                padding: '8px 16px',
+                                borderRadius: 6,
+                                textDecoration: 'none',
+                                fontWeight: 'bold',
+                                fontSize: 13,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4
+                              }}
+                            >
+                              📄 View Payslip
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleRevertToPending(item)}
+                              disabled={processingId === item.id}
+                              style={{
+                                background: 'transparent',
+                                color: '#6b7280',
+                                border: '1px solid #d1d5db',
+                                padding: '8px 12px',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                fontSize: 12
+                              }}
+                            >
+                              Reset to Pending
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>

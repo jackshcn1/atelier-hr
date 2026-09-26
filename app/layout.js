@@ -22,6 +22,7 @@ export default function RootLayout({ children }) {
           <a href="/export" style={{ color: 'white', textDecoration: 'none' }}>Export</a>
           <a href="/payroll" style={{ color: 'white', textDecoration: 'none' }}>Payroll</a>
           <a href="/payroll/processing" style={{ color: '#93c5fd', textDecoration: 'none', fontWeight: 500 }}>Salary Processing</a>
+          <a href="/payslips" style={{ color: '#6ee7b7', textDecoration: 'none', fontWeight: 500 }}>Payslips</a>
           <a href="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Log in</a>
           <LogoutButton />
         </nav>

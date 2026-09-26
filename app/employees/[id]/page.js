@@ -30,6 +30,7 @@ export default function EmployeeDetail() {
   const [newAsset, setNewAsset] = useState('');
   const [uniformReturned, setUniformReturned] = useState(false);
   const [documents, setDocuments] = useState([]);
+  const [employeePayslips, setEmployeePayslips] = useState([]);
   const [docTemplates, setDocTemplates] = useState([]);
   const [newDocType, setNewDocType] = useState('');
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -115,6 +116,13 @@ export default function EmployeeDetail() {
     }
     const { data: training } = await supabase.from('training_records').select('*').eq('employee_id', id);
     setTrainingRecords(training || []);
+    const { data: slips } = await supabase
+      .from('payroll_line_items')
+      .select('id, payslip_number, payroll_run_id, salary_paid_date, total_pay, net_pay, payment_status, bank_reference_number, payroll_runs(period, period_start, period_end)')
+      .eq('employee_id', id)
+      .not('payslip_number', 'is', null)
+      .order('id', { ascending: false });
+    setEmployeePayslips(slips || []);
   }
 
   useEffect(() => { load(); }, [id]);
@@ -500,6 +508,55 @@ export default function EmployeeDetail() {
             {renaming ? 'Updating…' : 'Update Employee ID'}
           </button>
         </div>
+      </section>
+
+      <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
+        <h2>Salary Payslips</h2>
+        {employeePayslips.length === 0 ? (
+          <p style={{ color: '#777', fontSize: 14 }}>No payslips generated yet for this employee.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 10 }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid #eee' }}>
+                  <th style={{ padding: 6 }}>Payslip ID</th>
+                  <th>Period</th>
+                  <th>Payment Date</th>
+                  <th>Net Paid</th>
+                  <th>Bank Ref (UTR)</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {employeePayslips.map(ps => {
+                  const run = ps.payroll_runs;
+                  const periodText = run?.period_start && run?.period_end ? `${run.period_start} to ${run.period_end}` : run?.period || '—';
+                  const isPaid = ps.payment_status === 'processed';
+                  return (
+                    <tr key={ps.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: 6, fontFamily: 'monospace', fontWeight: 'bold', color: '#0369a1' }}>{ps.payslip_number}</td>
+                      <td>{periodText}</td>
+                      <td>{ps.salary_paid_date || '—'}</td>
+                      <td style={{ fontWeight: 'bold', color: '#059669' }}>₹{Number(ps.total_pay || ps.net_pay || 0).toLocaleString('en-IN')}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{ps.bank_reference_number || '—'}</td>
+                      <td>
+                        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 'bold', background: isPaid ? '#dcfce7' : '#fef3c7', color: isPaid ? '#15803d' : '#b45309' }}>
+                          {isPaid ? '✓ Paid' : '⏳ Pending'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <a href={`/payslips/${encodeURIComponent(ps.payslip_number || ps.id)}`} target="_blank" rel="noreferrer" style={{ color: '#059669', fontWeight: 600, textDecoration: 'none' }}>
+                          📄 View / Print PDF →
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
