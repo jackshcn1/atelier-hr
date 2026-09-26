@@ -83,6 +83,7 @@ export default function PayrollPage() {
         ...calc, variablePay: Math.round((variablePercents[code] || 0) / 100 * variableTarget) || 0,
         variableTarget, variablePercent: variablePercents[code] || 0,
         bonusPay: 0, bonusDescription: '',
+        deductionAmount: 0, deductionReason: '',
         override: null, joinedDuringPeriod
       });
     }
@@ -106,6 +107,14 @@ export default function PayrollPage() {
     setResults(results.map(r => r.employee_id === employeeId ? { ...r, bonusDescription: value } : r));
   }
 
+  function updateDeductionAmount(employeeId, value) {
+    setResults(results.map(r => r.employee_id === employeeId ? { ...r, deductionAmount: Number(value) || 0 } : r));
+  }
+
+  function updateDeductionReason(employeeId, value) {
+    setResults(results.map(r => r.employee_id === employeeId ? { ...r, deductionReason: value } : r));
+  }
+
   function overrideTotalPaidDays(employeeId, value, totalDays) {
     setResults(results.map(r => {
       if (r.employee_id !== employeeId) return r;
@@ -127,9 +136,9 @@ export default function PayrollPage() {
       payroll_run_id: run.id,
       employee_id: r.employee_id,
       days_present: r.override ?? r.totalPaidDays,
-      gross_pay: r.fixedPay + Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)) + (r.bonusPay || 0),
+      gross_pay: r.fixedPay + Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)) + (r.bonusPay || 0) - (r.deductionAmount || 0),
       deductions: r.fixedSalary - r.fixedPay,
-      net_pay: r.fixedPay + Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)) + (r.bonusPay || 0)
+      net_pay: r.fixedPay + Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)) + (r.bonusPay || 0) - (r.deductionAmount || 0)
     }));
     const { error: itemsError } = await supabase.from('payroll_line_items').insert(lineItems);
     if (itemsError) { setError(itemsError.message); return; }
@@ -166,7 +175,8 @@ export default function PayrollPage() {
                 <th style={{ padding: 6 }}>Name</th>
                 <th>Present</th><th>Absent</th><th>Exp. hours</th><th>Actual hours</th><th>Eff. days</th>
                 <th>Offs paid</th><th>Total paid days</th><th>Per-day ₹</th>
-                <th>Fixed pay</th><th>Var %</th><th>Var ₹</th><th>Bonus ₹</th><th>Bonus description</th><th>Total pay</th>
+                <th>Fixed pay</th><th>Var %</th><th>Var ₹</th><th>Bonus ₹</th><th>Bonus description</th>
+                <th>Deduction ₹</th><th>Deduction reason</th><th>Total pay</th>
               </tr>
             </thead>
             <tbody>
@@ -192,10 +202,20 @@ export default function PayrollPage() {
                     onChange={e => updateBonusPay(r.employee_id, e.target.value)} /></td>
                   <td><input type="text" style={{ width: 120 }} value={r.bonusDescription || ''}
                     onChange={e => updateBonusDescription(r.employee_id, e.target.value)} placeholder="e.g. Festival bonus" /></td>
-                  <td><strong>₹{r.fixedPay + (Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0))) + (r.bonusPay || 0)}</strong></td>
+                  <td><input type="number" style={{ width: 80 }} value={r.deductionAmount || 0}
+                    onChange={e => updateDeductionAmount(r.employee_id, e.target.value)} /></td>
+                  <td><input type="text" style={{ width: 120 }} value={r.deductionReason || ''}
+                    onChange={e => updateDeductionReason(r.employee_id, e.target.value)} placeholder="e.g. Breakage" /></td>
+                  <td><strong>₹{r.fixedPay + (Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0))) + (r.bonusPay || 0) - (r.deductionAmount || 0)}</strong></td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #333', background: '#f5f5f5', fontWeight: 'bold' }}>
+                <td style={{ padding: 6 }} colSpan="16">TOTAL</td>
+                <td><strong>₹{results.reduce((sum, r) => sum + (r.fixedPay + Math.round((r.variablePercent || 0) / 100 * (r.variableTarget || 0)) + (r.bonusPay || 0) - (r.deductionAmount || 0)), 0)}</strong></td>
+              </tr>
+            </tfoot>
           </table>
           <p style={{ color: '#777', marginTop: 8 }}>
             You can override "Total paid days" directly for any correction — the fixed pay recalculates immediately.
