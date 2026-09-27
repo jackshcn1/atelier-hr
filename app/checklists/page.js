@@ -134,8 +134,21 @@ function ChecklistsHubContent() {
 
   // Historical completed/missed runs
   const historyRuns = useMemo(() => {
-    return runs.filter(r => ['completed', 'missed'].includes(r.status));
-  }, [runs]);
+    return runs.filter(r => {
+      if (!['completed', 'missed'].includes(r.status)) return false;
+
+      // If user is regular employee, filter to their assigned scope or department
+      if (!isManager && currentEmployee) {
+        const tmpl = r.checklist_templates;
+        if (tmpl) {
+          if (tmpl.assigned_type === 'individual' && tmpl.assigned_employee_id !== currentEmployee.employee_id) return false;
+          if (tmpl.assigned_type === 'group' && Array.isArray(tmpl.assigned_employee_ids) && !tmpl.assigned_employee_ids.includes(currentEmployee.employee_id)) return false;
+          if (tmpl.assigned_type === 'department' && tmpl.assigned_department && tmpl.assigned_department !== currentEmployee.department) return false;
+        }
+      }
+      return true;
+    });
+  }, [runs, isManager, currentEmployee]);
 
   // Overdue count for alert banner
   const overdueRuns = useMemo(() => {
