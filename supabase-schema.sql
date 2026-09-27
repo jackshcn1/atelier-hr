@@ -38,7 +38,7 @@ create table employees (
   pf_applicable boolean default false,
   esi_applicable boolean default false,
   accommodation_provided boolean default false,
-  uniform_issued text,
+  uniform_deposit_applicable text,
   current_fixed_salary numeric default 0,
   current_variable_salary numeric default 0,
   leave_balance numeric,

@@ -35,8 +35,11 @@ export default function EmployeesPage() {
   async function handleAdd(e) {
     e.preventDefault();
     setError('');
-    const { uniform_deposit_applicable, ...employeeFields } = form;
-    const payload = { ...employeeFields, reporting_manager_id: form.reporting_manager_id || null };
+    const payload = {
+      ...form,
+      reporting_manager_id: form.reporting_manager_id || null,
+      uniform_deposit_applicable: form.uniform_deposit_applicable ? 'true' : 'false'
+    };
     const { error } = await supabase.from('employees').insert([payload]);
     if (error) { setError(error.message); return; }
 
