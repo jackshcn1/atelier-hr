@@ -1,8 +1,37 @@
+'use client';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '../lib/supabaseClient';
+
 export default function Home() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function routeUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profile?.role === 'admin') {
+        router.push('/payroll');
+      } else {
+        router.push('/my-payslips');
+      }
+    }
+    routeUser();
+  }, []);
+
   return (
-    <div>
-      <h1>Welcome to Atelier HR</h1>
-      <p>Use the menu above to view employees or the org chart. Log in first if you haven't.</p>
+    <div style={{ padding: 60, textAlign: 'center', color: '#6b7280' }}>
+      Loading Atelier HR...
     </div>
   );
 }

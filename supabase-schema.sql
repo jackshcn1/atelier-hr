@@ -338,7 +338,27 @@ create policy "doc_templates_write" on doc_templates for all using (is_admin());
 
 -- Payroll and exit records: admin only (sensitive company-wide data)
 create policy "payroll_runs_admin" on payroll_runs for all using (is_admin());
+create policy "payroll_runs_employee_select" on payroll_runs for select
+  using (
+    is_admin() or
+    exists (
+      select 1 from payroll_line_items pli
+      join employees e on e.employee_id = pli.employee_id
+      where pli.payroll_run_id = payroll_runs.id
+      and (lower(e.email) = lower(auth.jwt() ->> 'email') or e.phone = auth.jwt() ->> 'phone')
+    )
+  );
+
 create policy "payroll_line_items_admin" on payroll_line_items for all using (is_admin());
+create policy "payroll_line_items_employee_select" on payroll_line_items for select
+  using (
+    is_admin() or
+    exists (
+      select 1 from employees e
+      where e.employee_id = payroll_line_items.employee_id
+      and (lower(e.email) = lower(auth.jwt() ->> 'email') or e.phone = auth.jwt() ->> 'phone')
+    )
+  );
 create policy "exit_records_admin" on exit_records for all using (is_admin());
 
 -- Profiles: you can read your own profile; admins can read/manage all
@@ -368,6 +388,7 @@ create policy "audit_log_admin" on audit_log for all using (is_admin());
 
 -- Payroll settings: admin only
 create policy "payroll_settings_admin" on payroll_settings for all using (is_admin());
+create policy "payroll_settings_read_all" on payroll_settings for select using (auth.role() = 'authenticated');
 
 -- Employee sensitive info: admin only, no department exception
 create policy "employee_sensitive_info_admin" on employee_sensitive_info for all using (is_admin());
