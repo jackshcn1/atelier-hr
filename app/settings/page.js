@@ -67,8 +67,46 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1>Settings</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ margin: '0 0 4px 0' }}>Company Settings</h1>
+          <p style={{ color: '#666', margin: 0 }}>Manage user access permissions, payroll split formulas, deposits, and company policies.</p>
+        </div>
+      </div>
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
+
+      {/* Quick Navigation Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 24, maxWidth: 800 }}>
+        <a
+          href="/settings/users"
+          style={{
+            background: 'white', padding: 16, borderRadius: 8, border: '1px solid #c084fc', textDecoration: 'none',
+            boxShadow: '0 2px 6px rgba(124, 58, 237, 0.08)', display: 'block'
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 'bold', color: '#7c3aed', marginBottom: 4 }}>
+            👥 User & Access Management →
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
+            Assign custom permission toggles, department scopes, manage role presets, and handle access revocations.
+          </p>
+        </a>
+
+        <a
+          href="/settings/document-templates"
+          style={{
+            background: 'white', padding: 16, borderRadius: 8, border: '1px solid #e5e7eb', textDecoration: 'none',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'block'
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 'bold', color: '#1f2937', marginBottom: 4 }}>
+            📄 Document Templates →
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
+            Manage per-department onboarding document packets and checklist templates.
+          </p>
+        </a>
+      </div>
 
       <h2>Payroll split</h2>
       <p style={{ color: '#777', maxWidth: 560 }}>

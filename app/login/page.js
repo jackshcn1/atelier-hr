@@ -22,6 +22,11 @@ export default function LoginPage() {
   const [adminPassword, setAdminPassword] = useState('');
   const [loggingInAdmin, setLoggingInAdmin] = useState(false);
 
+  // Forgot Password state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [sendingReset, setSendingReset] = useState(false);
+
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -82,11 +87,17 @@ export default function LoginPage() {
       // Check if user is an admin or employee to route accordingly
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_super_admin, permissions, access_status')
         .eq('id', data.user.id)
         .maybeSingle();
 
-      if (profile?.role === 'admin') {
+      if (profile?.access_status === 'revoked' || profile?.access_status === 'inactive') {
+        await supabase.auth.signOut();
+        setError('Your platform access has been revoked or expired. Please contact management.');
+        return;
+      }
+
+      if (profile?.is_super_admin || profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.permissions?.manage_users) {
         router.push('/payroll');
       } else {
         router.push('/my-payslips');
@@ -111,8 +122,47 @@ export default function LoginPage() {
     if (loginErr) {
       setError(loginErr.message);
     } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('access_status')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (profile?.access_status === 'revoked' || profile?.access_status === 'inactive') {
+        await supabase.auth.signOut();
+        setError('Your access has been revoked. Contact the administrator.');
+        return;
+      }
+
       router.push('/payroll');
       router.refresh();
+    }
+  }
+
+  // 4. Admin: Forgot Password Reset Email
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    const email = resetEmail.trim();
+
+    if (!email) {
+      setError('Please enter your admin email address.');
+      return;
+    }
+
+    setSendingReset(true);
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    });
+
+    setSendingReset(false);
+    if (resetErr) {
+      setError(resetErr.message);
+    } else {
+      setMessage(`✓ Password reset instructions sent to ${email}. Check your email.`);
+      setShowForgotPassword(false);
+      setResetEmail('');
     }
   }
 
@@ -143,7 +193,7 @@ export default function LoginPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#f3f4f6', padding: 4, borderRadius: 8, marginBottom: 20 }}>
           <button
             type="button"
-            onClick={() => { setLoginMode('employee'); setError(''); setMessage(''); }}
+            onClick={() => { setLoginMode('employee'); setShowForgotPassword(false); setError(''); setMessage(''); }}
             style={{
               padding: '8px 12px',
               borderRadius: 6,
@@ -161,7 +211,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setLoginMode('admin'); setError(''); setMessage(''); }}
+            onClick={() => { setLoginMode('admin'); setShowForgotPassword(false); setError(''); setMessage(''); }}
             style={{
               padding: '8px 12px',
               borderRadius: 6,
@@ -309,6 +359,65 @@ export default function LoginPage() {
               </form>
             )}
           </div>
+        ) : showForgotPassword ? (
+          /* Form 3: Forgot Password */
+          <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                Admin Email for Password Recovery
+              </label>
+              <input
+                type="email"
+                placeholder="admin@atelier.com"
+                value={resetEmail}
+                onChange={e => setResetEmail(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                  fontSize: 14,
+                  boxSizing: 'border-box'
+                }}
+              />
+              <span style={{ fontSize: 11, color: '#6b7280', marginTop: 4, display: 'block' }}>
+                We'll send a secure password reset link to this email address.
+              </span>
+            </div>
+
+            <button
+              type="submit"
+              disabled={sendingReset}
+              style={{
+                padding: '11px',
+                background: '#1f2937',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer'
+              }}
+            >
+              {sendingReset ? 'Sending Link...' : 'Send Reset Link →'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setShowForgotPassword(false); setError(''); }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#6b7280',
+                fontSize: 12,
+                cursor: 'pointer',
+                textDecoration: 'underline'
+              }}
+            >
+              ← Back to Admin Login
+            </button>
+          </form>
         ) : (
           /* Form 2: Admin Password Login */
           <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -334,9 +443,26 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                Password
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotPassword(true); setResetEmail(adminEmail); setError(''); }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#2563eb',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
               <input
                 type="password"
                 placeholder="••••••••"
