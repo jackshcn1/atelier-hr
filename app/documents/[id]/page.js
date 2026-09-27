@@ -46,7 +46,7 @@ export default function DocumentReaderPage() {
         .ilike('email', user.email)
         .maybeSingle();
 
-      setEmployeeProfile(emp);
+      setEmployeeProfile(emp || { name: user.email?.split('@')[0] || 'Admin', employee_id: null, department: null, designation: null });
     }
 
     // 2. Fetch company document

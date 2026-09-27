@@ -41,11 +41,20 @@ export default function Navbar() {
   async function checkUserRole(userObj) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_super_admin, permissions')
       .eq('id', userObj.id)
       .maybeSingle();
 
-    setIsAdmin(profile?.role === 'admin');
+    const isManagement = profile?.is_super_admin ||
+      profile?.role === 'admin' ||
+      profile?.role === 'super_admin' ||
+      profile?.role === 'hr_manager' ||
+      profile?.role === 'department_head' ||
+      profile?.permissions?.manage_users ||
+      profile?.permissions?.view_employees ||
+      profile?.permissions?.view_payroll;
+
+    setIsAdmin(!!isManagement);
   }
 
   async function handleLogout() {
