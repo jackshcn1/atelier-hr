@@ -37,9 +37,10 @@ function ChecklistsHubContent() {
     cadence: 'daily_once',
     scheduleTimesText: '23:00',
     rollover_if_missed: true,
-    assigned_type: 'department',
+    assigned_type: 'department', // 'all_staff' | 'department' | 'individual' | 'group'
     assigned_department: '',
     assigned_employee_id: '',
+    assigned_employee_ids: [],
     requires_approval: true,
     approver_role: 'manager',
     items: []
@@ -104,19 +105,20 @@ function ChecklistsHubContent() {
     return runs.filter(r => {
       if (!['pending', 'overdue', 'recheck_requested'].includes(r.status)) return false;
 
-      // Department filter
-      if (selectedDeptFilter !== 'all') {
-        if (selectedDeptFilter === 'company_wide' && r.department !== null) return false;
-        if (selectedDeptFilter !== 'company_wide' && r.department !== selectedDeptFilter) return false;
-      }
-
-      // If user is not manager, filter to their assigned scope or department
+      // If user is regular employee, filter strictly to what is assigned to them
       if (!isManager && currentEmployee) {
         const tmpl = r.checklist_templates;
         if (tmpl) {
           if (tmpl.assigned_type === 'individual' && tmpl.assigned_employee_id !== currentEmployee.employee_id) return false;
+          if (tmpl.assigned_type === 'group' && Array.isArray(tmpl.assigned_employee_ids) && !tmpl.assigned_employee_ids.includes(currentEmployee.employee_id)) return false;
           if (tmpl.assigned_type === 'department' && tmpl.assigned_department && tmpl.assigned_department !== currentEmployee.department) return false;
         }
+      }
+
+      // Department filter dropdown
+      if (selectedDeptFilter !== 'all') {
+        if (selectedDeptFilter === 'company_wide' && r.department !== null) return false;
+        if (selectedDeptFilter !== 'company_wide' && r.department !== selectedDeptFilter) return false;
       }
 
       if (!searchQuery.trim()) return true;
@@ -319,13 +321,14 @@ function ChecklistsHubContent() {
     const payload = {
       title: templateForm.title.trim(),
       description: templateForm.description.trim(),
-      department: templateForm.department || null,
+      department: templateForm.department || templateForm.assigned_department || null,
       cadence: templateForm.cadence,
       schedule_times: timesArray.length > 0 ? timesArray : ['23:00'],
       rollover_if_missed: templateForm.rollover_if_missed,
       assigned_type: templateForm.assigned_type,
-      assigned_department: templateForm.assigned_department || null,
-      assigned_employee_id: templateForm.assigned_employee_id || null,
+      assigned_department: templateForm.assigned_type === 'department' ? (templateForm.assigned_department || null) : null,
+      assigned_employee_id: templateForm.assigned_type === 'individual' ? (templateForm.assigned_employee_id || null) : null,
+      assigned_employee_ids: templateForm.assigned_type === 'group' ? (templateForm.assigned_employee_ids || []) : [],
       requires_approval: templateForm.requires_approval,
       items: templateForm.items,
       updated_at: new Date().toISOString()
@@ -363,8 +366,9 @@ function ChecklistsHubContent() {
         scheduleTimesText: (tmpl.schedule_times || ['23:00']).join(', '),
         rollover_if_missed: tmpl.rollover_if_missed ?? true,
         assigned_type: tmpl.assigned_type || 'department',
-        assigned_department: tmpl.assigned_department || '',
+        assigned_department: tmpl.assigned_department || tmpl.department || '',
         assigned_employee_id: tmpl.assigned_employee_id || '',
+        assigned_employee_ids: Array.isArray(tmpl.assigned_employee_ids) ? tmpl.assigned_employee_ids : [],
         requires_approval: tmpl.requires_approval ?? true,
         approver_role: tmpl.approver_role || 'manager',
         items: tmpl.items || []
@@ -381,16 +385,17 @@ function ChecklistsHubContent() {
         assigned_type: 'department',
         assigned_department: '',
         assigned_employee_id: '',
+        assigned_employee_ids: [],
         requires_approval: true,
         approver_role: 'manager',
         items: [
           {
             id: `sec_${Date.now()}`,
-            title: 'Station Checks',
+            title: 'Station Cleanliness & Setup',
             type: 'heading',
             subtasks: [
-              { id: `st_${Date.now()}_1`, title: 'Verify station is cleaned and sanitized', type: 'checkbox', required: true },
-              { id: `st_${Date.now()}_2`, title: 'Photo: Station Overview', type: 'photo', required: true }
+              { id: `st_${Date.now()}_1`, title: 'Verify station is thoroughly cleaned and sanitized', type: 'checkbox', required: true },
+              { id: `st_${Date.now()}_2`, title: 'Photo: Station Overview Proof', type: 'photo', required: true }
             ]
           }
         ]
@@ -623,6 +628,13 @@ function ChecklistsHubContent() {
                 const isRecheck = run.status === 'recheck_requested';
                 const dueTimeStr = new Date(run.due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+                const tmpl = run.checklist_templates;
+                const assignmentLabel =
+                  tmpl?.assigned_type === 'individual' ? `👤 Assigned to Specific Staff` :
+                  tmpl?.assigned_type === 'group' ? `👥 Assigned to Group (${(tmpl.assigned_employee_ids || []).length} Staff)` :
+                  tmpl?.assigned_type === 'department' ? `🏢 ${tmpl.assigned_department || run.department || 'Department'}` :
+                  '🌐 All Staff (Company-Wide)';
+
                 return (
                   <div
                     key={run.id}
@@ -640,7 +652,7 @@ function ChecklistsHubContent() {
                   >
                     <div>
                       {/* Top Badges */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                         <span
                           style={{
                             fontSize: 11, fontWeight: 'bold', padding: '3px 8px', borderRadius: 12,
@@ -656,12 +668,12 @@ function ChecklistsHubContent() {
                         </span>
                       </div>
 
-                      {/* Title & Dept */}
+                      {/* Title & Assignment */}
                       <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 700, color: '#111827' }}>
                         {run.title}
                       </h3>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>
-                        {run.department || 'Company-Wide'}
+                      <div style={{ fontSize: 12, color: '#0369a1', fontWeight: 600 }}>
+                        {assignmentLabel}
                       </div>
 
                       {isRecheck && run.recheck_notes && (
@@ -837,46 +849,58 @@ function ChecklistsHubContent() {
       {/* TAB 4: TEMPLATES CONFIGURATION (ADMIN / MANAGER) */}
       {activeTab === 'templates' && isManager && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-          {templates.map(tmpl => (
-            <div
-              key={tmpl.id}
-              style={{
-                background: 'white', borderRadius: 10, border: '1px solid #e5e7eb', padding: 16,
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '2px 8px', borderRadius: 4 }}>
-                    {tmpl.cadence.replace('_', ' ').toUpperCase()}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#6b7280' }}>
-                    {(tmpl.schedule_times || []).join(', ')}
-                  </span>
-                </div>
+          {templates.map(tmpl => {
+            const assignmentLabel =
+              tmpl.assigned_type === 'individual' && tmpl.assigned_employee_id ? `👤 Individual (${employees.find(e => e.employee_id === tmpl.assigned_employee_id)?.name || tmpl.assigned_employee_id})` :
+              tmpl.assigned_type === 'group' ? `👥 Group of ${(tmpl.assigned_employee_ids || []).length} Staff Members` :
+              tmpl.assigned_type === 'department' ? `🏢 ${tmpl.assigned_department || tmpl.department || 'Department'}` :
+              '🌐 All Staff (Company-Wide)';
 
-                <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 700, color: '#111827' }}>
-                  {tmpl.title}
-                </h3>
-                <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>
-                  {tmpl.description || 'No description provided.'}
-                </p>
-                <div style={{ fontSize: 12, color: '#374151' }}>
-                  Scope: <strong>{tmpl.department || 'All Departments'}</strong> • Rollover: <strong>{tmpl.rollover_if_missed ? 'Yes (Overdue)' : 'No (Expires)'}</strong>
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleOpenTemplateBuilder(tmpl)}
+            return (
+              <div
+                key={tmpl.id}
                 style={{
-                  width: '100%', padding: '8px', borderRadius: 6, border: '1px solid #d1d5db',
-                  background: '#f9fafb', color: '#111827', fontWeight: 600, fontSize: 12, cursor: 'pointer'
+                  background: 'white', borderRadius: 10, border: '1px solid #e5e7eb', padding: 16,
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12
                 }}
               >
-                ✏️ Edit Structure & Tasks
-              </button>
-            </div>
-          ))}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '2px 8px', borderRadius: 4 }}>
+                      {tmpl.cadence.replace('_', ' ').toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>
+                      {(tmpl.schedule_times || []).join(', ')}
+                    </span>
+                  </div>
+
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 700, color: '#111827' }}>
+                    {tmpl.title}
+                  </h3>
+                  <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>
+                    {tmpl.description || 'No description provided.'}
+                  </p>
+
+                  <div style={{ fontSize: 12, color: '#0369a1', fontWeight: 600, marginTop: 4 }}>
+                    {assignmentLabel}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    Rollover: <strong>{tmpl.rollover_if_missed ? 'Yes (Overdue)' : 'No (Expires)'}</strong> • Approval: <strong>{tmpl.requires_approval ? 'Required' : 'No'}</strong>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleOpenTemplateBuilder(tmpl)}
+                  style={{
+                    width: '100%', padding: '8px', borderRadius: 6, border: '1px solid #d1d5db',
+                    background: '#f9fafb', color: '#111827', fontWeight: 600, fontSize: 12, cursor: 'pointer'
+                  }}
+                >
+                  ✏️ Edit Structure, Assignees & Tasks
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1024,7 +1048,7 @@ function ChecklistsHubContent() {
             </div>
 
             {/* Bottom Actions */}
-            <div style={{ marginTop: 20, borderTop: '1px solid #e5e7eb', paddingTop: 14, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <div style={{ marginTop: 20, borderTop: '1px solid #e5e7eb', paddingTop: 14, display: 'flex', justifyContent: 'space-end', gap: 10 }}>
               <button
                 type="button"
                 onClick={() => setSelectedRun(null)}
@@ -1186,6 +1210,19 @@ function ChecklistsHubContent() {
                 />
               </div>
 
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                  Brief Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Daily station cleaning, temperature logs, and closing checks."
+                  value={templateForm.description}
+                  onChange={e => setTemplateForm({ ...templateForm, description: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }}
+                />
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
@@ -1217,18 +1254,154 @@ function ChecklistsHubContent() {
                 </div>
               </div>
 
-              {/* Rollover Toggle */}
-              <div style={{ background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
-                  <input
-                    type="checkbox"
-                    checked={templateForm.rollover_if_missed}
-                    onChange={e => setTemplateForm({ ...templateForm, rollover_if_missed: e.target.checked })}
-                  />
-                  <span>Carry forward if deadline missed (Mark as Overdue until completed)</span>
+              {/* Assignment Controls */}
+              <div style={{ background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
+                  👥 Who is Assigned to Complete this Checklist?
                 </label>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, marginLeft: 24 }}>
-                  Uncheck for daily point-in-time checks (like Staff Grooming) where missed instances should expire rather than roll over.
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="assigned_type"
+                      value="department"
+                      checked={templateForm.assigned_type === 'department'}
+                      onChange={() => setTemplateForm({ ...templateForm, assigned_type: 'department' })}
+                    />
+                    <span>🏢 By Department</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="assigned_type"
+                      value="group"
+                      checked={templateForm.assigned_type === 'group'}
+                      onChange={() => setTemplateForm({ ...templateForm, assigned_type: 'group' })}
+                    />
+                    <span>👥 Group of Staff</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="assigned_type"
+                      value="individual"
+                      checked={templateForm.assigned_type === 'individual'}
+                      onChange={() => setTemplateForm({ ...templateForm, assigned_type: 'individual' })}
+                    />
+                    <span>👤 Single Employee</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="assigned_type"
+                      value="all_staff"
+                      checked={templateForm.assigned_type === 'all_staff'}
+                      onChange={() => setTemplateForm({ ...templateForm, assigned_type: 'all_staff' })}
+                    />
+                    <span>🌐 All Staff</span>
+                  </label>
+                </div>
+
+                {/* Sub-selector based on assignment type */}
+                {templateForm.assigned_type === 'department' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                      Select Department (Any on-duty staff member in this department can complete)
+                    </label>
+                    <select
+                      value={templateForm.assigned_department}
+                      onChange={e => setTemplateForm({ ...templateForm, assigned_department: e.target.value, department: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, background: 'white' }}
+                    >
+                      <option value="">-- Choose Department --</option>
+                      {departments.map(d => (
+                        <option key={d} value={d}>{d} Department</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {templateForm.assigned_type === 'individual' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                      Select Designated Employee
+                    </label>
+                    <select
+                      value={templateForm.assigned_employee_id}
+                      onChange={e => setTemplateForm({ ...templateForm, assigned_employee_id: e.target.value })}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, background: 'white' }}
+                    >
+                      <option value="">-- Choose Employee --</option>
+                      {employees.map(emp => (
+                        <option key={emp.employee_id} value={emp.employee_id}>
+                          {emp.name} (ID: {emp.employee_id} • {emp.department} • {emp.designation})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {templateForm.assigned_type === 'group' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                      Select Group Members (Any of the checked staff can complete this checklist):
+                    </label>
+                    <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: 6, padding: 8, background: 'white', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6 }}>
+                      {employees.map(emp => {
+                        const isChecked = (templateForm.assigned_employee_ids || []).includes(emp.employee_id);
+                        return (
+                          <label key={emp.employee_id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#334151', cursor: 'pointer', padding: '3px 4px' }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => {
+                                const current = new Set(templateForm.assigned_employee_ids || []);
+                                if (e.target.checked) current.add(emp.employee_id);
+                                else current.delete(emp.employee_id);
+                                setTemplateForm({ ...templateForm, assigned_employee_ids: Array.from(current) });
+                              }}
+                            />
+                            <span>{emp.name} <small style={{ color: '#64748b' }}>({emp.department})</small></span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Rollover & Approval Toggles */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                    <input
+                      type="checkbox"
+                      checked={templateForm.rollover_if_missed}
+                      onChange={e => setTemplateForm({ ...templateForm, rollover_if_missed: e.target.checked })}
+                    />
+                    <span>Carry forward if missed (Overdue)</span>
+                  </label>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    Uncheck for grooming/daily point-in-time checks so missed instances expire.
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                    <input
+                      type="checkbox"
+                      checked={templateForm.requires_approval}
+                      onChange={e => setTemplateForm({ ...templateForm, requires_approval: e.target.checked })}
+                    />
+                    <span>Requires Manager Approval</span>
+                  </label>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    Queues completed runs in the Approvals tab for manager sign-off.
+                  </div>
                 </div>
               </div>
 
@@ -1313,7 +1486,7 @@ function ChecklistsHubContent() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
                 <button
                   type="button"
                   onClick={() => setShowTemplateModal(false)}
