@@ -16,11 +16,20 @@ export default function Home() {
       }
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_super_admin, permissions')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (profile?.role === 'admin') {
+      const isManagement = profile?.is_super_admin ||
+        profile?.role === 'admin' ||
+        profile?.role === 'super_admin' ||
+        profile?.role === 'hr_manager' ||
+        profile?.role === 'department_head' ||
+        profile?.permissions?.manage_users ||
+        profile?.permissions?.view_employees ||
+        profile?.permissions?.view_payroll;
+
+      if (isManagement) {
         router.push('/payroll');
       } else {
         router.push('/my-payslips');
