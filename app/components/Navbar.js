@@ -101,6 +101,7 @@ export default function Navbar() {
             <a href="/payroll" style={{ color: pathname === '/payroll' ? '#93c5fd' : '#f9fafb', textDecoration: 'none', fontWeight: pathname === '/payroll' ? 700 : 500 }}>Payroll</a>
             <a href="/payroll/processing" style={{ color: pathname === '/payroll/processing' ? '#6ee7b7' : '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>Salary Processing</a>
             <a href="/payslips" style={{ color: pathname === '/payslips' ? '#6ee7b7' : '#e5e7eb', textDecoration: 'none', fontWeight: 600 }}>Payslips</a>
+            <a href="/documents" style={{ color: pathname === '/documents' ? '#fde047' : '#fef08a', textDecoration: 'none', fontWeight: 600 }}>📚 SOPs & Training</a>
             <a href="/settings" style={{ color: pathname === '/settings' ? '#93c5fd' : '#cbd5e1', textDecoration: 'none' }}>Settings</a>
             <a href="/export" style={{ color: pathname === '/export' ? '#93c5fd' : '#cbd5e1', textDecoration: 'none' }}>Export</a>
             <button
@@ -126,6 +127,17 @@ export default function Navbar() {
               }}
             >
               📄 My Payslips
+            </a>
+            <a
+              href="/documents"
+              style={{
+                color: '#fef08a',
+                textDecoration: 'none',
+                fontWeight: 700,
+                fontSize: 14
+              }}
+            >
+              📚 SOPs & Training
             </a>
             <button
               onClick={handleLogout}

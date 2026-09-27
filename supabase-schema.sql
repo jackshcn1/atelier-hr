@@ -91,6 +91,22 @@ create table doc_templates (
   required boolean default true
 );
 
+-- 6b. Company Documents, Training Materials & SOPs ------------------
+create table company_documents (
+  id bigint generated always as identity primary key,
+  title text not null,
+  category text not null check (category in ('sop', 'policy', 'training', 'food_safety', 'targets', 'other')),
+  department text references departments(name) on update cascade on delete set null,
+  doc_type text not null default 'pdf' check (doc_type in ('pdf', 'article')),
+  file_url text,
+  file_name text,
+  content_html text,
+  description text,
+  created_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- 7. Training records -------------------------------------------------
 create table training_records (
   id bigint generated always as identity primary key,

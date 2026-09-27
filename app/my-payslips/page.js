@@ -132,6 +132,30 @@ export default function MyPayslipsPage() {
             Log out
           </button>
         </div>
+
+        {/* Quick Link to Training & SOPs */}
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f3f4f6' }}>
+          <a
+            href="/documents"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '10px 14px',
+              textDecoration: 'none',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              color: '#1f2937'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>📚</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Training Materials, SOPs & Policies</span>
+            </div>
+            <span style={{ fontSize: 13, color: '#6b7280' }}>→</span>
+          </a>
+        </div>
       </div>
 
       {error && (
