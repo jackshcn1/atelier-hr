@@ -107,6 +107,57 @@ create table company_documents (
   updated_at timestamptz default now()
 );
 
+-- 6c. Interactive Checklists & Operational Routine Runs -------------
+create table checklist_templates (
+  id bigint generated always as identity primary key,
+  title text not null,
+  description text,
+  department text references departments(name) on update cascade on delete set null,
+  cadence text not null check (cadence in ('daily_once', 'daily_multiple', 'weekly', 'monthly')),
+  schedule_times jsonb default '["23:00"]'::jsonb,
+  rollover_if_missed boolean default true,
+  assigned_type text default 'department' check (assigned_type in ('individual', 'department', 'all_staff')),
+  assigned_employee_id text references employees(employee_id) on update cascade on delete set null,
+  assigned_department text references departments(name) on update cascade on delete set null,
+  requires_approval boolean default false,
+  approver_role text default 'manager',
+  approver_employee_id text references employees(employee_id) on update cascade on delete set null,
+  items jsonb not null default '[]'::jsonb,
+  is_active boolean default true,
+  created_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table checklist_runs (
+  id bigint generated always as identity primary key,
+  template_id bigint references checklist_templates(id) on delete cascade,
+  title text not null,
+  department text,
+  due_at timestamptz not null,
+  status text not null default 'pending' check (status in ('pending', 'overdue', 'pending_approval', 'completed', 'missed', 'recheck_requested')),
+  submitted_by text,
+  submitted_by_name text,
+  submitted_at timestamptz,
+  approved_by text,
+  approved_by_name text,
+  approved_at timestamptz,
+  recheck_notes text,
+  is_overdue boolean default false,
+  delay_seconds numeric default 0,
+  responses jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table checklist_notifications_dismissed (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users(id) on delete cascade,
+  run_id bigint references checklist_runs(id) on delete cascade,
+  dismissed_at timestamptz default now(),
+  unique (user_id, run_id)
+);
+
 -- 7. Training records -------------------------------------------------
 create table training_records (
   id bigint generated always as identity primary key,
