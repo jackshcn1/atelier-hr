@@ -136,7 +136,7 @@ export default function MyPayslipsPage() {
         {/* Quick Links for Employees */}
         <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <a
-            href="/checklists"
+            href="/tasks"
             style={{
               background: '#ecfdf5',
               border: '1px solid #a7f3d0',
@@ -151,9 +151,9 @@ export default function MyPayslipsPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 16 }}>✅</span>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>Daily & Shift Checklists</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>My Tasks & Shift Checklists</span>
             </div>
-            <span style={{ fontSize: 13, color: '#059669', fontWeight: 'bold' }}>Start →</span>
+            <span style={{ fontSize: 13, color: '#059669', fontWeight: 'bold' }}>Open Hub →</span>
           </a>
 
           <a

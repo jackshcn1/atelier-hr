@@ -159,6 +159,53 @@ create table checklist_notifications_dismissed (
   unique (user_id, run_id)
 );
 
+-- 6d. Delegated Tasks, Subtasks & Accountability --------------------
+create table tasks (
+  id bigint generated always as identity primary key,
+  title text not null,
+  description text,
+  priority text default 'normal' check (priority in ('urgent', 'high', 'normal', 'low')),
+  cadence text default 'adhoc' check (cadence in ('adhoc', 'daily', 'weekly', 'monthly')),
+  cadence_details jsonb default '{}'::jsonb,
+  due_date date not null,
+  due_time time default '23:59:00',
+  status text default 'assigned' check (status in ('assigned', 'in_progress', 'completed', 'overdue', 'reopened')),
+  assigned_type text default 'individual' check (assigned_type in ('individual', 'group', 'department', 'all_staff')),
+  assigned_employee_id text references employees(employee_id) on update cascade on delete set null,
+  assigned_employee_ids jsonb default '[]'::jsonb,
+  assigned_department text references departments(name) on update cascade on delete set null,
+  subtasks jsonb default '[]'::jsonb,
+  mandatory_proofs jsonb default '[]'::jsonb,
+  completed_at timestamptz,
+  completed_by text,
+  completed_by_name text,
+  delay_seconds numeric default 0,
+  is_overdue boolean default false,
+  created_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table task_comments (
+  id bigint generated always as identity primary key,
+  task_id bigint references tasks(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  author_name text not null,
+  author_role text,
+  message text not null,
+  attachment_url text,
+  created_at timestamptz default now()
+);
+
+create table task_audit_logs (
+  id bigint generated always as identity primary key,
+  task_id bigint references tasks(id) on delete cascade,
+  actor_name text not null,
+  action text not null,
+  details text,
+  created_at timestamptz default now()
+);
+
 -- 7. Training records -------------------------------------------------
 create table training_records (
   id bigint generated always as identity primary key,
