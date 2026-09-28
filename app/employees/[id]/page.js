@@ -120,7 +120,7 @@ export default function EmployeeDetail() {
         setIdBackUrl(data?.signedUrl || null);
       }
     }
-    const { data: all } = await supabase.from('employees').select('employee_id, name, status');
+    const { data: all } = await supabase.from('employees').select('employee_id, name, status, designation, department');
     setAllEmployees(all || []);
     const { data: sh } = await supabase.from('salary_history').select('*').eq('employee_id', id).order('effective_from', { ascending: false });
     setSalaryHistory(sh || []);
@@ -735,14 +735,6 @@ export default function EmployeeDetail() {
                   {m.name} ({m.designation || 'Staff'}{m.department ? ` • ${m.department}` : ''})
                 </option>
               ))}
-              {managerEdit && !candidateManagers.some(m => m.employee_id === managerEdit) && (() => {
-                const exitedMgr = allEmployees.find(m => m.employee_id === managerEdit);
-                return exitedMgr ? (
-                  <option key={exitedMgr.employee_id} value={exitedMgr.employee_id} disabled>
-                    ⚠ {exitedMgr.name} (Exited — Please choose active manager)
-                  </option>
-                ) : null;
-              })()}
             </select>
           </label>
           <label style={{ fontSize: 13, fontWeight: 600 }}>Status
