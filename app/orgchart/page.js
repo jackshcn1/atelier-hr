@@ -146,14 +146,14 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
             }} />
           )}
 
-          {/* Reports row — all direct reports side by side on one line */}
+          {/* Reports row — all direct reports side by side on one line, sorted A→Z */}
           <div style={{
             display: 'flex', gap: 16, flexWrap: 'nowrap', justifyContent: 'center',
             marginTop: kids.length > 1 ? 14 : 0,
             overflowX: 'auto',
             maxWidth: '100%'
           }}>
-            {kids.map(k => (
+            {[...kids].sort((a, b) => a.name.localeCompare(b.name)).map(k => (
               <OrgNode
                 key={k.employee_id}
                 emp={k}
@@ -247,7 +247,7 @@ export default function OrgChartPage() {
 
           {/* Family Tree - roots displayed horizontally */}
           <div style={{ display: 'flex', gap: 40, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'flex-start', overflowX: 'auto', maxWidth: '100%' }}>
-            {tree.roots.map(r => (
+            {[...tree.roots].sort((a, b) => a.name.localeCompare(b.name)).map(r => (
               <OrgNode
                 key={r.employee_id}
                 emp={r}
