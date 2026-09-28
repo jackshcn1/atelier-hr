@@ -225,6 +225,7 @@ export default function DocumentReaderPage() {
 
             {/* Rendered HTML Content */}
             <div
+              className="document-prose"
               style={{
                 fontSize: 15,
                 lineHeight: 1.7,
@@ -256,12 +257,117 @@ export default function DocumentReaderPage() {
         )}
       </div>
 
-      {/* Strict Anti-Print CSS */}
+      {/* Strict Anti-Print & Rich Article Content Styles */}
       <style jsx global>{`
         @media print {
           body {
             display: none !important;
           }
+        }
+        .document-prose h2 {
+          font-size: 18px;
+          font-weight: 800;
+          color: #111827;
+          margin: 28px 0 12px 0;
+          padding-bottom: 6px;
+          border-bottom: 1.5px solid #e5e7eb;
+        }
+        .document-prose h3 {
+          font-size: 16px;
+          font-weight: 700;
+          color: #1e3a8a;
+          margin: 22px 0 8px 0;
+        }
+        .document-prose h4 {
+          font-size: 14px;
+          font-weight: 700;
+          color: #374151;
+          margin: 16px 0 6px 0;
+        }
+        .document-prose p {
+          margin: 0 0 12px 0;
+        }
+        .document-prose ul, .document-prose ol {
+          margin: 0 0 16px 0;
+          padding-left: 22px;
+        }
+        .document-prose li {
+          margin-bottom: 6px;
+        }
+        .document-prose table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 14px 0 20px 0;
+          font-size: 13px;
+          background: white;
+          border-radius: 6px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .document-prose th {
+          background: #f1f5f9;
+          color: #0f172a;
+          font-weight: 700;
+          text-align: left;
+          padding: 10px 12px;
+          border: 1px solid #cbd5e1;
+        }
+        .document-prose td {
+          padding: 10px 12px;
+          border: 1px solid #e2e8f0;
+          vertical-align: top;
+          color: #334155;
+        }
+        .document-prose tr:nth-child(even) {
+          background: #f8fafc;
+        }
+        .document-prose .badge-binary {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 700;
+          background: #fef3c7;
+          color: #92400e;
+          border: 1px solid #fde68a;
+        }
+        .document-prose .badge-proportional {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 700;
+          background: #e0f2fe;
+          color: #0369a1;
+          border: 1px solid #bae6fd;
+        }
+        .document-prose .callout-box {
+          background: #f0fdf4;
+          border: 1px solid #86efac;
+          border-left: 4px solid #10b981;
+          border-radius: 6px;
+          padding: 14px 16px;
+          margin: 16px 0 20px 0;
+          font-size: 13px;
+          color: #166534;
+        }
+        .document-prose .example-box {
+          background: #f8fafc;
+          border: 1px solid #cbd5e1;
+          border-left: 4px solid #3b82f6;
+          border-radius: 6px;
+          padding: 14px 16px;
+          margin: 14px 0 20px 0;
+          font-size: 13px;
+          color: #1e293b;
+        }
+        .document-prose code {
+          background: #f1f5f9;
+          color: #0f172a;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-family: monospace;
         }
       `}</style>
     </div>
