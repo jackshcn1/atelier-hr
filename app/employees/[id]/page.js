@@ -408,7 +408,7 @@ export default function EmployeeDetail() {
     return `${Math.floor(months / 12)}y ${months % 12}m`;
   })();
 
-  const directReports = allEmployees.filter(e => e.employee_id !== id);
+  const candidateManagers = allEmployees.filter(e => e.employee_id !== id && e.status !== 'exited');
 
   const initials = String(employee.name || 'Emp')
     .split(/\s+/)
@@ -730,9 +730,19 @@ export default function EmployeeDetail() {
               style={{ display: 'block', padding: '6px 8px', marginTop: 4, borderRadius: 4, border: '1px solid #ccc', background: 'white' }}
             >
               <option value="">None (top of hierarchy)</option>
-              {directReports.map(m => (
-                <option key={m.employee_id} value={m.employee_id}>{m.name}{m.status === 'exited' ? ' (exited)' : ''}</option>
+              {candidateManagers.map(m => (
+                <option key={m.employee_id} value={m.employee_id}>
+                  {m.name} ({m.designation || 'Staff'}{m.department ? ` • ${m.department}` : ''})
+                </option>
               ))}
+              {managerEdit && !candidateManagers.some(m => m.employee_id === managerEdit) && (() => {
+                const exitedMgr = allEmployees.find(m => m.employee_id === managerEdit);
+                return exitedMgr ? (
+                  <option key={exitedMgr.employee_id} value={exitedMgr.employee_id} disabled>
+                    ⚠ {exitedMgr.name} (Exited — Please choose active manager)
+                  </option>
+                ) : null;
+              })()}
             </select>
           </label>
           <label style={{ fontSize: 13, fontWeight: 600 }}>Status
