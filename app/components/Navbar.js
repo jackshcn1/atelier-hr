@@ -105,7 +105,7 @@ export default function Navbar() {
           /* Full Admin Nav Items */
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
             <a href="/employees" style={{ color: pathname === '/employees' ? '#93c5fd' : 'white', textDecoration: 'none' }}>Employees</a>
-            <a href="/employees/all" style={{ color: pathname === '/employees/all' ? '#93c5fd' : 'white', textDecoration: 'none' }}>All Staff</a>
+            <a href="/orgchart" style={{ color: pathname === '/orgchart' ? '#93c5fd' : '#e2e8f0', textDecoration: 'none' }}>Org Chart</a>
             <a href="/tasks" style={{ color: pathname === '/tasks' || pathname === '/checklists' ? '#86efac' : '#bbf7d0', textDecoration: 'none', fontWeight: 600 }}>✅ Tasks & Checklists</a>
             <a href="/payroll" style={{ color: pathname === '/payroll' ? '#93c5fd' : '#f9fafb', textDecoration: 'none', fontWeight: pathname === '/payroll' ? 700 : 500 }}>Payroll</a>
             <a href="/payroll/processing" style={{ color: pathname === '/payroll/processing' ? '#6ee7b7' : '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>Salary Processing</a>

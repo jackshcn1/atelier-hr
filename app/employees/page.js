@@ -244,6 +244,9 @@ export default function EmployeesPage() {
           <p style={{ color: '#666', margin: 0 }}>Showing active and on-notice staff records.</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <a href="/orgchart" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', fontWeight: 700, background: '#eff6ff', padding: '6px 12px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+            👥 Org Chart →
+          </a>
           <a href="/employees/all" style={{ fontSize: 13, color: '#4b5563', textDecoration: 'none', fontWeight: 600 }}>View all (incl. past) →</a>
           <a href="/employees/deleted" style={{ fontSize: 13, color: '#4b5563', textDecoration: 'none', fontWeight: 600 }}>Deleted →</a>
           <a href="/employees/bulk-import" style={{ fontSize: 13, color: '#4b5563', textDecoration: 'none', fontWeight: 600 }}>Bulk import →</a>

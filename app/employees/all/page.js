@@ -23,7 +23,14 @@ export default function AllEmployeesPage() {
 
   return (
     <div>
-      <a href="/employees">← Back to active employees</a>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <a href="/employees" style={{ color: '#4b5563', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
+          ← Back to active employees
+        </a>
+        <a href="/orgchart" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', fontWeight: 700, background: '#eff6ff', padding: '5px 12px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+          👥 View Organization Chart →
+        </a>
+      </div>
       <h1>All employees (all-time record)</h1>
       <p style={{ color: '#777' }}>
         Every employee ever added, active first then past — useful for rehire checks and reference calls.

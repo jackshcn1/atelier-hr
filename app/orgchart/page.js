@@ -2,52 +2,222 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '../../lib/supabaseClient';
 
-function Node({ emp, childrenMap }) {
+function OrgNode({ emp, childrenMap, allEmployees, onReassign }) {
+  const [collapsed, setCollapsed] = useState(false);
   const kids = childrenMap[emp.employee_id] || [];
-  const flagged = emp.status === 'exited' && kids.length > 0;
+  const isExited = emp.status === 'exited';
+  const hasReports = kids.length > 0;
+  const flagged = isExited && hasReports;
+
+  const initials = String(emp.name || 'E')
+    .split(/\s+/)
+    .map(n => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
-    <div style={{ marginLeft: 20, borderLeft: '2px solid #ddd', paddingLeft: 12, marginTop: 8 }}>
+    <div style={{ marginLeft: 24, borderLeft: '2px dashed #cbd5e1', paddingLeft: 18, marginTop: 14 }}>
+      {/* Node Card */}
       <div style={{
-        background: flagged ? '#fff3cd' : 'white',
-        border: flagged ? '1px solid #ffe08a' : 'none',
-        padding: '6px 10px', borderRadius: 6, display: 'inline-block'
+        background: flagged ? '#fffbeb' : 'white',
+        border: flagged ? '1.5px solid #f59e0b' : '1px solid #e2e8f0',
+        borderRadius: 8,
+        padding: '12px 16px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 12,
+        boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
+        minWidth: 280,
+        maxWidth: 420
       }}>
-        <strong>{emp.name}</strong> <span style={{ color: '#777' }}>— {emp.designation}</span>
-        {flagged && <span style={{ marginLeft: 8, color: '#856404' }}>⚠ exited — reassign their reports</span>}
+        {/* Avatar */}
+        <div style={{
+          width: 40, height: 40, borderRadius: '50%',
+          background: isExited ? '#fee2e2' : '#eff6ff',
+          color: isExited ? '#991b1b' : '#1d4ed8',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 800, fontSize: 13, flexShrink: 0,
+          border: `1.5px solid ${isExited ? '#fca5a5' : '#bfdbfe'}`
+        }}>
+          {emp.passport_photo_url ? (
+            <img
+              src={`https://wzxswmopfxnucmeygqeg.supabase.co/storage/v1/object/public/documents/${emp.passport_photo_url}`}
+              alt=""
+              onError={(e) => { e.target.style.display = 'none'; }}
+              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+            />
+          ) : initials}
+        </div>
+
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <a
+              href={`/employees/${emp.employee_id}`}
+              style={{ fontWeight: 800, fontSize: 14, color: '#111827', textDecoration: 'none' }}
+            >
+              {emp.name}
+            </a>
+            {isExited && (
+              <span style={{ fontSize: 10, background: '#fee2e2', color: '#991b1b', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
+                Exited
+              </span>
+            )}
+          </div>
+
+          <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>
+            <span style={{ fontWeight: 600 }}>{emp.designation || 'Staff'}</span>
+            {emp.department && (
+              <span style={{ color: '#6b7280' }}> • {emp.department}</span>
+            )}
+          </div>
+
+          {flagged && (
+            <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontWeight: 600 }}>
+              ⚠ Exited Manager — {kids.length} direct report(s) need reassignment:
+              <div style={{ marginTop: 4 }}>
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      kids.forEach(k => onReassign(k.employee_id, e.target.value));
+                    }
+                  }}
+                  style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, border: '1px solid #f59e0b', background: 'white' }}
+                >
+                  <option value="">Reassign all reports to…</option>
+                  {allEmployees.filter(m => m.status !== 'exited' && m.employee_id !== emp.employee_id).map(m => (
+                    <option key={m.employee_id} value={m.employee_id}>{m.name} ({m.designation || 'Staff'})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Collapse / Expand Toggle for Managers */}
+        {hasReports && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? 'Expand team' : 'Collapse team'}
+            style={{
+              background: '#f1f5f9', border: '1px solid #cbd5e1',
+              borderRadius: 12, padding: '2px 8px', fontSize: 11, fontWeight: 700,
+              color: '#334155', cursor: 'pointer', flexShrink: 0
+            }}
+          >
+            {collapsed ? `+${kids.length}` : `▼ ${kids.length}`}
+          </button>
+        )}
       </div>
-      {kids.map(k => <Node key={k.employee_id} emp={k} childrenMap={childrenMap} />)}
+
+      {/* Child Nodes */}
+      {!collapsed && kids.length > 0 && (
+        <div>
+          {kids.map(k => (
+            <OrgNode
+              key={k.employee_id}
+              emp={k}
+              childrenMap={childrenMap}
+              allEmployees={allEmployees}
+              onReassign={onReassign}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function OrgChart() {
+export default function OrgChartPage() {
   const supabase = createClient();
   const [tree, setTree] = useState({ roots: [], map: {} });
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // include exited managers so their (unreassigned) reports still render, flagged
-    supabase.from('employees').select('*').is('deleted_at', null).then(({ data }) => {
-      if (!data) return;
+  async function loadTree() {
+    setLoading(true);
+    const { data } = await supabase.from('employees').select('*').is('deleted_at', null).order('name');
+    if (data) {
+      setAllEmployees(data);
       const map = {};
       data.forEach(e => {
         if (!e.reporting_manager_id) return;
         map[e.reporting_manager_id] = map[e.reporting_manager_id] || [];
         map[e.reporting_manager_id].push(e);
       });
-      // roots = active employees with no manager, or exited managers who still have reports
+
+      // Roots: active employees without a manager, or exited managers who still have unreassigned reports
       const roots = data.filter(e =>
         e.status !== 'exited' ? !e.reporting_manager_id : (map[e.employee_id] || []).length > 0
       );
+
       setTree({ roots, map });
-    });
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadTree();
   }, []);
 
+  async function handleReassign(employeeId, newManagerId) {
+    await supabase.from('employees').update({ reporting_manager_id: newManagerId || null }).eq('employee_id', employeeId);
+    loadTree();
+  }
+
   return (
-    <div>
-      <h1>Org chart</h1>
-      <p style={{ color: '#777' }}>Built automatically from each employee's reporting manager — no separate upkeep needed.</p>
-      {tree.roots.map(r => <Node key={r.employee_id} emp={r} childrenMap={tree.map} />)}
-      {tree.roots.length === 0 && <p>No employees yet, or none without a manager set.</p>}
+    <div style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 60 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ margin: '0 0 4px 0' }}>Organization Chart</h1>
+          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
+            Visual team reporting structure built automatically from each employee's assigned reporting manager.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <a
+            href="/employees"
+            style={{
+              background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db',
+              padding: '8px 16px', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: 13
+            }}
+          >
+            ← Back to Employees
+          </a>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+          Building organizational hierarchy...
+        </div>
+      ) : tree.roots.length === 0 ? (
+        <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 40, textAlign: 'center', color: '#6b7280' }}>
+          No active employees found, or no top-level managers without an assigned reporting manager.
+        </div>
+      ) : (
+        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '24px 20px', overflowX: 'auto' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 12 }}>
+            👑 Top of Hierarchy ({tree.roots.length} Root Leads)
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {tree.roots.map(r => (
+              <OrgNode
+                key={r.employee_id}
+                emp={r}
+                childrenMap={tree.map}
+                allEmployees={allEmployees}
+                onReassign={handleReassign}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
