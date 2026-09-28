@@ -20,7 +20,26 @@
       "Bash(current_variable_salary)",
       "Bash(update_salaries: 'TRUE')",
       "Bash(git commit -m 'Add update_salaries flag to force salary updates in bulk import *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(npx supabase *)",
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(git commit -m 'Add Salary Processing page with pre-generated payslip IDs \\(Phase 2\\) *)",
+      "Bash(git commit -m 'Auto-prefill payroll cycle, support draft loading/updates, and set bank narration format *)",
+      "Bash(git commit -m 'Add Ad-hoc Mid-term Payroll & Automatic Prior Payout Deduction Adjustment *)",
+      "Bash(git commit -m 'Add delete option for past payroll runs with confirmation and cascade cleanup *)",
+      "Bash(git commit -m 'Prevent duplicate line items on re-save and ensure idempotent payroll runs *)",
+      "Bash(git commit -m 'Add Payslips Directory & Print-Ready A4 PDF Payslips \\(Phase 3\\) *)",
+      "Bash(git commit -m 'Add Employee Self-Service Portal & Email OTP Login \\(Phase 4\\) *)",
+      "Bash(git commit -m 'Fix uniform_deposit_applicable saving on employee add form *)",
+      "Bash(git commit -m 'Add User Management & Access Control Portal with Custom Toggles and Recovery *)",
+      "Bash(git commit -m 'Add Training Materials, SOPs & Policies Portal with In-App Editor and Protected Reader *)",
+      "Bash(git commit -m 'Fix admin routing on homepage to handle super_admin role correctly *)",
+      "Bash(git commit -m 'Fix admin navbar routing and document viewer watermark *)",
+      "Bash(git commit -m 'Add Interactive Daily & Shift Checklists Module with Mobile Camera Proof and Sign-offs *)",
+      "Bash(git commit -m 'Add flexible Employee and Group Assignment options to Checklist Builder *)",
+      "Bash(git commit -m 'Ensure checklists and history are strictly scoped for regular employee accounts *)",
+      "Bash(git commit -m 'Add Unified Delegated Tasks, Subtasks & Accountability Hub \\(/tasks\\) *)"
     ]
   }
 }

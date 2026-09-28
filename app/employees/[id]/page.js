@@ -17,6 +17,8 @@ export default function EmployeeDetail() {
   const [managerEdit, setManagerEdit] = useState('');
   const [payrollInfoSaved, setPayrollInfoSaved] = useState(false);
   const [standardHours, setStandardHours] = useState(10);
+  const [variableSchemes, setVariableSchemes] = useState([]);
+  const [assignedScheme, setAssignedScheme] = useState('');
   const [newEmployeeId, setNewEmployeeId] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -65,6 +67,7 @@ export default function EmployeeDetail() {
     if (emp) {
       setManagerEdit(emp.reporting_manager_id || '');
       setStandardHours(emp.standard_hours_per_day || 10);
+      setAssignedScheme(emp.variable_pay_scheme || '');
       setStatusEdit(emp.status || 'active');
       setExitDate(emp.date_of_leaving || '');
       setExitReason(emp.exit_reason || '');
@@ -116,6 +119,8 @@ export default function EmployeeDetail() {
     }
     const { data: training } = await supabase.from('training_records').select('*').eq('employee_id', id);
     setTrainingRecords(training || []);
+    const { data: vSchemes } = await supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true);
+    setVariableSchemes(vSchemes || []);
     const { data: slips } = await supabase
       .from('payroll_line_items')
       .select('id, payslip_number, payroll_run_id, salary_paid_date, total_pay, net_pay, payment_status, bank_reference_number, payroll_runs(period, period_start, period_end)')
@@ -216,7 +221,8 @@ export default function EmployeeDetail() {
     e.preventDefault();
     setError(''); setPayrollInfoSaved(false);
     const { error } = await supabase.from('employees').update({
-      standard_hours_per_day: standardHours
+      standard_hours_per_day: standardHours,
+      variable_pay_scheme: assignedScheme || null
     }).eq('employee_id', id);
     if (error) { setError(error.message); return; }
     setPayrollInfoSaved(true);
@@ -488,13 +494,27 @@ export default function EmployeeDetail() {
       </section>
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
-        <h2>Payroll info</h2>
-        <form onSubmit={savePayrollInfo} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <label>Standard hours/day
-            <input type="number" value={standardHours} onChange={e => setStandardHours(e.target.value)} style={{ display: 'block', width: 80 }} />
+        <h2>Payroll & Variable Pay Info</h2>
+        <form onSubmit={savePayrollInfo} style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Standard hours/day
+            <input type="number" value={standardHours} onChange={e => setStandardHours(e.target.value)} style={{ display: 'block', width: 90, padding: 6, marginTop: 4, borderRadius: 4, border: '1px solid #ccc' }} />
           </label>
-          <button type="submit">Save</button>
-          {payrollInfoSaved && <span style={{ color: 'green' }}>Saved.</span>}
+          <label style={{ fontSize: 13, fontWeight: 600, minWidth: 260 }}>Assigned Variable Pay Scheme
+            <select
+              value={assignedScheme}
+              onChange={e => setAssignedScheme(e.target.value)}
+              style={{ display: 'block', width: '100%', padding: '6px 8px', marginTop: 4, borderRadius: 4, border: '1px solid #ccc', background: 'white' }}
+            >
+              <option value="">None (Standard / Manual Variable %)</option>
+              {variableSchemes.map(s => (
+                <option key={s.name} value={s.name}>{s.display_name}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" style={{ padding: '7px 16px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 4, fontWeight: 600, cursor: 'pointer' }}>
+            Save Payroll Info
+          </button>
+          {payrollInfoSaved && <span style={{ color: 'green', fontWeight: 600 }}>✓ Saved.</span>}
         </form>
 
         <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 16 }}>

@@ -41,6 +41,7 @@ create table employees (
   uniform_deposit_applicable text,
   current_fixed_salary numeric default 0,
   current_variable_salary numeric default 0,
+  variable_pay_scheme text,
   leave_balance numeric,
   notes text,
   created_at timestamptz default now()
@@ -246,6 +247,7 @@ create table payroll_line_items (
   variable_target numeric,
   variable_percent numeric,
   variable_pay numeric default 0,
+  variable_breakdown jsonb default '[]'::jsonb,
   bonus_pay numeric default 0,
   bonus_description text,
   deduction_amount numeric default 0,

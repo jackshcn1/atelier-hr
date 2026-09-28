@@ -9,25 +9,29 @@ const empty = {
   reporting_manager_id: '', standard_hours_per_day: 10,
   pf_applicable: false, esi_applicable: false, accommodation_provided: false,
   uniform_deposit_applicable: true,
-  current_fixed_salary: '', current_variable_salary: ''
+  current_fixed_salary: '', current_variable_salary: '',
+  variable_pay_scheme: ''
 };
 
 export default function EmployeesPage() {
   const supabase = createClient();
   const [employees, setEmployees] = useState([]); // active + on-notice only, for display + add form
   const [allEmployees, setAllEmployees] = useState([]); // every status, for manager lookups + reassignment check
+  const [schemes, setSchemes] = useState([]);
   const [form, setForm] = useState(empty);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
 
   async function load() {
-    const [visible, all] = await Promise.all([
+    const [visible, all, schemeData] = await Promise.all([
       supabase.from('employees').select('*').in('status', ['active', 'on-notice']).is('deleted_at', null).order('name'),
-      supabase.from('employees').select('*').is('deleted_at', null)
+      supabase.from('employees').select('*').is('deleted_at', null),
+      supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true)
     ]);
     if (visible.error) setError(visible.error.message);
     else setEmployees(visible.data);
     setAllEmployees(all.data || []);
+    setSchemes(schemeData.data || []);
   }
 
   useEffect(() => { load(); }, []);
@@ -161,10 +165,22 @@ export default function EmployeesPage() {
             <input type="number" value={form.standard_hours_per_day}
               onChange={e => setForm({ ...form, standard_hours_per_day: e.target.value })} />
           </label>
-          <input placeholder="Fixed salary" type="number" value={form.current_fixed_salary}
+          <input placeholder="Fixed salary (₹/mo)" type="number" value={form.current_fixed_salary}
             onChange={e => setForm({ ...form, current_fixed_salary: e.target.value })} />
-          <input placeholder="Variable salary" type="number" value={form.current_variable_salary}
+          <input placeholder="Variable salary (₹/mo target)" type="number" value={form.current_variable_salary}
             onChange={e => setForm({ ...form, current_variable_salary: e.target.value })} />
+          <label style={{ gridColumn: 'span 2' }}>Variable Pay Scheme
+            <select
+              value={form.variable_pay_scheme}
+              onChange={e => setForm({ ...form, variable_pay_scheme: e.target.value })}
+              style={{ display: 'block', width: '100%', padding: 8, marginTop: 4 }}
+            >
+              <option value="">None (Standard / Manual Variable)</option>
+              {schemes.map(s => (
+                <option key={s.name} value={s.name}>{s.display_name}</option>
+              ))}
+            </select>
+          </label>
           <label><input type="checkbox" checked={form.pf_applicable}
             onChange={e => setForm({ ...form, pf_applicable: e.target.checked })} /> PF applicable</label>
           <label><input type="checkbox" checked={form.esi_applicable}

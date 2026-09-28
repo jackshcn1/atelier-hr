@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { createClient } from '../../lib/supabaseClient';
 import { parseHours, daysInPeriod, calculateEmployeePayroll } from '../../lib/payroll';
+import { computeEmployeeVariablePayout } from '../../lib/variablePayCalculator';
 
 function getDefaultPayrollCycle() {
   const today = new Date();
@@ -62,13 +63,26 @@ export default function PayrollPage() {
   const [saving, setSaving] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
 
+  // Variable Pay Schemes & Metric Modal
+  const [schemes, setSchemes] = useState([]);
+  const [showMetricModal, setShowMetricModal] = useState(false);
+  const [selectedEmpForMetrics, setSelectedEmpForMetrics] = useState(null);
+  const [selectedSchemeName, setSelectedSchemeName] = useState('');
+  const [metricInputValues, setMetricInputValues] = useState({});
+
   useEffect(() => {
     loadPastRuns();
     loadEmployees();
+    loadSchemes();
     if (payrollMode === 'regular') {
       checkAndLoadExistingRun(defaultCycle.start, defaultCycle.end);
     }
   }, []);
+
+  async function loadSchemes() {
+    const { data } = await supabase.from('variable_pay_schemes').select('*').eq('is_active', true).order('id', { ascending: true });
+    if (data) setSchemes(data);
+  }
 
   async function loadEmployees() {
     const { data } = await supabase.from('employees').select('employee_id, name, designation, department, current_fixed_salary, current_variable_salary').eq('status', 'active').is('deleted_at', null);
@@ -131,14 +145,20 @@ export default function PayrollPage() {
       .order('id', { ascending: true });
 
     if (!itemsErr && items) {
-      const { data: emps } = await supabase.from('employees').select('employee_id, name');
+      const { data: emps } = await supabase.from('employees').select('employee_id, name, variable_pay_scheme');
       const empMap = {};
-      (emps || []).forEach(e => { empMap[e.employee_id] = e.name; });
+      const empSchemeMap = {};
+      (emps || []).forEach(e => {
+        empMap[e.employee_id] = e.name;
+        empSchemeMap[e.employee_id] = e.variable_pay_scheme;
+      });
 
       const loadedResults = items.map(item => ({
         id: item.id,
         employee_id: item.employee_id,
         name: empMap[item.employee_id] || item.employee_id,
+        variable_pay_scheme: empSchemeMap[item.employee_id] || null,
+        variable_breakdown: item.variable_breakdown || [],
         daysPresent: item.days_present ?? 0,
         daysAbsent: item.days_absent ?? 0,
         expectedHours: item.expected_hours ?? 0,
@@ -282,6 +302,8 @@ export default function PayrollPage() {
         employee_id: emp.employee_id, name: emp.name, fixedSalary,
         ...calc, variablePay: Math.round((variablePercents[code] || 0) / 100 * variableTarget) || 0,
         variableTarget, variablePercent: variablePercents[code] || 0,
+        variable_pay_scheme: emp.variable_pay_scheme || null,
+        variable_breakdown: [],
         bonusPay: 0, bonusDescription: '',
         deductionAmount: 0, deductionReason: '',
         priorPayoutsDeduction: prior.total,
@@ -351,6 +373,65 @@ export default function PayrollPage() {
     const pct = Number(percentValue) || 0;
     setVariablePercents({ ...variablePercents, [employeeId]: pct });
     setResults(results.map(r => r.employee_id === employeeId ? { ...r, variablePercent: pct, variablePay: Math.round((pct / 100) * (r.variableTarget || 0)) } : r));
+  }
+
+  function openMetricModal(r) {
+    setSelectedEmpForMetrics(r);
+    const assignedScheme = r.variable_pay_scheme || (schemes.length > 0 ? schemes[0].name : '');
+    setSelectedSchemeName(assignedScheme);
+
+    const initialInputs = {};
+    if (r.variable_breakdown && r.variable_breakdown.length > 0) {
+      r.variable_breakdown.forEach(b => {
+        initialInputs[b.metric_id] = b.actual;
+      });
+    }
+    setMetricInputValues(initialInputs);
+    setShowMetricModal(true);
+  }
+
+  function handleMetricInputChange(metricId, value) {
+    setMetricInputValues(prev => ({
+      ...prev,
+      [metricId]: value
+    }));
+  }
+
+  const activeSchemeObj = schemes.find(s => s.name === selectedSchemeName) || schemes[0];
+
+  const livePayoutCalc = useMemo(() => {
+    if (!activeSchemeObj || !selectedEmpForMetrics) return null;
+    return computeEmployeeVariablePayout(
+      activeSchemeObj,
+      metricInputValues,
+      selectedEmpForMetrics.variableTarget || 0
+    );
+  }, [activeSchemeObj, metricInputValues, selectedEmpForMetrics]);
+
+  function applyCalculatedVariable() {
+    if (!selectedEmpForMetrics || !livePayoutCalc) return;
+    const earnedPct = livePayoutCalc.totalEarnedPct;
+    const payoutAmt = livePayoutCalc.totalPayoutAmount;
+
+    setVariablePercents(prev => ({
+      ...prev,
+      [selectedEmpForMetrics.employee_id]: earnedPct
+    }));
+
+    setResults(prev => prev.map(row => {
+      if (row.employee_id === selectedEmpForMetrics.employee_id) {
+        return {
+          ...row,
+          variablePercent: earnedPct,
+          variablePay: payoutAmt,
+          variable_breakdown: livePayoutCalc.breakdown,
+          variable_pay_scheme: selectedSchemeName
+        };
+      }
+      return row;
+    }));
+
+    setShowMetricModal(false);
   }
 
   function updateBonusPay(employeeId, value) {
@@ -445,6 +526,7 @@ export default function PayrollPage() {
         variable_target: r.variableTarget,
         variable_percent: r.variablePercent || 0,
         variable_pay: varAmt,
+        variable_breakdown: r.variable_breakdown || [],
         bonus_pay: r.bonusPay || 0,
         bonus_description: r.bonusDescription || null,
         deduction_amount: r.deductionAmount || 0,
@@ -760,10 +842,35 @@ export default function PayrollPage() {
                       <td>₹{r.perDaySalary}</td>
                       <td>₹{r.fixedPay}</td>
                       <td>
-                        <input type="number" style={{ width: 50, padding: 2 }} value={r.variablePercent || 0}
-                          onChange={e => updateVariablePay(r.employee_id, Number(e.target.value))} />%
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <input type="number" style={{ width: 45, padding: 2 }} value={r.variablePercent || 0}
+                            onChange={e => updateVariablePay(r.employee_id, Number(e.target.value))} />%
+                          <button
+                            type="button"
+                            onClick={() => openMetricModal(r)}
+                            title="Calculate Variable Pay using Role Metrics"
+                            style={{
+                              background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd',
+                              borderRadius: 4, padding: '2px 6px', fontSize: 11, cursor: 'pointer', fontWeight: 'bold'
+                            }}
+                          >
+                            🎯
+                          </button>
+                        </div>
                       </td>
-                      <td>₹{varAmount}</td>
+                      <td>
+                        <div>
+                          <strong>₹{varAmount.toLocaleString('en-IN')}</strong>
+                          {r.variable_breakdown && r.variable_breakdown.length > 0 && (
+                            <span
+                              style={{ display: 'block', fontSize: 10, color: '#059669', cursor: 'pointer', textDecoration: 'underline' }}
+                              onClick={() => openMetricModal(r)}
+                            >
+                              ({r.variable_breakdown.length} criteria applied)
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <input type="number" style={{ width: 70, padding: 2 }} value={r.bonusPay || 0}
                           onChange={e => updateBonusPay(r.employee_id, e.target.value)} />
@@ -915,6 +1022,171 @@ export default function PayrollPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Variable Pay Attainment Calculator Modal */}
+      {showMetricModal && selectedEmpForMetrics && activeSchemeObj && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }}>
+          <div style={{
+            background: 'white', borderRadius: 8, padding: 24,
+            maxWidth: 780, width: '100%', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, borderBottom: '1px solid #e5e7eb', paddingBottom: 12 }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: 18, fontWeight: 800, color: '#111827' }}>
+                  🎯 Variable Pay Calculator — {selectedEmpForMetrics.name}
+                </h2>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>
+                  Monthly Target Pool: <strong style={{ color: '#059669' }}>₹{Number(selectedEmpForMetrics.variableTarget || 0).toLocaleString('en-IN')}</strong> • Employee ID: <code>{selectedEmpForMetrics.employee_id}</code>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMetricModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: 20, color: '#9ca3af', cursor: 'pointer', padding: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Scheme Selector */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                Applied Variable Scheme:
+              </label>
+              <select
+                value={selectedSchemeName}
+                onChange={e => setSelectedSchemeName(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #cbd5e1', background: 'white', fontWeight: 600, fontSize: 13 }}
+              >
+                {schemes.map(s => (
+                  <option key={s.name} value={s.name}>{s.display_name} ({s.department || 'All'})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Metrics Form Table */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              {(activeSchemeObj.metrics || []).map((metric) => {
+                const inputVal = metricInputValues[metric.id] ?? '';
+                const breakdownItem = (livePayoutCalc?.breakdown || []).find(b => b.metric_id === metric.id);
+                const isProportional = metric.type === 'proportional';
+
+                return (
+                  <div
+                    key={metric.id}
+                    style={{
+                      border: '1px solid #e2e8f0', borderRadius: 6, padding: '12px 14px',
+                      background: breakdownItem?.earnedWeightFraction > 0 ? '#f0fdf4' : '#fafafa',
+                      display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr', gap: 12, alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
+                        {metric.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        Weight: <strong>{Math.round(Number(metric.weight || 0) * 100)}%</strong> • Target: {metric.target}{metric.unit || ''}
+                        {isProportional && metric.floor !== null && ` • Floor: ${metric.floor}`}
+                        {isProportional && metric.ceiling !== null && ` • Ceiling: ${metric.ceiling}`}
+                      </div>
+                      {metric.comments && (
+                        <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', marginTop: 2 }}>
+                          {metric.comments}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 2 }}>
+                        Actual Achieved ({metric.unit || 'units'})
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder={`Target: ${metric.target}`}
+                        value={inputVal}
+                        onChange={e => handleMetricInputChange(metric.id, e.target.value === '' ? '' : Number(e.target.value))}
+                        style={{
+                          width: '100%', padding: '6px 8px', borderRadius: 4,
+                          border: '1px solid #94a3b8', fontSize: 13, fontWeight: 700, boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase' }}>Attainment</div>
+                      <div style={{
+                        fontSize: 13, fontWeight: 800,
+                        color: (breakdownItem?.attainmentRate || 0) >= 1 ? '#15803d' : (breakdownItem?.attainmentRate || 0) > 0 ? '#b45309' : '#dc2626'
+                      }}>
+                        {breakdownItem?.attainmentPct || 0}%
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase' }}>Earned Payout</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: (breakdownItem?.payoutAmount || 0) > 0 ? '#059669' : '#64748b' }}>
+                        ₹{Number(breakdownItem?.payoutAmount || 0).toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Live Totals Card */}
+            {livePayoutCalc && (
+              <div style={{
+                background: '#ecfdf5', border: '1.5px solid #10b981', borderRadius: 8,
+                padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20
+              }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#065f46', textTransform: 'uppercase' }}>
+                    Calculated Attainment & Payout
+                  </div>
+                  <div style={{ fontSize: 13, color: '#047857', marginTop: 2 }}>
+                    Overall Attainment: <strong>{livePayoutCalc.totalEarnedPct}%</strong> of ₹{Number(selectedEmpForMetrics.variableTarget || 0).toLocaleString('en-IN')} pool
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#065f46' }}>
+                    ₹{livePayoutCalc.totalPayoutAmount.toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowMetricModal(false)}
+                style={{
+                  background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db',
+                  padding: '8px 16px', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyCalculatedVariable}
+                style={{
+                  background: '#059669', color: 'white', border: 'none',
+                  padding: '8px 20px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer'
+                }}
+              >
+                ✓ Apply {livePayoutCalc?.totalEarnedPct || 0}% (₹{livePayoutCalc?.totalPayoutAmount.toLocaleString('en-IN') || 0}) to Payroll
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

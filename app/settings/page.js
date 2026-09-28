@@ -93,6 +93,21 @@ export default function SettingsPage() {
         </a>
 
         <a
+          href="/settings/variable-pay"
+          style={{
+            background: 'white', padding: 16, borderRadius: 8, border: '1px solid #6ee7b7', textDecoration: 'none',
+            boxShadow: '0 2px 6px rgba(5, 150, 105, 0.08)', display: 'block'
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 'bold', color: '#059669', marginBottom: 4 }}>
+            🎯 Variable Pay Schemes →
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
+            Configure role targets, metric weights, floors & ceilings for Captains, Kitchen, B2B, and Service staff.
+          </p>
+        </a>
+
+        <a
           href="/settings/document-templates"
           style={{
             background: 'white', padding: 16, borderRadius: 8, border: '1px solid #e5e7eb', textDecoration: 'none',

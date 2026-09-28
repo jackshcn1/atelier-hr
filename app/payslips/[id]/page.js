@@ -287,12 +287,40 @@ export default function PayslipViewPage() {
                   </tr>
                 )}
                 {varAmt > 0 && (
-                  <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '7px 12px', color: '#4b5563' }}>
-                      Variable Pay ({lineItem.variable_percent || 0}% Target)
-                    </td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 600 }}>₹{varAmt.toLocaleString('en-IN')}</td>
-                  </tr>
+                  <>
+                    <tr style={{ borderBottom: lineItem.variable_breakdown?.length ? 'none' : '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '7px 12px', color: '#4b5563' }}>
+                        Variable Pay ({lineItem.variable_percent || 0}% Target)
+                      </td>
+                      <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 600 }}>₹{varAmt.toLocaleString('en-IN')}</td>
+                    </tr>
+                    {lineItem.variable_breakdown && Array.isArray(lineItem.variable_breakdown) && lineItem.variable_breakdown.length > 0 && (
+                      <tr style={{ borderBottom: '1px solid #f3f4f6', background: '#f8fafc' }}>
+                        <td colSpan="2" style={{ padding: '6px 12px 10px 18px', fontSize: 11 }}>
+                          <div style={{ color: '#0369a1', fontWeight: 700, marginBottom: 4 }}>
+                            Performance Criteria Breakdown:
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {lineItem.variable_breakdown.map((m, idx) => (
+                              <div key={m.metric_id || idx} style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: 11 }}>
+                                <span>
+                                  • {m.metric_name} ({Math.round(Number(m.weight || 0) * 100)}% wt):{' '}
+                                  <strong style={{ color: '#1e293b' }}>
+                                    {m.type === 'binary'
+                                      ? (m.attainmentRate >= 1 ? 'Achieved (100%)' : 'Missed (0%)')
+                                      : `${m.actual}${m.unit || ''} (${m.attainmentPct}%)`}
+                                  </strong>
+                                </span>
+                                <span style={{ fontWeight: 600, color: m.payoutAmount > 0 ? '#059669' : '#94a3b8' }}>
+                                  ₹{Number(m.payoutAmount || 0).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )}
                 {bonusAmt > 0 && (
                   <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
