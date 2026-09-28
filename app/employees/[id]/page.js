@@ -349,18 +349,141 @@ export default function EmployeeDetail() {
 
   const directReports = allEmployees.filter(e => e.employee_id !== id);
 
+  const initials = String(employee.name || 'Emp')
+    .split(/\s+/)
+    .map(n => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
-    <div>
-      <a href="/employees">← Back to employees</a>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-        {photoUrl && <img src={photoUrl} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />}
-        <div>
-          <h1 style={{ margin: 0 }}>{employee.name}</h1>
-          <p style={{ margin: 0 }}>{employee.designation} — {employee.department}</p>
+    <div style={{ paddingBottom: 40 }}>
+      <a href="/employees" style={{ color: '#4b5563', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
+        ← Back to all employees
+      </a>
+
+      {/* Top Employee Profile Card with Photo Thumbnail */}
+      <div style={{
+        background: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: 10,
+        padding: '20px 24px',
+        marginTop: 14,
+        marginBottom: 20,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+        display: 'flex',
+        gap: 20,
+        alignItems: 'center',
+        flexWrap: 'wrap'
+      }}>
+        {/* Passport Photo Thumbnail / Avatar */}
+        <div style={{ position: 'relative', width: 96, height: 96, flexShrink: 0 }}>
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt={employee.name}
+              style={{
+                width: 96,
+                height: 96,
+                objectFit: 'cover',
+                borderRadius: 8,
+                border: '2px solid #e2e8f0',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.08)'
+              }}
+            />
+          ) : (
+            <div style={{
+              width: 96,
+              height: 96,
+              borderRadius: 8,
+              background: '#e0f2fe',
+              border: '2px dashed #7dd3fc',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#0369a1'
+            }}>
+              <span style={{ fontSize: 24, fontWeight: 800 }}>{initials}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, marginTop: 2 }}>No Photo</span>
+            </div>
+          )}
+
+          {/* Quick upload trigger on avatar */}
+          <label style={{
+            position: 'absolute',
+            bottom: -6,
+            right: -6,
+            background: '#2563eb',
+            color: 'white',
+            borderRadius: '50%',
+            width: 26,
+            height: 26,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            border: '2px solid white'
+          }} title="Upload / Update Passport Photo">
+            📷
+            <input type="file" accept="image/*" onChange={uploadPassportPhoto} disabled={uploadingPhoto} style={{ display: 'none' }} />
+          </label>
+        </div>
+
+        {/* Profile Info Details */}
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#111827' }}>
+              {employee.name}
+            </h1>
+            <span style={{
+              padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
+              background: employee.status === 'active' ? '#dcfce7' : employee.status === 'on-notice' ? '#fef3c7' : '#fee2e2',
+              color: employee.status === 'active' ? '#15803d' : employee.status === 'on-notice' ? '#b45309' : '#991b1b',
+              border: `1px solid ${employee.status === 'active' ? '#bbf7d0' : employee.status === 'on-notice' ? '#fde68a' : '#fca5a5'}`
+            }}>
+              {employee.status === 'active' ? '✓ Active' : employee.status === 'on-notice' ? '⏳ On Notice' : '🚪 Exited'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontSize: 13, color: '#4b5563', marginBottom: 8 }}>
+            <span style={{ fontWeight: 600, color: '#1f2937' }}>{employee.designation || 'Staff'}</span>
+            <span>•</span>
+            <span style={{ background: '#f3f4f6', padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{employee.department || 'All Departments'}</span>
+            <span>•</span>
+            <span style={{ fontFamily: 'monospace', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+              ID: {id}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#6b7280' }}>
+            <span>📅 Joined: <strong>{employee.date_of_joining || '—'}</strong> ({tenure})</span>
+            {employee.reporting_manager_id && (
+              <span>👤 Reports to: <strong>{allEmployees.find(m => m.employee_id === employee.reporting_manager_id)?.name || employee.reporting_manager_id}</strong></span>
+            )}
+            {employee.phone && <span>📞 {employee.phone}</span>}
+            {employee.email && <span>✉️ {employee.email}</span>}
+          </div>
+        </div>
+
+        {/* Top Right Action Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+          <a
+            href={`/employees/${id}/onboarding`}
+            style={{
+              background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155',
+              padding: '6px 14px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 6
+            }}
+          >
+            📄 Onboarding Doc →
+          </a>
+          {uploadingPhoto && <span style={{ fontSize: 11, color: '#2563eb' }}>Uploading photo…</span>}
         </div>
       </div>
-      <p>In service: {tenure} · Status: {employee.status}{employee.exit_reason ? ` (${employee.exit_reason.replace('_', ' ')})` : ''}</p>
-      <p><a href={`/employees/${id}/onboarding`}>View / print onboarding acknowledgment document →</a></p>
+
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
