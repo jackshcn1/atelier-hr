@@ -21,7 +21,7 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
       {/* Connector line from parent */}
       {depth > 0 && (
         <div style={{
-          width: 2, height: 18,
+          width: 2, height: 16,
           background: '#cbd5e1', borderRadius: 2,
           marginBottom: -2
         }} />
@@ -31,23 +31,23 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
       <div style={{
         background: flagged ? '#fffbeb' : 'white',
         border: flagged ? '2px solid #f59e0b' : '2px solid #e2e8f0',
-        borderRadius: 12,
-        padding: '10px 14px',
+        borderRadius: 10,
+        padding: '8px 12px',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-        minWidth: 220,
-        maxWidth: 300,
+        gap: 8,
+        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+        minWidth: 180,
+        maxWidth: 240,
         position: 'relative'
       }}>
         {/* Avatar */}
         <div style={{
-          width: 38, height: 38, borderRadius: '50%',
+          width: 32, height: 32, borderRadius: '50%',
           background: isExited ? '#fee2e2' : '#eff6ff',
           color: isExited ? '#991b1b' : '#1d4ed8',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 800, fontSize: 13, flexShrink: 0,
+          fontWeight: 800, fontSize: 12, flexShrink: 0,
           border: `2px solid ${isExited ? '#fca5a5' : '#bfdbfe'}`
         }}>
           {emp.passport_photo_url ? (
@@ -61,11 +61,11 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
         </div>
 
         {/* Info */}
-        <div style={{ flex: 1, minWidth: 100 }}>
+        <div style={{ flex: 1, minWidth: 80 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
             <a
               href={`/employees/${emp.employee_id}`}
-              style={{ fontWeight: 800, fontSize: 13, color: '#111827', textDecoration: 'none' }}
+              style={{ fontWeight: 800, fontSize: 12, color: '#111827', textDecoration: 'none' }}
             >
               {emp.name}
             </a>
@@ -76,7 +76,7 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
             )}
           </div>
 
-          <div style={{ fontSize: 11, color: '#4b5563', marginTop: 2 }}>
+          <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
             <span style={{ fontWeight: 600 }}>{emp.designation || 'Staff'}</span>
             {emp.department && (
               <span style={{ color: '#6b7280' }}> • {emp.department}</span>
@@ -84,9 +84,9 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
           </div>
 
           {flagged && (
-            <div style={{ marginTop: 5, fontSize: 10, color: '#b45309', fontWeight: 600 }}>
+            <div style={{ marginTop: 4, fontSize: 9, color: '#b45309', fontWeight: 600 }}>
               ⚠ Exited Manager — {kids.length} direct report(s) need reassignment:
-              <div style={{ marginTop: 3 }}>
+              <div style={{ marginTop: 2 }}>
                 <select
                   defaultValue=""
                   onChange={(e) => {
@@ -94,7 +94,7 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
                       kids.forEach(k => onReassign(k.employee_id, e.target.value));
                     }
                   }}
-                  style={{ fontSize: 10, padding: '2px 5px', borderRadius: 3, border: '1px solid #f59e0b', background: 'white' }}
+                  style={{ fontSize: 9, padding: '2px 4px', borderRadius: 3, border: '1px solid #f59e0b', background: 'white' }}
                 >
                   <option value="">Reassign all reports to…</option>
                   {allEmployees.filter(m => m.status !== 'exited' && m.employee_id !== emp.employee_id).map(m => (
@@ -113,10 +113,10 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Expand team' : 'Collapse team'}
             style={{
-              position: 'absolute', top: -10, right: -10,
+              position: 'absolute', top: -8, right: -8,
               background: '#2563eb', color: 'white',
               border: 'none', borderRadius: '50%',
-              width: 22, height: 22, fontSize: 11, fontWeight: 800,
+              width: 20, height: 20, fontSize: 10, fontWeight: 800,
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
           >
@@ -125,23 +125,33 @@ function OrgNode({ emp, childrenMap, allEmployees, onReassign, depth = 0 }) {
         )}
       </div>
 
-      {/* Child Nodes — rendered side by side like a family tree */}
+      {/* Child Nodes — rendered in a single horizontal row (family tree style) */}
       {!collapsed && kids.length > 0 && (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           marginTop: 14, position: 'relative'
         }}>
-          {/* Horizontal connector bar */}
+          {/* Vertical connector from manager down to horizontal bar */}
+          <div style={{
+            width: 2, height: 14,
+            background: '#cbd5e1', borderRadius: 2
+          }} />
+
+          {/* Horizontal connector bar spanning all reports */}
           {kids.length > 1 && (
             <div style={{
-              position: 'absolute', top: 0,
-              width: `${Math.max(kids.length * 180, 220)}px`, height: 2,
+              position: 'absolute', top: 14,
+              width: `${Math.max(kids.length * 180, 200)}px`, height: 2,
               background: '#cbd5e1', borderRadius: 2
             }} />
           )}
+
+          {/* Reports row — all direct reports side by side on one line */}
           <div style={{
-            display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center',
-            marginTop: kids.length > 1 ? 16 : 0
+            display: 'flex', gap: 16, flexWrap: 'nowrap', justifyContent: 'center',
+            marginTop: kids.length > 1 ? 14 : 0,
+            overflowX: 'auto',
+            maxWidth: '100%'
           }}>
             {kids.map(k => (
               <OrgNode
@@ -236,7 +246,7 @@ export default function OrgChartPage() {
           </div>
 
           {/* Family Tree - roots displayed horizontally */}
-          <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', gap: 40, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'flex-start', overflowX: 'auto', maxWidth: '100%' }}>
             {tree.roots.map(r => (
               <OrgNode
                 key={r.employee_id}
