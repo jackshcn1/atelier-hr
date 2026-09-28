@@ -24,6 +24,8 @@ export default function EmployeeDetail() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [statusEdit, setStatusEdit] = useState('');
+  const [managerAndStatusSaved, setManagerAndStatusSaved] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
   const [exitDate, setExitDate] = useState('');
   const [exitReason, setExitReason] = useState('');
   const [resignationLetter, setResignationLetter] = useState(null);
@@ -159,14 +161,26 @@ export default function EmployeeDetail() {
   async function saveManagerAndStatus(e) {
     e.preventDefault();
     setError('');
+    setSavingStatus(true);
+    setManagerAndStatusSaved(false);
+
     const update = {
       reporting_manager_id: managerEdit || null,
       status: statusEdit,
       date_of_leaving: statusEdit === 'exited' ? (exitDate || new Date().toISOString().slice(0, 10)) : null,
       exit_reason: statusEdit === 'exited' ? (exitReason || null) : null
     };
-    const { error } = await supabase.from('employees').update(update).eq('employee_id', id);
-    if (error) { setError(error.message); return; }
+
+    const { error: upErr } = await supabase.from('employees').update(update).eq('employee_id', id);
+    setSavingStatus(false);
+
+    if (upErr) {
+      setError(`Failed to update status: ${upErr.message}`);
+      return;
+    }
+
+    setManagerAndStatusSaved(true);
+    setTimeout(() => setManagerAndStatusSaved(false), 4000);
     load();
   }
 
@@ -562,18 +576,26 @@ export default function EmployeeDetail() {
       </section>
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
-        <h2>Manager & status</h2>
-        <form onSubmit={saveManagerAndStatus} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <label>Reports to
-            <select value={managerEdit} onChange={e => setManagerEdit(e.target.value)}>
+        <h2>Manager & Status</h2>
+        <form onSubmit={saveManagerAndStatus} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Reports to
+            <select
+              value={managerEdit}
+              onChange={e => setManagerEdit(e.target.value)}
+              style={{ display: 'block', padding: '6px 8px', marginTop: 4, borderRadius: 4, border: '1px solid #ccc', background: 'white' }}
+            >
               <option value="">None (top of hierarchy)</option>
               {directReports.map(m => (
                 <option key={m.employee_id} value={m.employee_id}>{m.name}{m.status === 'exited' ? ' (exited)' : ''}</option>
               ))}
             </select>
           </label>
-          <label>Status
-            <select value={statusEdit} onChange={e => setStatusEdit(e.target.value)}>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Status
+            <select
+              value={statusEdit}
+              onChange={e => setStatusEdit(e.target.value)}
+              style={{ display: 'block', padding: '6px 8px', marginTop: 4, borderRadius: 4, border: '1px solid #ccc', background: 'white' }}
+            >
               <option value="active">Active</option>
               <option value="on-notice">On notice</option>
               <option value="exited">Exited</option>
@@ -581,11 +603,20 @@ export default function EmployeeDetail() {
           </label>
           {statusEdit === 'exited' && (
             <>
-              <label>Date of leaving
-                <input type="date" value={exitDate} onChange={e => setExitDate(e.target.value)} />
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Date of leaving
+                <input
+                  type="date"
+                  value={exitDate}
+                  onChange={e => setExitDate(e.target.value)}
+                  style={{ display: 'block', padding: '6px 8px', marginTop: 4, borderRadius: 4, border: '1px solid #ccc' }}
+                />
               </label>
-              <label>Exit reason
-                <select value={exitReason} onChange={e => setExitReason(e.target.value)}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Exit reason
+                <select
+                  value={exitReason}
+                  onChange={e => setExitReason(e.target.value)}
+                  style={{ display: 'block', padding: '6px 8px', marginTop: 4, borderRadius: 4, border: '1px solid #ccc', background: 'white' }}
+                >
                   <option value="">Select reason…</option>
                   <option value="resigned">Resigned</option>
                   <option value="absconding">Absconding</option>
@@ -595,7 +626,27 @@ export default function EmployeeDetail() {
               </label>
             </>
           )}
-          <button type="submit">Save</button>
+          <button
+            type="submit"
+            disabled={savingStatus}
+            style={{
+              padding: '7px 18px',
+              background: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer'
+            }}
+          >
+            {savingStatus ? 'Saving…' : 'Save Status'}
+          </button>
+          {managerAndStatusSaved && (
+            <span style={{ color: '#059669', fontWeight: 700, fontSize: 13 }}>
+              ✓ Status updated successfully!
+            </span>
+          )}
         </form>
         {statusEdit === 'exited' && (
           <p style={{ color: '#856404', marginTop: 10 }}>
