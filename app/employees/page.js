@@ -55,6 +55,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]); // active + on-notice only
   const [allEmployees, setAllEmployees] = useState([]); // every status, for manager lookups
   const [departments, setDepartments] = useState([]);
+  const [designations, setDesignations] = useState([]);
   const [schemes, setSchemes] = useState([]);
   const [form, setForm] = useState(initialEmptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -66,10 +67,11 @@ export default function EmployeesPage() {
   const [error, setError] = useState('');
 
   async function load() {
-    const [visible, all, depts, schemeData] = await Promise.all([
+    const [visible, all, depts, desigs, schemeData] = await Promise.all([
       supabase.from('employees').select('*').in('status', ['active', 'on-notice']).is('deleted_at', null).order('name'),
       supabase.from('employees').select('*').is('deleted_at', null),
       supabase.from('departments').select('name').order('name'),
+      supabase.from('designations').select('*').order('name'),
       supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true)
     ]);
 
@@ -77,6 +79,7 @@ export default function EmployeesPage() {
     else setEmployees(visible.data || []);
     setAllEmployees(all.data || []);
     setDepartments((depts.data || []).map(d => d.name));
+    setDesignations(desigs.data || []);
     setSchemes(schemeData.data || []);
   }
 
@@ -339,16 +342,6 @@ export default function EmployeesPage() {
               </label>
 
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
-                Designation
-                <input
-                  placeholder="e.g. Captain, Line Cook, Cashier"
-                  value={form.designation}
-                  onChange={e => setForm({ ...form, designation: e.target.value })}
-                  style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
-                />
-              </label>
-
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 Department
                 <select
                   value={form.department}
@@ -368,6 +361,22 @@ export default function EmployeesPage() {
                     </>
                   )}
                 </select>
+              </label>
+
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                Designation (Role)
+                <input
+                  list="add-employee-desig-options"
+                  placeholder="Select or type designation"
+                  value={form.designation}
+                  onChange={e => setForm({ ...form, designation: e.target.value })}
+                  style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
+                />
+                <datalist id="add-employee-desig-options">
+                  {designations.map(d => (
+                    <option key={d.id} value={d.name}>{d.department ? `(${d.department})` : ''}</option>
+                  ))}
+                </datalist>
               </label>
 
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>

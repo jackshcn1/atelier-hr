@@ -19,6 +19,17 @@ export default function EmployeeDetail() {
   const [standardHours, setStandardHours] = useState(10);
   const [variableSchemes, setVariableSchemes] = useState([]);
   const [assignedScheme, setAssignedScheme] = useState('');
+  const [departments, setDepartments] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  const [jobDetails, setJobDetails] = useState({
+    designation: '',
+    department: '',
+    employment_type: 'full-time',
+    date_of_joining: '',
+    probation_end_date: ''
+  });
+  const [jobSaved, setJobSaved] = useState(false);
+  const [savingJob, setSavingJob] = useState(false);
   const [newEmployeeId, setNewEmployeeId] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -73,6 +84,13 @@ export default function EmployeeDetail() {
       setStatusEdit(emp.status || 'active');
       setExitDate(emp.date_of_leaving || '');
       setExitReason(emp.exit_reason || '');
+      setJobDetails({
+        designation: emp.designation || '',
+        department: emp.department || '',
+        employment_type: emp.employment_type || 'full-time',
+        date_of_joining: emp.date_of_joining || '',
+        probation_end_date: emp.probation_end_date || ''
+      });
       setPersonal({
         name: emp.name || '', phone: emp.phone || '', email: emp.email || '',
         dob: emp.dob || '', gender: emp.gender || '', blood_group: emp.blood_group || '',
@@ -123,6 +141,10 @@ export default function EmployeeDetail() {
     setTrainingRecords(training || []);
     const { data: vSchemes } = await supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true);
     setVariableSchemes(vSchemes || []);
+    const { data: deptData } = await supabase.from('departments').select('name').order('name');
+    setDepartments((deptData || []).map(d => d.name));
+    const { data: desigData } = await supabase.from('designations').select('*').order('name');
+    setDesignations(desigData || []);
     const { data: slips } = await supabase
       .from('payroll_line_items')
       .select('id, payslip_number, payroll_run_id, salary_paid_date, total_pay, net_pay, payment_status, bank_reference_number, payroll_runs(period, period_start, period_end)')
@@ -181,6 +203,31 @@ export default function EmployeeDetail() {
 
     setManagerAndStatusSaved(true);
     setTimeout(() => setManagerAndStatusSaved(false), 4000);
+    load();
+  }
+
+  async function saveJobDetails(e) {
+    e.preventDefault();
+    setError('');
+    setSavingJob(true);
+    setJobSaved(false);
+
+    const { error: jobErr } = await supabase.from('employees').update({
+      designation: jobDetails.designation || null,
+      department: jobDetails.department || null,
+      employment_type: jobDetails.employment_type || 'full-time',
+      date_of_joining: jobDetails.date_of_joining || null,
+      probation_end_date: jobDetails.probation_end_date || null
+    }).eq('employee_id', id);
+
+    setSavingJob(false);
+    if (jobErr) {
+      setError(`Failed to update job details: ${jobErr.message}`);
+      return;
+    }
+
+    setJobSaved(true);
+    setTimeout(() => setJobSaved(false), 4000);
     load();
   }
 
@@ -499,6 +546,104 @@ export default function EmployeeDetail() {
       </div>
 
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
+
+      {/* 1. Job & Department Assignment Section */}
+      <section style={{ background: 'white', padding: 18, borderRadius: 8, marginTop: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', border: '1px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827' }}>
+            💼 Job, Department & Designation
+          </h2>
+          <a
+            href="/settings/departments-designations"
+            style={{ fontSize: 12, color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
+          >
+            ⚙️ Manage Departments & Designations →
+          </a>
+        </div>
+        <p style={{ color: '#6b7280', fontSize: 13, margin: '0 0 14px 0' }}>
+          Assign official organization department, role designation, and employment contracts.
+        </p>
+
+        <form onSubmit={saveJobDetails} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+            Department
+            <select
+              value={jobDetails.department}
+              onChange={e => setJobDetails({ ...jobDetails, department: e.target.value })}
+              style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, background: 'white', boxSizing: 'border-box' }}
+            >
+              <option value="">Unassigned</option>
+              {departments.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+            Designation (Role)
+            <input
+              list="desig-options"
+              value={jobDetails.designation}
+              onChange={e => setJobDetails({ ...jobDetails, designation: e.target.value })}
+              placeholder="Select or type designation"
+              style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
+            />
+            <datalist id="desig-options">
+              {designations.map(d => (
+                <option key={d.id} value={d.name}>{d.department ? `(${d.department})` : ''}</option>
+              ))}
+            </datalist>
+          </label>
+
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+            Employment Type
+            <select
+              value={jobDetails.employment_type}
+              onChange={e => setJobDetails({ ...jobDetails, employment_type: e.target.value })}
+              style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, background: 'white', boxSizing: 'border-box' }}
+            >
+              <option value="full-time">Full-time</option>
+              <option value="probation">Probation</option>
+              <option value="contract">Contract</option>
+              <option value="part-time">Part-time</option>
+            </select>
+          </label>
+
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+            Date of Joining
+            <input
+              type="date"
+              value={jobDetails.date_of_joining}
+              onChange={e => setJobDetails({ ...jobDetails, date_of_joining: e.target.value })}
+              style={{ width: '100%', padding: '6px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
+            />
+          </label>
+
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+            Probation End Date
+            <input
+              type="date"
+              value={jobDetails.probation_end_date}
+              onChange={e => setJobDetails({ ...jobDetails, probation_end_date: e.target.value })}
+              style={{ width: '100%', padding: '6px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
+            />
+          </label>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+            <button
+              type="submit"
+              disabled={savingJob}
+              style={{
+                padding: '8px 20px', background: '#2563eb', color: 'white', border: 'none',
+                borderRadius: 4, fontWeight: 700, fontSize: 13, cursor: 'pointer'
+              }}
+            >
+              {savingJob ? 'Saving…' : 'Save Job Details'}
+            </button>
+            {jobSaved && <span style={{ color: '#059669', fontWeight: 700, fontSize: 13 }}>✓ Job details updated!</span>}
+          </div>
+        </form>
+      </section>
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
         <h2>Personal details</h2>

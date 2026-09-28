@@ -93,6 +93,21 @@ export default function SettingsPage() {
         </a>
 
         <a
+          href="/settings/departments-designations"
+          style={{
+            background: 'white', padding: 16, borderRadius: 8, border: '1px solid #60a5fa', textDecoration: 'none',
+            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.08)', display: 'block'
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 'bold', color: '#2563eb', marginBottom: 4 }}>
+            🏢 Departments & Designations →
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
+            Configure company departments, role designations, and department heads for onboarding dropdowns.
+          </p>
+        </a>
+
+        <a
           href="/settings/variable-pay"
           style={{
             background: 'white', padding: 16, borderRadius: 8, border: '1px solid #6ee7b7', textDecoration: 'none',

@@ -5,7 +5,19 @@
 -- 1. Departments -------------------------------------------------
 create table departments (
   name text primary key,
-  head_employee_id text
+  head_employee_id text,
+  description text,
+  created_at timestamptz default now()
+);
+
+-- 1b. Designations ------------------------------------------------
+create table designations (
+  id bigint generated always as identity primary key,
+  name text not null unique,
+  department text references departments(name) on update cascade on delete set null,
+  description text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 -- 2. Employees -----------------------------------------------------
