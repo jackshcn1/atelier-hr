@@ -612,6 +612,8 @@ export async function runPetpoojaSync(options = {}) {
       const counterRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/65', 'Item Report (Counter Sales)');
       const counterResult = parseCounterSales(counterRows, cycle);
       if (counterResult.ok) {
+        console.log('  📊 Counter Sales breakdown by category:', JSON.stringify(counterResult.byCategory));
+        console.log(`  📊 Total Counter Sales: ₹${counterResult.total} across ${counterResult.itemsCounted || 0} items`);
         await saveMetric('b2b_counter_sales', counterResult.total, 'petpooja', 'Item Report (Counter Sales)', {
           scheme_name: 'b2b_counter',
           byCategory: counterResult.byCategory
@@ -626,8 +628,10 @@ export async function runPetpoojaSync(options = {}) {
     // REPORT 4: Orders Master Report (#10) - Swiggy & Zomato
     try {
       const ordersMasterRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/10', 'Orders Master (Delivery)');
-      const deliveryResult = parseDeliverySales(ordersMasterRows, { ...cycle, channels: ['Swiggy_Atelier', 'Zomato'] });
+      const deliveryResult = parseDeliverySales(ordersMasterRows, { ...cycle, channels: ['Swiggy_Atelier', 'Zomato', 'Swiggy', 'Zomato_Atelier', 'Swiggy_Ambrosia', 'Delivery'] });
       if (deliveryResult.ok) {
+        console.log('  📊 Delivery Sales breakdown by channel:', JSON.stringify(deliveryResult.byChannel));
+        console.log(`  📊 Total Delivery Sales: ₹${deliveryResult.total} across ${deliveryResult.orders || 0} orders`);
         await saveMetric('acc_delivery_sales', deliveryResult.total, 'petpooja', 'Orders Master Report', {
           scheme_name: 'accounting',
           byChannel: deliveryResult.byChannel
