@@ -148,35 +148,59 @@ export async function runPetpoojaSync(options = {}) {
   }
 
   try {
-    // 3. Login to Petpooja Billing
+    // 3. Login to Petpooja Billing (2-Step Form)
     console.log('🔐 Logging in to Petpooja (billing.petpooja.com)...');
-    await page.goto('https://billing.petpooja.com/', { waitUntil: 'networkidle', timeout: 45000 });
+    await page.goto('https://billing.petpooja.com/', { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForTimeout(2000);
 
-    // Fill login form
-    const emailInput = page.locator('input[name="username"], input[name="email"], input[type="text"]').first();
-    const passInput = page.locator('input[name="password"], input[type="password"]').first();
-    const submitBtn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Sign in"), button:has-text("Login")').first();
-
+    // Step 1: Email / Username
+    const emailInput = page.locator('#UserEmail, input[name="data[User][email]"], input[type="text"]').first();
+    await emailInput.waitFor({ state: 'visible', timeout: 20000 });
     await emailInput.fill(email);
+
+    const continueBtn = page.locator('button:has-text("Continue"), button[type="submit"], input[type="submit"]').first();
+    await continueBtn.click();
+    await page.waitForTimeout(2000);
+
+    // Step 2: Password
+    const passInput = page.locator('#UserPassword, input[name="data[User][password]"], input[type="password"]').first();
+    await passInput.waitFor({ state: 'visible', timeout: 20000 });
     await passInput.fill(password);
-    await submitBtn.click();
+
+    const loginSubmitBtn = page.locator('button:has-text("Sign in"), button:has-text("Login"), button[type="submit"], input[type="submit"]').first();
+    await loginSubmitBtn.click();
 
     // Wait for navigation after login
-    await page.waitForNavigation({ timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(3000);
-    console.log('✓ Successfully logged in to Petpooja Billing.');
+    await page.waitForNavigation({ timeout: 35000 }).catch(() => {});
+    await page.waitForTimeout(4000);
+    console.log('✓ Successfully authenticated with Petpooja Billing.');
 
     // Helper: download custom report and return sheet rows
     async function fetchCustomReport(url, reportName) {
       console.log(`📥 Fetching ${reportName} (${url})...`);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 40000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
+
+      // Try setting date inputs if present on page
+      try {
+        const fromInput = page.locator('input[name*="from_date"], input[name*="start_date"], input#from_date, input#startDate').first();
+        const toInput = page.locator('input[name*="to_date"], input[name*="end_date"], input#to_date, input#endDate').first();
+        if (await fromInput.count() > 0 && await toInput.count() > 0) {
+          await fromInput.fill(cycle.start);
+          await toInput.fill(cycle.end);
+          const filterBtn = page.locator('button:has-text("Search"), button:has-text("Filter"), input[value="Search"]').first();
+          if (await filterBtn.count() > 0) {
+            await filterBtn.click();
+            await page.waitForTimeout(2000);
+          }
+        }
+      } catch (_) {}
 
       // Trigger export
-      const exportBtn = page.locator('a:has-text("Export"), button:has-text("Export"), a:has-text("Excel"), a[href*="export"], button:has-text("Download")').first();
+      const exportBtn = page.locator('a:has-text("Export"), button:has-text("Export"), a:has-text("Excel"), a[href*="export"], button:has-text("Download"), a[title*="Export"], a[title*="Excel"]').first();
 
       const [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: 30000 }),
+        page.waitForEvent('download', { timeout: 35000 }),
         exportBtn.click()
       ]);
 
