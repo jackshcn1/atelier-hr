@@ -115,12 +115,22 @@ export async function runPetpoojaSync(options = {}) {
   console.log('🌐 Launching headless browser...');
   const browser = await chromium.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled'
+    ]
   });
 
   const context = await browser.newContext({
     acceptDownloads: true,
-    viewport: { width: 1280, height: 800 }
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 768 },
+    locale: 'en-US',
+    extraHTTPHeaders: {
+      'Accept-Language': 'en-US,en;q=0.9'
+    }
   });
   const page = await context.newPage();
 
@@ -149,31 +159,40 @@ export async function runPetpoojaSync(options = {}) {
 
   try {
     // 3. Login to Petpooja Billing (2-Step Form)
-    console.log('🔐 Logging in to Petpooja (billing.petpooja.com)...');
-    await page.goto('https://billing.petpooja.com/', { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForTimeout(2000);
+    console.log('🔐 Navigating to Petpooja Billing (https://billing.petpooja.com/)...');
+    await page.goto('https://billing.petpooja.com/', { waitUntil: 'load', timeout: 45000 });
+    await page.waitForTimeout(3000);
+
+    console.log(`  Current Page URL: ${page.url()}`);
+    console.log(`  Current Page Title: "${await page.title()}"`);
+
+    // Diagnostic: find all inputs on the page
+    const inputCount = await page.locator('input').count();
+    console.log(`  Total input tags found on page: ${inputCount}`);
 
     // Step 1: Email / Username
-    const emailInput = page.locator('#UserEmail, input[name="data[User][email]"], input[type="text"]').first();
-    await emailInput.waitFor({ state: 'visible', timeout: 20000 });
+    const emailInput = page.locator('#UserEmail, input[name="data[User][email]"], input[placeholder*="Email"]').first();
+    await emailInput.waitFor({ state: 'attached', timeout: 20000 });
     await emailInput.fill(email);
+    console.log('  ✓ Filled email address.');
 
     const continueBtn = page.locator('button:has-text("Continue"), button[type="submit"], input[type="submit"]').first();
     await continueBtn.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
     // Step 2: Password
     const passInput = page.locator('#UserPassword, input[name="data[User][password]"], input[type="password"]').first();
-    await passInput.waitFor({ state: 'visible', timeout: 20000 });
+    await passInput.waitFor({ state: 'attached', timeout: 20000 });
     await passInput.fill(password);
+    console.log('  ✓ Filled password.');
 
-    const loginSubmitBtn = page.locator('button:has-text("Sign in"), button:has-text("Login"), button[type="submit"], input[type="submit"]').first();
+    const loginSubmitBtn = page.locator('button:has-text("Sign in"), button:has-text("Login"), button:has-text("Continue"), button[type="submit"], input[type="submit"]').first();
     await loginSubmitBtn.click();
 
     // Wait for navigation after login
     await page.waitForNavigation({ timeout: 35000 }).catch(() => {});
-    await page.waitForTimeout(4000);
-    console.log('✓ Successfully authenticated with Petpooja Billing.');
+    await page.waitForTimeout(5000);
+    console.log(`✓ Post-login URL: ${page.url()} ("${await page.title()}")`);
 
     // Helper: download custom report and return sheet rows
     async function fetchCustomReport(url, reportName) {
