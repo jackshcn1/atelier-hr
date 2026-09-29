@@ -86,8 +86,22 @@ function getActivePayrollCycle() {
 }
 
 function parseWorkbookBuffer(buffer) {
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
+  if (!buffer || buffer.length === 0) return [];
+  let wb;
+  try {
+    wb = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
+  } catch (e) {
+    try {
+      const str = buffer.toString('utf8');
+      wb = XLSX.read(str, { type: 'string', cellDates: true, raw: false });
+    } catch (e2) {
+      console.error('  ❌ Could not parse report buffer:', e2.message);
+      return [];
+    }
+  }
+  const sheetName = wb?.SheetNames?.[0];
+  if (!sheetName || !wb.Sheets[sheetName]) return [];
+  const sheet = wb.Sheets[sheetName];
   return XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: '',
@@ -397,7 +411,15 @@ export async function runPetpoojaSync(options = {}) {
           await page.waitForTimeout(3000);
         }
 
-        const downloadLink = page.locator('table a:visible:has-text("Download"), a:visible:has-text("Download")').first();
+        // Locate the latest generated row in the table (or matching current month)
+        const matchRow = page.locator('table tr').filter({ hasText: cycle.start.slice(0, 7) }).first();
+        let downloadLink = null;
+        if (await matchRow.count() > 0 && await matchRow.locator('a:has-text("Download")').count() > 0) {
+          downloadLink = matchRow.locator('a:has-text("Download")').first();
+        } else {
+          downloadLink = page.locator('table tr:last-child a:has-text("Download"), table a:visible:has-text("Download")').first();
+        }
+
         await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
 
         const href = await downloadLink.getAttribute('href');
@@ -431,7 +453,7 @@ export async function runPetpoojaSync(options = {}) {
         await exportBtn.click({ force: true });
         await page.waitForTimeout(1500);
 
-        const excelOption = page.locator('a:visible:has-text("Excel"), button:visible:has-text("Excel"), li:visible:has-text("Excel"), a[href*="excel" i]:visible').first();
+        const excelOption = page.locator('.dropdown-menu a:visible, .dropdown-menu button:visible, a:visible:has-text("Excel"), button:visible:has-text("Excel"), li:visible:has-text("Excel"), a:visible:has-text("CSV"), a[href*="excel" i]:visible, a:visible:has-text("Export")').first();
         await excelOption.waitFor({ state: 'visible', timeout: 15000 });
 
         const href = await excelOption.getAttribute('href');
@@ -657,6 +679,23 @@ export async function runPetpoojaSync(options = {}) {
     // REPORT 7: Petpooja Inventory (Wastage & Purchase Returns)
     try {
       console.log('🔐 Navigating to Petpooja Inventory...');
+      await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
+      await page.waitForTimeout(2000);
+
+      // In Petpooja Billing sidebar, click Inventory to trigger authenticated SSO session
+      const invLink = page.locator('.sidebar-menu a:has-text("Inventory"), a:has-text("Inventory"), span:has-text("Inventory")').first();
+      if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
+        console.log('  ✓ Clicking Inventory in sidebar navigation...');
+        const [invPage] = await Promise.all([
+          context.waitForEvent('page', { timeout: 6000 }).catch(() => null),
+          invLink.click({ force: true })
+        ]);
+        if (invPage) {
+          await invPage.waitForLoadState('load').catch(() => {});
+        }
+        await page.waitForTimeout(3000);
+      }
+
       // Wastage download
       try {
         const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report');
