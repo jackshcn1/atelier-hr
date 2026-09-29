@@ -43,7 +43,7 @@ function loadLocalConfig() {
   return cfg;
 }
 
-// Calculate active 20th–19th payroll cycle
+// Calculate active 20th–19th payroll cycle (e.g. 2026-09-20 to 2026-10-19 when today is Sep 29)
 function getActivePayrollCycle() {
   if (process.env.SYNC_START_DATE && process.env.SYNC_END_DATE) {
     return {
@@ -53,18 +53,35 @@ function getActivePayrollCycle() {
   }
   const today = new Date();
   const y = today.getFullYear();
-  const m = today.getMonth(); // 0-indexed
+  const m = today.getMonth(); // 0-indexed (0=Jan, 8=Sep, 9=Oct...)
   const d = today.getDate();
-  let ey = y, em = m;
+
+  let startYear = y;
+  let startMonth = m;
+
   if (d < 20) {
-    em -= 1;
-    if (em < 0) { em = 11; ey -= 1; }
+    // Before the 20th of the current month, the active cycle started on the 20th of last month
+    startMonth -= 1;
+    if (startMonth < 0) {
+      startMonth = 11;
+      startYear -= 1;
+    }
   }
-  let sy = ey, sm = em - 1;
-  if (sm < 0) { sm = 11; sy -= 1; }
+
+  // End of cycle is the 19th of the following month
+  let endMonth = startMonth + 1;
+  let endYear = startYear;
+  if (endMonth > 11) {
+    endMonth = 0;
+    endYear += 1;
+  }
+
+  const startStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-20`;
+  const endStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-19`;
+
   return {
-    start: `${sy}-${String(sm + 1).padStart(2, '0')}-20`,
-    end: `${ey}-${String(em + 1).padStart(2, '0')}-19`
+    start: startStr,
+    end: endStr
   };
 }
 
@@ -298,54 +315,54 @@ export async function runPetpoojaSync(options = {}) {
 
       // 1. Fill Date Range if datepicker inputs are present
       try {
-        await page.evaluate(({ startDates, endDates }) => {
-          const inputs = Array.from(document.querySelectorAll('input[type="text"], input[name*="date" i], input[id*="date" i], input.datepicker, input.set-calendar, input.start_fromdate, input.reportsatrtdate'))
-            .filter(el => {
-              const style = window.getComputedStyle(el);
-              return style.display !== 'none' && style.visibility !== 'hidden' && el.type !== 'hidden';
-            });
+        const dateInputLocators = await page.locator('input.start_fromdate:visible, input.set-calendar:visible, input.reportsatrtdate:visible, input[name*="date" i]:visible, input[id*="date" i]:visible, input[type="text"]:visible').all();
 
-          if (inputs.length >= 2) {
-            const fromEl = inputs[0];
-            const toEl = inputs[1];
+        if (dateInputLocators.length >= 2) {
+          // Remove readonly attribute so inputs can be edited
+          await dateInputLocators[0].evaluate(el => el.removeAttribute('readonly'));
+          await dateInputLocators[1].evaluate(el => el.removeAttribute('readonly'));
 
-            fromEl.removeAttribute('readonly');
-            toEl.removeAttribute('readonly');
+          const val0 = (await dateInputLocators[0].inputValue().catch(() => '')) || (await dateInputLocators[0].getAttribute('placeholder').catch(() => '')) || '';
 
-            const curVal = fromEl.value || fromEl.getAttribute('placeholder') || '';
+          let sVal = startDates.iso;
+          let eVal = endDates.iso;
 
-            let sVal = startDates.iso;
-            let eVal = endDates.iso;
-
-            if (curVal.match(/[A-Za-z]{3}/)) {
-              sVal = startDates.dmyWords;
-              eVal = endDates.dmyWords;
-            } else if (curVal.includes('/') || (curVal.includes('-') && curVal.split('-')[0].length === 2)) {
-              sVal = curVal.includes('/') ? startDates.dmySlash : startDates.dmyHyphen;
-              eVal = curVal.includes('/') ? endDates.dmySlash : endDates.dmyHyphen;
-            } else if (curVal.includes(':')) {
-              sVal = `${startDates.iso} 00:00:00`;
-              eVal = `${endDates.iso} 23:59:59`;
-            }
-
-            fromEl.value = sVal;
-            toEl.value = eVal;
-
-            fromEl.dispatchEvent(new Event('input', { bubbles: true }));
-            fromEl.dispatchEvent(new Event('change', { bubbles: true }));
-            toEl.dispatchEvent(new Event('input', { bubbles: true }));
-            toEl.dispatchEvent(new Event('change', { bubbles: true }));
-
-            if (window.jQuery) {
-              try {
-                window.jQuery(fromEl).datepicker('setDate', sVal);
-                window.jQuery(toEl).datepicker('setDate', eVal);
-              } catch(e) {}
-            }
+          if (val0.match(/[A-Za-z]{3}/)) {
+            sVal = startDates.dmyWords;
+            eVal = endDates.dmyWords;
+          } else if (val0.includes('/') || (val0.includes('-') && val0.split('-')[0].length === 2)) {
+            sVal = val0.includes('/') ? startDates.dmySlash : startDates.dmyHyphen;
+            eVal = val0.includes('/') ? endDates.dmySlash : endDates.dmyHyphen;
+          } else if (val0.includes(':')) {
+            sVal = `${startDates.iso} 00:00:00`;
+            eVal = `${endDates.iso} 23:59:59`;
           }
-        }, { startDates, endDates });
 
-        console.log(`  ✓ Set date range: ${cycle.start} to ${cycle.end}`);
+          // Visibly type dates into the input fields
+          await dateInputLocators[0].click({ force: true });
+          await dateInputLocators[0].fill(sVal);
+          await dateInputLocators[0].evaluate((el, v) => {
+            el.value = v;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            if (window.jQuery) {
+              try { window.jQuery(el).datepicker('setDate', v); } catch(e){}
+            }
+          }, sVal);
+
+          await dateInputLocators[1].click({ force: true });
+          await dateInputLocators[1].fill(eVal);
+          await dateInputLocators[1].evaluate((el, v) => {
+            el.value = v;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            if (window.jQuery) {
+              try { window.jQuery(el).datepicker('setDate', v); } catch(e){}
+            }
+          }, eVal);
+
+          console.log(`  ✓ Set date range: ${sVal} to ${eVal}`);
+        }
 
         // If on All Orders / Corporate GSTN summary page, click "Show All" or "Search"
         if (url.includes('all_restaurant_orders')) {
