@@ -254,6 +254,26 @@ export async function runPetpoojaSync(options = {}) {
     await page.waitForTimeout(5000);
     console.log(`✓ Post-login URL: ${page.url()} ("${await page.title()}")`);
 
+    function findEmployeeByName(name, empList) {
+      if (!name) return null;
+      const n = name.trim().toLowerCase();
+      // 1. Exact match
+      let match = empList.find(e => e.name.toLowerCase() === n);
+      if (match) return match;
+      // 2. Substring match (e.g. "Chingaap" vs "Chingaap Gangmei")
+      match = empList.find(e => {
+        const en = e.name.toLowerCase();
+        return en.includes(n) || n.includes(en);
+      });
+      if (match) return match;
+      // 3. First name match
+      const firstWord = n.split(/\s+/)[0];
+      if (firstWord && firstWord.length > 2) {
+        match = empList.find(e => e.name.toLowerCase().startsWith(firstWord));
+      }
+      return match || null;
+    }
+
     // Helper: download custom report and return sheet rows
     async function fetchCustomReport(url, reportName) {
       console.log(`📥 Fetching ${reportName} (${url})...`);
@@ -262,7 +282,6 @@ export async function runPetpoojaSync(options = {}) {
 
       // Helper to format date in DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, or DD MMM YYYY
       function formatDates(isoDate) {
-        // isoDate is 'YYYY-MM-DD'
         const [y, m, d] = isoDate.split('-');
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const monthName = monthNames[parseInt(m, 10) - 1];
@@ -280,8 +299,7 @@ export async function runPetpoojaSync(options = {}) {
       // 1. Fill Date Range if datepicker inputs are present
       try {
         await page.evaluate(({ startDates, endDates }) => {
-          // Find all visible text/date inputs
-          const inputs = Array.from(document.querySelectorAll('input[type="text"], input[name*="date" i], input[id*="date" i], input.datepicker, input.set-calendar, input.start_fromdate'))
+          const inputs = Array.from(document.querySelectorAll('input[type="text"], input[name*="date" i], input[id*="date" i], input.datepicker, input.set-calendar, input.start_fromdate, input.reportsatrtdate'))
             .filter(el => {
               const style = window.getComputedStyle(el);
               return style.display !== 'none' && style.visibility !== 'hidden' && el.type !== 'hidden';
@@ -296,20 +314,16 @@ export async function runPetpoojaSync(options = {}) {
 
             const curVal = fromEl.value || fromEl.getAttribute('placeholder') || '';
 
-            // Detect date format
             let sVal = startDates.iso;
             let eVal = endDates.iso;
 
             if (curVal.match(/[A-Za-z]{3}/)) {
-              // e.g. "29 Sep 2026" -> "20 Aug 2026"
               sVal = startDates.dmyWords;
               eVal = endDates.dmyWords;
             } else if (curVal.includes('/') || (curVal.includes('-') && curVal.split('-')[0].length === 2)) {
-              // e.g. "20-08-2026"
               sVal = curVal.includes('/') ? startDates.dmySlash : startDates.dmyHyphen;
               eVal = curVal.includes('/') ? endDates.dmySlash : endDates.dmyHyphen;
             } else if (curVal.includes(':')) {
-              // datetime e.g. "2026-08-20 00:00:00"
               sVal = `${startDates.iso} 00:00:00`;
               eVal = `${endDates.iso} 23:59:59`;
             }
@@ -333,59 +347,103 @@ export async function runPetpoojaSync(options = {}) {
 
         console.log(`  ✓ Set date range: ${cycle.start} to ${cycle.end}`);
 
-        // If there's a restaurant dropdown that needs a selection
-        const restSelect = page.locator('select#restaurant_id, select[name*="restaurant" i]').first();
-        if (await restSelect.count() > 0 && await restSelect.isVisible().catch(() => false)) {
-          const options = await restSelect.locator('option').all();
-          if (options.length > 1) {
-            const firstVal = await options[1].getAttribute('value');
-            if (firstVal) await restSelect.selectOption(firstVal);
+        // If on All Orders / Corporate GSTN summary page, click "Show All" or "Search"
+        if (url.includes('all_restaurant_orders')) {
+          const showAllBtn = page.locator('button:visible:has-text("Show All"), a:visible:has-text("Show All"), input[value*="Show All" i]:visible, button:visible:has-text("Search")').first();
+          if (await showAllBtn.count() > 0) {
+            await showAllBtn.click({ force: true });
+            console.log('  ✓ Clicked Show All/Search button on Corporate orders.');
+            await page.waitForTimeout(5000);
           }
-        }
-
-        // Look for Filter / Search / Submit / View button next to dates
-        const filterBtn = page.locator('button:visible:has-text("Search"), button:visible:has-text("Filter"), button:visible:has-text("Submit"), button:visible:has-text("View"), input[type="submit"]:visible, input[type="button"]:visible[value*="Search" i], input[type="button"]:visible[value*="Filter" i], .btn-primary:visible:has-text("Search"), .btn-success:visible').first();
-        if (await filterBtn.count() > 0) {
-          await filterBtn.click({ force: true });
-          console.log('  ✓ Clicked Filter/Search button.');
-          await page.waitForTimeout(4000);
+        } else {
+          // Look for Filter / Search / Submit button next to dates
+          const filterBtn = page.locator('button:visible:has-text("Search"), button:visible:has-text("Filter"), button:visible:has-text("Submit"), button:visible:has-text("View"), input[type="submit"]:visible, input[type="button"]:visible[value*="Search" i], input[type="button"]:visible[value*="Filter" i], .btn-primary:visible:has-text("Search"), .btn-success:visible').first();
+          if (await filterBtn.count() > 0) {
+            await filterBtn.click({ force: true });
+            console.log('  ✓ Clicked Filter/Search button.');
+            await page.waitForTimeout(4000);
+          }
         }
       } catch (dateErr) {
         console.log('  (Date filter bypassed or not found:', dateErr.message, ')');
       }
 
-      // Check if this is an async queue report page (e.g. Advance Orders Summary at /reports/order_summary_ho/1)
+      // Special Handler A: Async queue report page (e.g. Advance Orders Summary at /reports/order_summary_ho/1)
       if (url.includes('order_summary_ho')) {
         console.log('  Handling Async Report Queue on Due Payment Report...');
         const exportQueueBtn = page.locator('button:visible:has-text("Export"), input[value*="Export" i]:visible, a.btn:visible:has-text("Export"), .btn-primary:visible:has-text("Export")').first();
         if (await exportQueueBtn.count() > 0) {
           await exportQueueBtn.click({ force: true });
-          console.log('  ✓ Triggered Export generation. Waiting for download link to generate...');
+          console.log('  ✓ Triggered Export generation. Waiting for queue row...');
           await page.waitForTimeout(6000);
+          await page.reload({ waitUntil: 'load' }).catch(() => {});
+          await page.waitForTimeout(3000);
         }
 
-        // Check for Download link in the queue table
         const downloadLink = page.locator('table a:visible:has-text("Download"), a:visible:has-text("Download")').first();
         await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
 
-        console.log('  ✓ Clicking Download link in queue table...');
-        const downloadPromise = page.waitForEvent('download', { timeout: 35000 });
-        await downloadLink.click({ force: true });
-        const download = await downloadPromise;
+        const href = await downloadLink.getAttribute('href');
+        let buffer = null;
 
-        const downloadStream = await download.createReadStream();
-        const chunks = [];
-        for await (const chunk of downloadStream) chunks.push(chunk);
-        const buffer = Buffer.concat(chunks);
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          const downloadUrl = new URL(href, page.url()).href;
+          console.log(`  ✓ Fetching direct download URL: ${downloadUrl}`);
+          const response = await page.request.get(downloadUrl);
+          buffer = await response.body();
+        } else {
+          console.log('  ✓ Clicking Download link in queue table...');
+          const [download] = await Promise.all([
+            page.waitForEvent('download', { timeout: 35000 }),
+            downloadLink.click({ force: true })
+          ]);
+          const downloadStream = await download.createReadStream();
+          const chunks = [];
+          for await (const chunk of downloadStream) chunks.push(chunk);
+          buffer = Buffer.concat(chunks);
+        }
         console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
         return parseWorkbookBuffer(buffer);
       }
 
-      // 2. Locate and trigger "Excel" button / Export Dropdown
+      // Special Handler B: Corporate GSTN Summary (/reports/all_restaurant_orders/all)
+      if (url.includes('all_restaurant_orders')) {
+        console.log('  Handling Corporate GSTN Orders Export...');
+        const exportBtn = page.locator('button:visible:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export")').first();
+        await exportBtn.waitFor({ state: 'visible', timeout: 25000 });
+        await exportBtn.click({ force: true });
+        await page.waitForTimeout(1500);
+
+        const excelOption = page.locator('a:visible:has-text("Excel"), button:visible:has-text("Excel"), li:visible:has-text("Excel"), a[href*="excel" i]:visible').first();
+        await excelOption.waitFor({ state: 'visible', timeout: 15000 });
+
+        const href = await excelOption.getAttribute('href');
+        let buffer = null;
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          const downloadUrl = new URL(href, page.url()).href;
+          console.log(`  ✓ Fetching direct download URL: ${downloadUrl}`);
+          const response = await page.request.get(downloadUrl);
+          buffer = await response.body();
+        } else {
+          console.log('  ✓ Clicking Excel export option...');
+          const [download] = await Promise.all([
+            page.waitForEvent('download', { timeout: 35000 }),
+            excelOption.click({ force: true })
+          ]);
+          const downloadStream = await download.createReadStream();
+          const chunks = [];
+          for await (const chunk of downloadStream) chunks.push(chunk);
+          buffer = Buffer.concat(chunks);
+        }
+        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
+        return parseWorkbookBuffer(buffer);
+      }
+
+      // 2. General Case: Locate and trigger "Excel" button / Export Dropdown
       console.log(`  Locating Excel button on ${reportName}...`);
 
       const excelPrioritySelectors = [
-        // 1. Direct text "Excel" matches across any tag or color
+        // Direct text "Excel" matches across any tag or color
         'a:visible:has-text("Excel")',
         'button:visible:has-text("Excel")',
         '.btn:visible:has-text("Excel")',
@@ -401,7 +459,6 @@ export async function runPetpoojaSync(options = {}) {
         'a[href*="export" i]:visible',
         'a:has(i.fa-file-excel-o):visible',
         'button:has(i.fa-file-excel-o):visible',
-        // 2. Export dropdowns on top right (e.g. Corporate GSTN Summary)
         'button:visible:has-text("Export")',
         'a:visible:has-text("Export")',
         '.dropdown-toggle:visible:has-text("Export")',
@@ -422,7 +479,6 @@ export async function runPetpoojaSync(options = {}) {
       }
 
       if (!targetBtn || (await targetBtn.count()) === 0) {
-        // Save screenshot for diagnosis
         const debugPath = `scripts/debug-${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
         await page.screenshot({ path: debugPath, fullPage: true });
         console.error(`  ❌ Excel button not found with any selector. Saved screenshot to ${debugPath}`);
@@ -436,7 +492,7 @@ export async function runPetpoojaSync(options = {}) {
         const downloadPromise = page.waitForEvent('download', { timeout: 35000 });
         await targetBtn.click({ force: true });
 
-        // Check if an export sub-menu opened (e.g. "Excel (.xlsx)", "Download Excel", "CSV")
+        // Check if an export sub-menu opened
         await page.waitForTimeout(1000);
         const subOption = page.locator('a:visible:has-text("Excel"), button:visible:has-text("Excel"), a:visible:has-text("CSV"), button:visible:has-text("CSV"), li:visible:has-text("Excel"), li:visible:has-text("Export")').first();
         if (await subOption.count() > 0 && await subOption.isVisible().catch(() => false)) {
@@ -470,7 +526,7 @@ export async function runPetpoojaSync(options = {}) {
       const capResult = parseCaptainPerformance(captainRows, cycle);
       if (capResult.ok && capResult.captains) {
         for (const cap of capResult.captains) {
-          const emp = employees.find(e => e.name.toLowerCase() === cap.name.toLowerCase());
+          const emp = findEmployeeByName(cap.name, employees);
           if (emp) {
             await saveMetric('cap_sales', cap.total, 'petpooja', 'Captain Performance Report', {
               scheme_name: 'service_captain',
@@ -496,7 +552,7 @@ export async function runPetpoojaSync(options = {}) {
       const paxResult = parsePaxSales(paxRows, cycle);
       if (paxResult.ok && paxResult.people) {
         for (const person of paxResult.people) {
-          const emp = employees.find(e => e.name.toLowerCase() === person.name.toLowerCase());
+          const emp = findEmployeeByName(person.name, employees);
           if (emp) {
             await saveMetric('cap_pax_avg', person.apc, 'petpooja', 'Pax Sales Report', {
               scheme_name: 'service_captain',
@@ -583,24 +639,7 @@ export async function runPetpoojaSync(options = {}) {
 
     // REPORT 7: Petpooja Inventory (Wastage & Purchase Returns)
     try {
-      console.log('🔐 Navigating to Petpooja Inventory (inventory.petpooja.com)...');
-      await page.goto('https://inventory.petpooja.com/inventories/wastage_list/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(2000);
-
-      // Check if login needed on inventory domain
-      if (page.url().includes('login') || (await page.locator('input[type="password"]:visible').count()) > 0) {
-        const invEmail = page.locator('#UserEmail:visible, input[name="data[User][email]"]:visible, input[name="username"]:visible, input[name="email"]:visible, input[type="email"]:visible, input[type="text"]:visible').first();
-        const invPass = page.locator('#UserPassword:visible, input[name="data[User][password]"]:visible, input[name="password"]:visible, input[type="password"]:visible').first();
-        const invSubmit = page.locator('button[type="submit"]:visible, input[type="submit"]:visible, button:visible:has-text("Sign in"), button:visible:has-text("Login")').first();
-        if (await invEmail.count() > 0 && await invPass.count() > 0) {
-          await invEmail.fill(email);
-          await invPass.fill(password);
-          await invSubmit.click();
-          await page.waitForNavigation({ timeout: 20000 }).catch(() => {});
-          await page.waitForTimeout(2000);
-        }
-      }
-
+      console.log('🔐 Navigating to Petpooja Inventory...');
       // Wastage download
       try {
         const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report');
