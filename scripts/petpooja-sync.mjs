@@ -235,65 +235,123 @@ export async function runPetpoojaSync(options = {}) {
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
 
-      // 1. Try to fill Date Range if datepicker inputs are present
+      // Helper to format date in DD-MM-YYYY, YYYY-MM-DD, or DD/MM/YYYY
+      function formatDates(isoDate) {
+        // isoDate is 'YYYY-MM-DD'
+        const [y, m, d] = isoDate.split('-');
+        return {
+          iso: isoDate,                // 2026-08-20
+          dmyHyphen: `${d}-${m}-${y}`, // 20-08-2026
+          dmySlash: `${d}/${m}/${y}`   // 20/08/2026
+        };
+      }
+
+      const startDates = formatDates(cycle.start);
+      const endDates = formatDates(cycle.end);
+
+      // 1. Fill Date Range if datepicker inputs are present
       try {
-        const dateInputs = await page.locator('input[type="text"]:visible, input[name*="date"]:visible, input.datepicker:visible').all();
+        const dateInputs = await page.locator('input[type="text"]:visible, input[name*="date"]:visible, input[id*="date" i]:visible, input.datepicker:visible').all();
         console.log(`  Found ${dateInputs.length} visible text/date input(s) on ${reportName}`);
 
         if (dateInputs.length >= 2) {
-          // First input = From / Start date, Second input = To / End date
-          await dateInputs[0].fill(cycle.start);
-          await dateInputs[1].fill(cycle.end);
-          console.log(`  ✓ Set date range: ${cycle.start} to ${cycle.end}`);
+          // Check placeholder or initial value to determine format (DD-MM-YYYY vs YYYY-MM-DD)
+          const val0 = (await dateInputs[0].inputValue().catch(() => '')) || '';
+          const isDmy = val0.includes('-') && val0.split('-')[0].length === 2 || val0.includes('/') || (await dateInputs[0].getAttribute('placeholder').catch(() => ''))?.includes('dd');
 
-          // Look for Filter / Search / Submit button next to dates
-          const filterBtn = page.locator('button:has-text("Filter"), button:has-text("Search"), button:has-text("Submit"), input[value*="Filter" i], input[value*="Search" i], button.btn-success, button.btn-primary').first();
+          const startVal = isDmy ? startDates.dmyHyphen : startDates.iso;
+          const endVal = isDmy ? endDates.dmyHyphen : endDates.iso;
+
+          // Clear and fill start date
+          await dateInputs[0].click({ force: true });
+          await dateInputs[0].fill(startVal);
+          await dateInputs[0].evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, startVal);
+
+          // Clear and fill end date
+          await dateInputs[1].click({ force: true });
+          await dateInputs[1].fill(endVal);
+          await dateInputs[1].evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, endVal);
+
+          console.log(`  ✓ Set date range: ${startVal} to ${endVal}`);
+
+          // Look for Filter / Search / Submit / View button next to dates
+          const filterBtn = page.locator('button:has-text("Filter"), button:has-text("Search"), button:has-text("Submit"), button:has-text("View"), input[value*="Filter" i], input[value*="Search" i], input[value*="Submit" i], button.btn-success, button.btn-primary, .btn-success, .btn-primary').first();
           if (await filterBtn.count() > 0) {
-            await filterBtn.click();
+            await filterBtn.click({ force: true });
             console.log('  ✓ Clicked Filter/Search button.');
-            await page.waitForTimeout(3000);
+            await page.waitForTimeout(4000);
           }
         }
       } catch (dateErr) {
         console.log('  (Date filter bypassed or not found:', dateErr.message, ')');
       }
 
-      // 2. Locate and trigger Export button (Orange button on top right)
-      console.log(`  Locating Export button on ${reportName}...`);
-      const exportCandidates = page.locator(
-        'button:has-text("Export"), a:has-text("Export"), button:has-text("Download"), a:has-text("Download"), button:has-text("Excel"), a:has-text("Excel"), [id*="export" i], [class*="export" i], a[href*="export" i], a[title*="Export" i], button[title*="Export" i]'
-      );
+      // 2. Locate and trigger orange "Excel" / Export button
+      console.log(`  Locating Excel button on ${reportName}...`);
 
-      const count = await exportCandidates.count();
-      console.log(`  Found ${count} candidate Export button(s) on ${reportName}`);
+      const excelPrioritySelectors = [
+        'a.btn-warning:has-text("Excel")',
+        'button.btn-warning:has-text("Excel")',
+        'a.btn-orange:has-text("Excel")',
+        'button.btn-orange:has-text("Excel")',
+        'a:has-text("Excel")',
+        'button:has-text("Excel")',
+        'input[value*="Excel" i]',
+        '[title*="Excel" i]',
+        'a:has(i.fa-file-excel-o)',
+        'button:has(i.fa-file-excel-o)',
+        'a.btn-warning',
+        'button.btn-warning',
+        'a.btn-orange',
+        'button.btn-orange',
+        'a[href*="excel" i]',
+        'a[href*="export" i]',
+        'button:has-text("Export")',
+        'a:has-text("Export")',
+        'button:has-text("Download")',
+        'a:has-text("Download")'
+      ];
 
       let targetBtn = null;
-      if (count > 0) {
-        targetBtn = exportCandidates.first();
-      } else {
-        // Fallback: search by icon or any button containing excel / download svg/i
-        targetBtn = page.locator('button:has(i), a:has(i), .btn-warning, .btn-info, .btn-orange, [onclick*="export" i]').first();
+      let matchedSelector = '';
+
+      for (const sel of excelPrioritySelectors) {
+        const loc = page.locator(sel).first();
+        if (await loc.count() > 0 && await loc.isVisible().catch(() => false)) {
+          targetBtn = loc;
+          matchedSelector = sel;
+          break;
+        }
+      }
+
+      if (!targetBtn) {
+        // Fallback: search for any visible button or link with class warning/orange or icon
+        const fallbackLoc = page.locator('.btn-warning, .btn-orange, a[class*="warning"], button[class*="warning"], a[class*="orange"], [onclick*="excel" i], [onclick*="export" i]').first();
+        if (await fallbackLoc.count() > 0) {
+          targetBtn = fallbackLoc;
+          matchedSelector = 'fallback-warning-orange';
+        }
       }
 
       if (!targetBtn || (await targetBtn.count()) === 0) {
         // Save screenshot for diagnosis
         const debugPath = `scripts/debug-${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
         await page.screenshot({ path: debugPath, fullPage: true });
-        console.error(`  ❌ Export button not found. Saved screenshot to ${debugPath}`);
-        throw new Error(`Export button not found on ${reportName}. Screenshot saved to ${debugPath}`);
+        console.error(`  ❌ Excel button not found with any selector. Saved screenshot to ${debugPath}`);
+        throw new Error(`Excel button not found on ${reportName}. Screenshot saved to ${debugPath}`);
       }
 
-      console.log('  ✓ Clicking Export button...');
+      console.log(`  ✓ Found Excel button using selector: "${matchedSelector}"`);
       let download = null;
 
       try {
         const downloadPromise = page.waitForEvent('download', { timeout: 35000 });
         await targetBtn.click({ force: true });
 
-        // Check if an export sub-menu opened (e.g. "Export to Excel" or "Download CSV")
+        // Check if an export sub-menu opened (e.g. "Excel (.xlsx)", "Download Excel", "CSV")
         const subOption = page.locator('a:has-text("Excel"), button:has-text("Excel"), a:has-text("CSV"), button:has-text("CSV"), li:has-text("Excel"), li:has-text("Export")').first();
-        if (await subOption.isVisible().catch(() => false)) {
-          console.log('  ✓ Sub-menu appeared, clicking Excel/CSV option...');
+        if (await subOption.isVisible().catch(() => false) && await subOption.count() > 0) {
+          console.log('  ✓ Sub-menu appeared, clicking Excel option...');
           await subOption.click({ force: true });
         }
 
