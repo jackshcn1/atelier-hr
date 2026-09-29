@@ -529,10 +529,21 @@ export default function VariablePayPage() {
         <div>
           <h1 style={{ margin: '0 0 4px 0' }}>Variable Pay — Data Collection</h1>
           <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
-            Upload each month's source reports. Values are filtered to the pay period you set below.
+            Upload source reports or let the automated nightly Petpooja sync pull metrics directly into this period.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <a
+            href="https://github.com/jackshcn1/atelier-hr/actions/workflows/petpooja-sync.yml"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: '#047857', color: 'white', padding: '8px 14px', borderRadius: 6,
+              textDecoration: 'none', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6
+            }}
+          >
+            ⚡ Run Nightly Sync on GitHub →
+          </a>
           <a href="/payroll" style={{ background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '8px 16px', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: 13 }}>
             ← Back to Payroll
           </a>

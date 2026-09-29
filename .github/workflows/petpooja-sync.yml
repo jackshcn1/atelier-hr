@@ -1,0 +1,50 @@
+name: Petpooja Variable Pay Automated Sync
+
+on:
+  # 1. Runs automatically every night at 2:30 AM IST (21:00 UTC)
+  schedule:
+    - cron: '0 21 * * *'
+
+  # 2. Allows manual 1-click trigger from GitHub Actions tab anytime
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Optional Pay Period Start Date (YYYY-MM-DD)'
+        required: false
+      end_date:
+        description: 'Optional Pay Period End Date (YYYY-MM-DD)'
+        required: false
+
+jobs:
+  sync-petpooja:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright & Chromium
+        run: |
+          npm install -D playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run Petpooja Variable Pay Sync Engine
+        env:
+          PETPOOJA_EMAIL: ${{ secrets.PETPOOJA_EMAIL }}
+          PETPOOJA_PASSWORD: ${{ secrets.PETPOOJA_PASSWORD }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://wzxswmopfxnucmeygqeg.supabase.co' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SYNC_START_DATE: ${{ github.event.inputs.start_date }}
+          SYNC_END_DATE: ${{ github.event.inputs.end_date }}
+        run: |
+          node scripts/petpooja-sync.mjs
