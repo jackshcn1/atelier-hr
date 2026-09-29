@@ -5,7 +5,7 @@ import { createClient } from '../../../lib/supabaseClient';
 import {
   parseCaptainPerformance, parsePaxSales, parseKitchenPrepTime, parseWastage,
   parseB2bGstOrders, parseCreditRecovery, parsePurchaseReturns,
-  parseDeliverySales, parseFeedbackForm
+  parseDeliverySales, parseFeedbackForm, parseCounterSales
 } from '../../../lib/variablePayParsers';
 import { computeEmployeeVariablePayout } from '../../../lib/variablePayCalculator';
 
@@ -19,30 +19,32 @@ const DEFAULT_KITCHEN_CATEGORIES = [
 const DELIVERY_CHANNELS = ['Swiggy_Atelier', 'Zomato'];
 
 // metric_id -> how its value is obtained and which report feeds it.
+// Metric source config: source type, parser key, label, whether individual (per-employee),
+// optional Petpooja/Google link, and for Counter Sales the category/area filters.
 const SOURCE_MAP = {
-  cap_sales:     { source: 'petpooja', parser: 'captain', label: 'Captain Performance Report', individual: true },
+  cap_sales:     { source: 'petpooja', parser: 'captain', label: 'Captain Performance Report', individual: true, link: 'https://billing.petpooja.com/custom_reports/view_report/27' },
   cap_reviews:   { source: 'manual_entry', label: 'Manual check of Google reviews' },
-  cap_pax_avg:   { source: 'petpooja', parser: 'pax', label: 'Pax Sales Report (Biller Wise)', individual: true },
+  cap_pax_avg:   { source: 'petpooja', parser: 'pax', label: 'Pax Sales Report (Biller Wise)', individual: true, link: 'https://billing.petpooja.com/custom_reports/view_report/61' },
   cap_grooming:  { source: 'checklist', label: 'Grooming checklists in this system' },
-  cap_quality:   { source: 'feedback_form', label: 'Customer Feedback Form sheet' },
-  hlp_team_sales:{ source: 'petpooja', parser: 'captain', label: 'Captain Performance Report (team total)' },
+  cap_quality:   { source: 'feedback_form', label: 'Customer Feedback Form sheet', link: 'https://docs.google.com/spreadsheets/d/1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU/edit?usp=sharing' },
+  hlp_team_sales:{ source: 'petpooja', parser: 'captain', label: 'Captain Performance Report (team total — sum of all captains)', link: 'https://billing.petpooja.com/custom_reports/view_report/27' },
   hlp_grooming:  { source: 'checklist', label: 'Grooming checklists in this system' },
-  hlp_quality:   { source: 'feedback_form', label: 'Customer Feedback Form sheet' },
-  kit_food_quality: { source: 'feedback_form', label: 'Customer Feedback Form sheet' },
-  kit_prep_time:{ source: 'petpooja', parser: 'kot', label: 'KOT Process Time + Base Menu' },
-  kit_wastage:  { source: 'petpooja', parser: 'wastage', label: 'Wastage Report' },
+  hlp_quality:   { source: 'feedback_form', label: 'Customer Feedback Form sheet', link: 'https://docs.google.com/spreadsheets/d/1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU/edit?usp=sharing' },
+  kit_food_quality: { source: 'feedback_form', label: 'Customer Feedback Form sheet', link: 'https://docs.google.com/spreadsheets/d/1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU/edit?usp=sharing' },
+  kit_prep_time:{ source: 'petpooja', parser: 'kot', label: 'KOT Process Time + Base Menu', link: 'https://billing.petpooja.com/custom_reports/view_report/78' },
+  kit_wastage:  { source: 'petpooja', parser: 'wastage', label: 'Wastage Report', link: 'https://inventory.petpooja.com/inventories/wastage_list/' },
   kit_hygiene:  { source: 'checklist', label: 'Kitchen hygiene checklists in this system' },
   kit_grooming: { source: 'checklist', label: 'Grooming checklists in this system' },
-  b2b_rev:      { source: 'petpooja', parser: 'b2b', label: 'Corporate Customers order summary' },
-  b2b_clients:  { source: 'petpooja', parser: 'b2b', label: 'Corporate Customers order summary' },
-  b2b_returns:  { source: 'petpooja', parser: 'returns', label: 'Purchase Return report' },
-  b2b_credit:   { source: 'petpooja', parser: 'credit', label: 'Due Payment report' },
-  b2b_counter_sales: { source: 'petpooja', parser: 'delivery', label: 'Orders Master (Swiggy/Zomato)' },
+  b2b_rev:      { source: 'petpooja', parser: 'b2b', label: 'Corporate Customers order summary (100-day report; data filtered to payroll period)', link: 'https://billing.petpooja.com/reports/all_restaurant_orders/all' },
+  b2b_clients:  { source: 'petpooja', parser: 'b2b', label: 'Corporate Customers order summary (same report as B2B Revenue — new GST clients in period)', link: 'https://billing.petpooja.com/reports/all_restaurant_orders/all' },
+  b2b_returns:  { source: 'petpooja', parser: 'returns', label: 'Purchase Return report', link: 'https://inventory.petpooja.com/inventories/purchase_return_list/' },
+  b2b_credit:   { source: 'petpooja', parser: 'credit', label: 'Due Payment report', link: 'https://billing.petpooja.com/reports/order_summary_ho/1' },
+  b2b_counter_sales: { source: 'petpooja', parser: 'counter', label: 'Item Report with Customer Order Details (Final Total, filtered categories, exclude delivery)', link: 'https://billing.petpooja.com/custom_reports/view_report/65' },
   hk_checklist: { source: 'checklist', label: 'Housekeeping cleaning checklists' },
   hk_cleanliness:{ source: 'manual_entry', label: 'Manual entry — no cleanliness field in feedback form' },
   hk_breakage:  { source: 'manual_entry', label: 'Manual entry' },
   acc_reconciliation: { source: 'manual_entry', label: 'Manual entry — reconciliation report pending' },
-  acc_delivery_sales: { source: 'petpooja', parser: 'delivery', label: 'Orders Master (Swiggy/Zomato)' },
+  acc_delivery_sales: { source: 'petpooja', parser: 'delivery', label: 'Orders Master (Swiggy/Zomato)', link: 'https://billing.petpooja.com/custom_reports/view_report/10' },
   acc_gst:      { source: 'manual_entry', label: 'Manual entry' }
 };
 
@@ -204,6 +206,30 @@ export default function VariablePayPage() {
     });
   }
 
+  // Store the uploaded Base Menu rows in component state so the KOT parser
+  // can map item names to categories without asking for a second file.
+  const [baseMenuRows, setBaseMenuRows] = useState(null);
+
+  async function handleBaseMenuUpload(file) {
+    setError(''); setMessage(''); setBusyParser('basemenu');
+    try {
+      const rows = await readWorkbook(file);
+      // Count usable rows for a quick confirmation
+      const headerIndex = rows.findIndex(r =>
+        r.some(c => String(c).trim().toLowerCase() === 'category') &&
+        r.some(c => String(c).trim().toLowerCase() === 'item name')
+      );
+      const itemCount = headerIndex >= 0
+        ? rows.slice(headerIndex + 1).filter(r => String(r[2] ?? '').trim()).length
+        : rows.filter(r => r.some(c => String(c).trim())).length;
+      setBaseMenuRows(rows);
+      setMessage(`✓ Base Menu loaded (${itemCount} items). Now upload the KOT Process Time report.`);
+      setBusyParser(null);
+    } catch (err) {
+      setError(err.message); setBusyParser(null);
+    }
+  }
+
   // ------------------------------------------------------------- uploading
   async function handleParserFile(metricId, parserKey, file) {
     setError('');
@@ -216,19 +242,24 @@ export default function VariablePayPage() {
       let extraFiles = null;
 
       if (parserKey === 'kot') {
-        // KOT needs the monthly Base Menu alongside it. Ask for the second file.
-        const menuInput = document.createElement('input');
-        menuInput.type = 'file';
-        menuInput.accept = '.csv,.xlsx,.xls';
-        const menuFile = await new Promise(res => {
-          menuInput.onchange = () => res(menuInput.files?.[0] || null);
-          menuInput.oncancel = () => res(null);
-          menuInput.click();
-        });
-        if (!menuFile) { setBusyParser(null); setError('Base Menu file is required to map KOT items to kitchen categories.'); return; }
-        const menuRows = await readWorkbook(menuFile);
+        // KOT needs the Base Menu to map item names to kitchen categories.
+        // Prefer a previously uploaded Base Menu; otherwise ask for one now.
+        let menuRows = baseMenuRows;
+        if (!menuRows) {
+          const menuInput = document.createElement('input');
+          menuInput.type = 'file';
+          menuInput.accept = '.csv,.xlsx,.xls';
+          const menuFile = await new Promise(res => {
+            menuInput.onchange = () => res(menuInput.files?.[0] || null);
+            menuInput.oncancel = () => res(null);
+            menuInput.click();
+          });
+          if (!menuFile) { setBusyParser(null); setError('Base Menu file is required to map KOT items to kitchen categories.'); return; }
+          menuRows = await readWorkbook(menuFile);
+          setBaseMenuRows(menuRows);
+        }
         result = parseKitchenPrepTime(rows, menuRows, { ...range, kitchenCategories });
-        extraFiles = menuFile.name;
+        extraFiles = baseMenuRows ? 'using saved Base Menu' : menuFile.name;
       } else if (parserKey === 'captain') {
         result = parseCaptainPerformance(rows, range);
       } else if (parserKey === 'pax') {
@@ -243,6 +274,8 @@ export default function VariablePayPage() {
         result = parsePurchaseReturns(rows, range);
       } else if (parserKey === 'delivery') {
         result = parseDeliverySales(rows, { ...range, channels: DELIVERY_CHANNELS });
+      } else if (parserKey === 'counter') {
+        result = parseCounterSales(rows, range);
       } else {
         result = { ok: false, error: `Unknown parser "${parserKey}".` };
       }
@@ -276,7 +309,9 @@ export default function VariablePayPage() {
         value = result.total;
       } else if (metricId === 'b2b_credit') {
         value = result.pass ? 1 : 0;
-      } else if (metricId === 'b2b_counter_sales' || metricId === 'acc_delivery_sales') {
+      } else if (metricId === 'b2b_counter_sales') {
+        value = result.total;
+      } else if (metricId === 'acc_delivery_sales') {
         value = result.total;
       }
 
@@ -287,21 +322,51 @@ export default function VariablePayPage() {
       }
 
       const cfg = SOURCE_MAP[metricId] || {};
-      // For individual metrics (cap_sales, cap_pax_avg), save one row per captain
+
       if (cfg.individual && result.captains) {
+        // Per-captain metrics: one stored row per captain, matched to the
+        // employee record by name so the payslip can attribute it.
+        let matched = 0;
+        let unmatchedNames = [];
         for (const cap of result.captains) {
-          // Match captain name to employee record
           const emp = employees.find(e => e.name.toLowerCase() === cap.name.toLowerCase());
-          await saveMetric(metricId, cap.total, 'petpooja', file.name, {
-            ...detail,
-            scheme_name: scheme?.name,
-            captain_name: cap.name,
-            captain_employee_id: emp?.employee_id || null
-          });
+          if (emp) {
+            matched++;
+            await saveMetric(metricId, cap.total, 'petpooja', file.name, {
+              scheme_name: scheme?.name,
+              captain_name: cap.name
+            }, emp.employee_id);
+          } else {
+            unmatchedNames.push(cap.name);
+          }
         }
-      } else {
-        await saveMetric(metricId, value, 'petpooja', file.name, detail);
+        // The Helpers' team target comes from the same report — save the total
+        // so nobody has to upload the same file twice.
+        await saveMetric('hlp_team_sales', result.teamTotal, 'petpooja', file.name, {
+          scheme_name: 'service_helpers',
+          from: 'Captain Performance Report (sum of all captains)'
+        });
+        setMessage(
+          `✓ Saved ${matched} captain(s) and updated Helpers team total (₹${result.teamTotal.toLocaleString('en-IN')}).` +
+          (unmatchedNames.length ? ` ⚠ No employee record found for: ${unmatchedNames.join(', ')} — check spelling.` : '')
+        );
+        setBusyParser(null);
+        return;
       }
+
+      await saveMetric(metricId, value, 'petpooja', file.name, detail);
+
+      // B2B revenue and new-client count come from the same report.
+      if (metricId === 'b2b_rev') {
+        await saveMetric('b2b_clients', result.newCustomerCount, 'petpooja', file.name, {
+          scheme_name: 'b2b_counter',
+          from: 'Corporate Customers order summary'
+        });
+        setMessage(`✓ B2B revenue ₹${result.totalRevenue.toLocaleString('en-IN')} and ${result.newCustomerCount} new client(s) saved.`);
+        setBusyParser(null);
+        return;
+      }
+
       setMessage(`✓ ${metric?.name || metricId} updated from ${file.name}.`);
       setBusyParser(null);
     } catch (err) {
@@ -556,7 +621,22 @@ export default function VariablePayPage() {
             <label htmlFor="upload-feedback" style={{ background: isLocked ? '#e5e7eb' : '#6d28d9', color: isLocked ? '#6b7280' : 'white', padding: '7px 14px', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: isLocked ? 'not-allowed' : 'pointer', display: 'inline-block' }}>
               {busyParser === 'feedback' ? 'Reading…' : '📝 Upload Customer Feedback Form'}
             </label>
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Fills: kitchen food quality, captain &amp; helper service quality</div>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Fills: kitchen food quality, captain & helper service quality</div>
+            <a href="https://docs.google.com/spreadsheets/d/1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU/edit?usp=sharing" target="_blank" style={{ fontSize: 11, color: '#6d28d9', marginTop: 2, display: 'block' }}>🔗 Open Feedback Form</a>
+          </div>
+          <div>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              disabled={isLocked}
+              id="upload-basemenu"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleBaseMenuUpload(f); e.target.value = ''; }}
+              style={{ display: 'none' }}
+            />
+            <label htmlFor="upload-basemenu" style={{ background: isLocked ? '#e5e7eb' : '#2563eb', color: isLocked ? '#6b7280' : 'white', padding: '7px 14px', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: isLocked ? 'not-allowed' : 'pointer', display: 'inline-block' }}>
+              {busyParser === 'basemenu' ? 'Reading…' : '🍽 Upload Base Menu (CSV/Excel)'}
+            </label>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Required for KOT Prep Time — maps items to categories</div>
           </div>
         </div>
       </div>
@@ -576,6 +656,11 @@ export default function VariablePayPage() {
               const badge = SOURCE_BADGE[cfg.source];
               const rec = inputs[metric.id];
               const isTeam = metric.scope !== 'individual';
+              const teamValue = rec?.['TEAM']?.actual ?? null;
+              // hlp_team_sales and b2b_clients are filled automatically from the
+              // same report as their sibling metric, so they get no upload button.
+              const autoFilled = metric.id === 'hlp_team_sales' || metric.id === 'b2b_clients';
+              const displayValue = isTeam ? teamValue : teamValue;
 
               // Per-person metrics show one value per employee.
               const relevantPeople = isTeam ? [{ name: 'Whole team', employee_id: null }] : teamMembers;
@@ -593,32 +678,46 @@ export default function VariablePayPage() {
                       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
                         Target: {metric.target}{metric.unit || ''} · Floor: {metric.floor ?? '—'} · Ceiling: {metric.ceiling ?? '—'}
                       </div>
-                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 3, fontStyle: 'italic' }}>{cfg.label}</div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 3, fontStyle: 'italic' }}>
+                        {cfg.label}
+                        {cfg.link && (
+                          <a href={cfg.link} target="_blank" rel="noopener noreferrer"
+                             style={{ marginLeft: 6, fontStyle: 'normal', fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}>
+                            ↗ Download report
+                          </a>
+                        )}
+                      </div>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{ background: badge.bg, color: badge.fg, padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{badge.icon} {badge.label}</span>
 
-                      {rec ? (
+                      {displayValue !== null && displayValue !== undefined ? (
                         <span style={{ fontSize: 13, fontWeight: 800, color: '#059669', background: '#ecfdf5', padding: '4px 10px', borderRadius: 6 }}>
-                          {metricIdDisplay(metric, rec.actual)}
+                          {metricIdDisplay(metric, displayValue)}
                         </span>
                       ) : (
                         <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600, background: '#f9fafb', padding: '4px 10px', borderRadius: 6 }}>Not provided</span>
                       )}
 
-                      {cfg.source === 'petpooja' && cfg.parser && (
+                      {autoFilled && (
+                        <span style={{ fontSize: 11, color: '#6b7280' }}>
+                          Auto-filled from {metric.id === 'hlp_team_sales' ? 'Captain Performance Report' : 'Corporate Customers report'}
+                        </span>
+                      )}
+
+                      {cfg.source === 'petpooja' && cfg.parser && !autoFilled && (
                         <>
                           <input
                             type="file"
                             accept=".xlsx,.xls,.csv"
                             disabled={isLocked}
-                            id={`upload-${cfg.parser}`}
+                            id={`upload-${metric.id}`}
                             onChange={e => { const f = e.target.files?.[0]; if (f) handleParserFile(metric.id, cfg.parser, f); e.target.value = ''; }}
                             style={{ display: 'none' }}
                           />
-                          <label htmlFor={`upload-${cfg.parser}`} style={{ background: isLocked ? '#e5e7eb' : '#2563eb', color: isLocked ? '#6b7280' : 'white', padding: '6px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: isLocked ? 'not-allowed' : 'pointer', display: 'inline-block' }}>
-                            {busyParser === cfg.parser ? 'Reading…' : 'Upload'}
+                          <label htmlFor={`upload-${metric.id}`} style={{ background: isLocked ? '#e5e7eb' : '#2563eb', color: isLocked ? '#6b7280' : 'white', padding: '6px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: isLocked ? 'not-allowed' : 'pointer', display: 'inline-block' }}>
+                            {busyParser === metric.id ? 'Reading…' : 'Upload'}
                           </label>
                         </>
                       )}
@@ -630,7 +729,7 @@ export default function VariablePayPage() {
                             step="any"
                             disabled={isLocked}
                             placeholder="Enter value"
-                            defaultValue={rec ? rec.actual : ''}
+                            defaultValue={displayValue ?? ''}
                             onBlur={e => { if (e.target.value !== '') saveManual(metric.id, e.target.value); }}
                             style={{ width: 80, padding: '4px 6px', borderRadius: 4, border: '1px solid #cbd5e1' }}
                           />
