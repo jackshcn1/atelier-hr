@@ -188,11 +188,38 @@ export default function VariablePayPage() {
       actual_value: actual,
       source_type: sourceType,
       source_filename: filename || null,
-      source_detail: detail || {}
+      source_detail: detail || {},
+      updated_at: new Date().toISOString()
     };
-    const { error: e } = await supabase.from('variable_metric_inputs').upsert(payload, {
-      onConflict: 'period_id,metric_id,employee_id'
-    });
+
+    let query = supabase
+      .from('variable_metric_inputs')
+      .select('id')
+      .eq('period_id', period.id)
+      .eq('metric_id', metricId);
+
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId);
+    } else {
+      query = query.is('employee_id', null);
+    }
+
+    const { data: existing } = await query.maybeSingle();
+
+    let e = null;
+    if (existing?.id) {
+      const { error } = await supabase
+        .from('variable_metric_inputs')
+        .update(payload)
+        .eq('id', existing.id);
+      e = error;
+    } else {
+      const { error } = await supabase
+        .from('variable_metric_inputs')
+        .insert([payload]);
+      e = error;
+    }
+
     setSaving(false);
     if (e) { setError(e.message); return; }
     setInputs(prev => {

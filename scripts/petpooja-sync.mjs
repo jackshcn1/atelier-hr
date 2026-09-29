@@ -170,6 +170,20 @@ export async function runPetpoojaSync(options = {}) {
   const page = await context.newPage();
 
   async function saveMetric(metricId, actual, sourceType, filename, detail, employeeId = null) {
+    let query = supabase
+      .from('variable_metric_inputs')
+      .select('id')
+      .eq('period_id', period.id)
+      .eq('metric_id', metricId);
+
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId);
+    } else {
+      query = query.is('employee_id', null);
+    }
+
+    const { data: existing } = await query.maybeSingle();
+
     const payload = {
       period_id: period.id,
       scheme_name: detail?.scheme_name || '',
@@ -178,17 +192,28 @@ export async function runPetpoojaSync(options = {}) {
       actual_value: actual,
       source_type: sourceType,
       source_filename: filename || 'Petpooja Automated Sync',
-      source_detail: detail || {}
+      source_detail: detail || {},
+      updated_at: new Date().toISOString()
     };
 
-    const { error: upErr } = await supabase.from('variable_metric_inputs').upsert(payload, {
-      onConflict: 'period_id,metric_id,employee_id'
-    });
-
-    if (upErr) {
-      console.error(`  ❌ Error saving metric ${metricId}:`, upErr.message);
+    let saveErr = null;
+    if (existing?.id) {
+      const { error } = await supabase
+        .from('variable_metric_inputs')
+        .update(payload)
+        .eq('id', existing.id);
+      saveErr = error;
     } else {
-      console.log(`  ✓ Metric ${metricId} -> ${actual} (${employeeId ? `Emp: ${employeeId}` : 'TEAM'})`);
+      const { error } = await supabase
+        .from('variable_metric_inputs')
+        .insert([payload]);
+      saveErr = error;
+    }
+
+    if (saveErr) {
+      console.error(`  ❌ Error saving metric ${metricId}:`, saveErr.message);
+    } else {
+      console.log(`  💾 Saved metric: ${metricId} = ${actual}${employeeId ? ` (Emp: ${employeeId})` : ' (TEAM)'}`);
     }
   }
 
@@ -235,14 +260,17 @@ export async function runPetpoojaSync(options = {}) {
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
 
-      // Helper to format date in DD-MM-YYYY, YYYY-MM-DD, or DD/MM/YYYY
+      // Helper to format date in DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, or DD MMM YYYY
       function formatDates(isoDate) {
         // isoDate is 'YYYY-MM-DD'
         const [y, m, d] = isoDate.split('-');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthName = monthNames[parseInt(m, 10) - 1];
         return {
           iso: isoDate,                // 2026-08-20
           dmyHyphen: `${d}-${m}-${y}`, // 20-08-2026
-          dmySlash: `${d}/${m}/${y}`   // 20/08/2026
+          dmySlash: `${d}/${m}/${y}`,   // 20/08/2026
+          dmyWords: `${parseInt(d, 10)} ${monthName} ${y}` // 20 Aug 2026
         };
       }
 
@@ -251,68 +279,134 @@ export async function runPetpoojaSync(options = {}) {
 
       // 1. Fill Date Range if datepicker inputs are present
       try {
-        const dateInputs = await page.locator('input[type="text"]:visible, input[name*="date"]:visible, input[id*="date" i]:visible, input.datepicker:visible').all();
-        console.log(`  Found ${dateInputs.length} visible text/date input(s) on ${reportName}`);
+        await page.evaluate(({ startDates, endDates }) => {
+          // Find all visible text/date inputs
+          const inputs = Array.from(document.querySelectorAll('input[type="text"], input[name*="date" i], input[id*="date" i], input.datepicker, input.set-calendar, input.start_fromdate'))
+            .filter(el => {
+              const style = window.getComputedStyle(el);
+              return style.display !== 'none' && style.visibility !== 'hidden' && el.type !== 'hidden';
+            });
 
-        if (dateInputs.length >= 2) {
-          // Check placeholder or initial value to determine format (DD-MM-YYYY vs YYYY-MM-DD)
-          const val0 = (await dateInputs[0].inputValue().catch(() => '')) || '';
-          const isDmy = val0.includes('-') && val0.split('-')[0].length === 2 || val0.includes('/') || (await dateInputs[0].getAttribute('placeholder').catch(() => ''))?.includes('dd');
+          if (inputs.length >= 2) {
+            const fromEl = inputs[0];
+            const toEl = inputs[1];
 
-          const startVal = isDmy ? startDates.dmyHyphen : startDates.iso;
-          const endVal = isDmy ? endDates.dmyHyphen : endDates.iso;
+            fromEl.removeAttribute('readonly');
+            toEl.removeAttribute('readonly');
 
-          // Clear and fill start date
-          await dateInputs[0].click({ force: true });
-          await dateInputs[0].fill(startVal);
-          await dateInputs[0].evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, startVal);
+            const curVal = fromEl.value || fromEl.getAttribute('placeholder') || '';
 
-          // Clear and fill end date
-          await dateInputs[1].click({ force: true });
-          await dateInputs[1].fill(endVal);
-          await dateInputs[1].evaluate((el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, endVal);
+            // Detect date format
+            let sVal = startDates.iso;
+            let eVal = endDates.iso;
 
-          console.log(`  ✓ Set date range: ${startVal} to ${endVal}`);
+            if (curVal.match(/[A-Za-z]{3}/)) {
+              // e.g. "29 Sep 2026" -> "20 Aug 2026"
+              sVal = startDates.dmyWords;
+              eVal = endDates.dmyWords;
+            } else if (curVal.includes('/') || (curVal.includes('-') && curVal.split('-')[0].length === 2)) {
+              // e.g. "20-08-2026"
+              sVal = curVal.includes('/') ? startDates.dmySlash : startDates.dmyHyphen;
+              eVal = curVal.includes('/') ? endDates.dmySlash : endDates.dmyHyphen;
+            } else if (curVal.includes(':')) {
+              // datetime e.g. "2026-08-20 00:00:00"
+              sVal = `${startDates.iso} 00:00:00`;
+              eVal = `${endDates.iso} 23:59:59`;
+            }
 
-          // Look for Filter / Search / Submit / View button next to dates
-          const filterBtn = page.locator('button:has-text("Filter"), button:has-text("Search"), button:has-text("Submit"), button:has-text("View"), input[value*="Filter" i], input[value*="Search" i], input[value*="Submit" i], button.btn-success, button.btn-primary, .btn-success, .btn-primary').first();
-          if (await filterBtn.count() > 0) {
-            await filterBtn.click({ force: true });
-            console.log('  ✓ Clicked Filter/Search button.');
-            await page.waitForTimeout(4000);
+            fromEl.value = sVal;
+            toEl.value = eVal;
+
+            fromEl.dispatchEvent(new Event('input', { bubbles: true }));
+            fromEl.dispatchEvent(new Event('change', { bubbles: true }));
+            toEl.dispatchEvent(new Event('input', { bubbles: true }));
+            toEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+            if (window.jQuery) {
+              try {
+                window.jQuery(fromEl).datepicker('setDate', sVal);
+                window.jQuery(toEl).datepicker('setDate', eVal);
+              } catch(e) {}
+            }
           }
+        }, { startDates, endDates });
+
+        console.log(`  ✓ Set date range: ${cycle.start} to ${cycle.end}`);
+
+        // If there's a restaurant dropdown that needs a selection
+        const restSelect = page.locator('select#restaurant_id, select[name*="restaurant" i]').first();
+        if (await restSelect.count() > 0 && await restSelect.isVisible().catch(() => false)) {
+          const options = await restSelect.locator('option').all();
+          if (options.length > 1) {
+            const firstVal = await options[1].getAttribute('value');
+            if (firstVal) await restSelect.selectOption(firstVal);
+          }
+        }
+
+        // Look for Filter / Search / Submit / View button next to dates
+        const filterBtn = page.locator('button:visible:has-text("Search"), button:visible:has-text("Filter"), button:visible:has-text("Submit"), button:visible:has-text("View"), input[type="submit"]:visible, input[type="button"]:visible[value*="Search" i], input[type="button"]:visible[value*="Filter" i], .btn-primary:visible:has-text("Search"), .btn-success:visible').first();
+        if (await filterBtn.count() > 0) {
+          await filterBtn.click({ force: true });
+          console.log('  ✓ Clicked Filter/Search button.');
+          await page.waitForTimeout(4000);
         }
       } catch (dateErr) {
         console.log('  (Date filter bypassed or not found:', dateErr.message, ')');
       }
 
-      // 2. Locate and trigger "Excel" button (Blue/Primary or any button with text "Excel")
+      // Check if this is an async queue report page (e.g. Advance Orders Summary at /reports/order_summary_ho/1)
+      if (url.includes('order_summary_ho')) {
+        console.log('  Handling Async Report Queue on Due Payment Report...');
+        const exportQueueBtn = page.locator('button:visible:has-text("Export"), input[value*="Export" i]:visible, a.btn:visible:has-text("Export"), .btn-primary:visible:has-text("Export")').first();
+        if (await exportQueueBtn.count() > 0) {
+          await exportQueueBtn.click({ force: true });
+          console.log('  ✓ Triggered Export generation. Waiting for download link to generate...');
+          await page.waitForTimeout(6000);
+        }
+
+        // Check for Download link in the queue table
+        const downloadLink = page.locator('table a:visible:has-text("Download"), a:visible:has-text("Download")').first();
+        await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
+
+        console.log('  ✓ Clicking Download link in queue table...');
+        const downloadPromise = page.waitForEvent('download', { timeout: 35000 });
+        await downloadLink.click({ force: true });
+        const download = await downloadPromise;
+
+        const downloadStream = await download.createReadStream();
+        const chunks = [];
+        for await (const chunk of downloadStream) chunks.push(chunk);
+        const buffer = Buffer.concat(chunks);
+        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
+        return parseWorkbookBuffer(buffer);
+      }
+
+      // 2. Locate and trigger "Excel" button / Export Dropdown
       console.log(`  Locating Excel button on ${reportName}...`);
 
       const excelPrioritySelectors = [
         // 1. Direct text "Excel" matches across any tag or color
-        'a:has-text("Excel")',
-        'button:has-text("Excel")',
-        '.btn:has-text("Excel")',
-        '.btn-primary:has-text("Excel")',
-        '.btn-info:has-text("Excel")',
-        '.btn-default:has-text("Excel")',
-        '.btn-secondary:has-text("Excel")',
-        '.btn-warning:has-text("Excel")',
-        'span:has-text("Excel")',
-        'input[value*="Excel" i]',
-        '[title*="Excel" i]',
-        'a[href*="excel" i]',
-        'a[href*="export" i]',
-        'a:has(i.fa-file-excel-o)',
-        'button:has(i.fa-file-excel-o)',
-        'a:has(i.fa-file-excel)',
-        'button:has(i.fa-file-excel)',
-        // 2. Fallbacks
-        'button:has-text("Export")',
-        'a:has-text("Export")',
-        'button:has-text("Download")',
-        'a:has-text("Download")'
+        'a:visible:has-text("Excel")',
+        'button:visible:has-text("Excel")',
+        '.btn:visible:has-text("Excel")',
+        '.btn-primary:visible:has-text("Excel")',
+        '.btn-info:visible:has-text("Excel")',
+        '.btn-default:visible:has-text("Excel")',
+        '.btn-secondary:visible:has-text("Excel")',
+        '.btn-warning:visible:has-text("Excel")',
+        'span:visible:has-text("Excel")',
+        'input[value*="Excel" i]:visible',
+        '[title*="Excel" i]:visible',
+        'a[href*="excel" i]:visible',
+        'a[href*="export" i]:visible',
+        'a:has(i.fa-file-excel-o):visible',
+        'button:has(i.fa-file-excel-o):visible',
+        // 2. Export dropdowns on top right (e.g. Corporate GSTN Summary)
+        'button:visible:has-text("Export")',
+        'a:visible:has-text("Export")',
+        '.dropdown-toggle:visible:has-text("Export")',
+        'button:visible:has-text("Download")',
+        'a:visible:has-text("Download")'
       ];
 
       let targetBtn = null;
@@ -324,15 +418,6 @@ export async function runPetpoojaSync(options = {}) {
           targetBtn = loc;
           matchedSelector = sel;
           break;
-        }
-      }
-
-      if (!targetBtn) {
-        // Fallback: search for any visible button or link with class warning/orange or icon
-        const fallbackLoc = page.locator('.btn-warning, .btn-orange, a[class*="warning"], button[class*="warning"], a[class*="orange"], [onclick*="excel" i], [onclick*="export" i]').first();
-        if (await fallbackLoc.count() > 0) {
-          targetBtn = fallbackLoc;
-          matchedSelector = 'fallback-warning-orange';
         }
       }
 
@@ -352,8 +437,9 @@ export async function runPetpoojaSync(options = {}) {
         await targetBtn.click({ force: true });
 
         // Check if an export sub-menu opened (e.g. "Excel (.xlsx)", "Download Excel", "CSV")
-        const subOption = page.locator('a:has-text("Excel"), button:has-text("Excel"), a:has-text("CSV"), button:has-text("CSV"), li:has-text("Excel"), li:has-text("Export")').first();
-        if (await subOption.isVisible().catch(() => false) && await subOption.count() > 0) {
+        await page.waitForTimeout(1000);
+        const subOption = page.locator('a:visible:has-text("Excel"), button:visible:has-text("Excel"), a:visible:has-text("CSV"), button:visible:has-text("CSV"), li:visible:has-text("Excel"), li:visible:has-text("Export")').first();
+        if (await subOption.count() > 0 && await subOption.isVisible().catch(() => false)) {
           console.log('  ✓ Sub-menu appeared, clicking Excel option...');
           await subOption.click({ force: true });
         }
@@ -502,11 +588,11 @@ export async function runPetpoojaSync(options = {}) {
       await page.waitForTimeout(2000);
 
       // Check if login needed on inventory domain
-      if (page.url().includes('login') || (await page.locator('input[type="password"]').count()) > 0) {
-        const invEmail = page.locator('input[name="username"], input[name="email"], input[type="text"]').first();
-        const invPass = page.locator('input[name="password"], input[type="password"]').first();
-        const invSubmit = page.locator('button[type="submit"], input[type="submit"], button:has-text("Sign in"), button:has-text("Login")').first();
-        if (await invEmail.count() > 0) {
+      if (page.url().includes('login') || (await page.locator('input[type="password"]:visible').count()) > 0) {
+        const invEmail = page.locator('#UserEmail:visible, input[name="data[User][email]"]:visible, input[name="username"]:visible, input[name="email"]:visible, input[type="email"]:visible, input[type="text"]:visible').first();
+        const invPass = page.locator('#UserPassword:visible, input[name="data[User][password]"]:visible, input[name="password"]:visible, input[type="password"]:visible').first();
+        const invSubmit = page.locator('button[type="submit"]:visible, input[type="submit"]:visible, button:visible:has-text("Sign in"), button:visible:has-text("Login")').first();
+        if (await invEmail.count() > 0 && await invPass.count() > 0) {
           await invEmail.fill(email);
           await invPass.fill(password);
           await invSubmit.click();
