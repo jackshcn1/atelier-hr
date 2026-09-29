@@ -78,10 +78,13 @@ function getActivePayrollCycle() {
 
   const startStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-20`;
   const endStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-19`;
+  const todayStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const queryEnd = todayStr < endStr ? todayStr : endStr;
 
   return {
     start: startStr,
-    end: endStr
+    end: endStr,
+    queryEnd: queryEnd
   };
 }
 
@@ -325,7 +328,7 @@ export async function runPetpoojaSync(options = {}) {
       }
 
       const startDates = formatDates(cycle.start);
-      const endDates = formatDates(cycle.end);
+      const endDates = formatDates(cycle.queryEnd || cycle.end);
 
       // 1. Fill Date Range if datepicker inputs are present
       try {
@@ -607,10 +610,12 @@ export async function runPetpoojaSync(options = {}) {
       console.error('⚠️ Could not sync Pax Sales Report:', e.message);
     }
 
-    // REPORT 3: Counter Sales / Item Report (#65)
+    // REPORT 3: Counter Sales & Delivery Sales / Item Report (#65)
     try {
-      const counterRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/65', 'Item Report (Counter Sales)');
-      const counterResult = parseCounterSales(counterRows, cycle);
+      const itemRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/65', 'Item Report (Counter & Delivery Sales)');
+
+      // A. Calculate Counter Sales
+      const counterResult = parseCounterSales(itemRows, cycle);
       if (counterResult.ok) {
         console.log('  📊 Counter Sales breakdown by category:', JSON.stringify(counterResult.byCategory));
         console.log(`  📊 Total Counter Sales: ₹${counterResult.total} across ${counterResult.itemsCounted || 0} items`);
@@ -620,27 +625,21 @@ export async function runPetpoojaSync(options = {}) {
         });
         successfulReports++;
       }
-    } catch (e) {
-      failedReports++;
-      console.error('⚠️ Could not sync Counter Sales Report:', e.message);
-    }
 
-    // REPORT 4: Orders Master Report (#10) - Swiggy & Zomato
-    try {
-      const ordersMasterRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/10', 'Orders Master (Delivery)');
-      const deliveryResult = parseDeliverySales(ordersMasterRows, { ...cycle, channels: ['Swiggy_Atelier', 'Zomato', 'Swiggy', 'Zomato_Atelier', 'Swiggy_Ambrosia', 'Delivery'] });
-      if (deliveryResult.ok) {
-        console.log('  📊 Delivery Sales breakdown by channel:', JSON.stringify(deliveryResult.byChannel));
-        console.log(`  📊 Total Delivery Sales: ₹${deliveryResult.total} across ${deliveryResult.orders || 0} orders`);
-        await saveMetric('acc_delivery_sales', deliveryResult.total, 'petpooja', 'Orders Master Report', {
+      // B. Calculate Delivery Sales (Swiggy + Zomato) directly from the same master item report
+      const itemDeliveryResult = parseDeliverySales(itemRows, cycle);
+      if (itemDeliveryResult.ok && itemDeliveryResult.total > 0) {
+        console.log('  📊 Delivery Sales breakdown from Item Report:', JSON.stringify(itemDeliveryResult.byChannel));
+        console.log(`  📊 Total Delivery Sales: ₹${itemDeliveryResult.total} across ${itemDeliveryResult.orders || 0} rows`);
+        await saveMetric('acc_delivery_sales', itemDeliveryResult.total, 'petpooja', 'Item Report (Delivery Sales)', {
           scheme_name: 'accounting',
-          byChannel: deliveryResult.byChannel
+          byChannel: itemDeliveryResult.byChannel
         });
         successfulReports++;
       }
     } catch (e) {
       failedReports++;
-      console.error('⚠️ Could not sync Delivery Sales Report:', e.message);
+      console.error('⚠️ Could not sync Counter & Delivery Sales from Item Report:', e.message);
     }
 
     // REPORT 5: All Restaurant Orders with GSTN
