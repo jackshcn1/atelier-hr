@@ -286,26 +286,29 @@ export async function runPetpoojaSync(options = {}) {
         console.log('  (Date filter bypassed or not found:', dateErr.message, ')');
       }
 
-      // 2. Locate and trigger orange "Excel" / Export button
+      // 2. Locate and trigger "Excel" button (Blue/Primary or any button with text "Excel")
       console.log(`  Locating Excel button on ${reportName}...`);
 
       const excelPrioritySelectors = [
-        'a.btn-warning:has-text("Excel")',
-        'button.btn-warning:has-text("Excel")',
-        'a.btn-orange:has-text("Excel")',
-        'button.btn-orange:has-text("Excel")',
+        // 1. Direct text "Excel" matches across any tag or color
         'a:has-text("Excel")',
         'button:has-text("Excel")',
+        '.btn:has-text("Excel")',
+        '.btn-primary:has-text("Excel")',
+        '.btn-info:has-text("Excel")',
+        '.btn-default:has-text("Excel")',
+        '.btn-secondary:has-text("Excel")',
+        '.btn-warning:has-text("Excel")',
+        'span:has-text("Excel")',
         'input[value*="Excel" i]',
         '[title*="Excel" i]',
-        'a:has(i.fa-file-excel-o)',
-        'button:has(i.fa-file-excel-o)',
-        'a.btn-warning',
-        'button.btn-warning',
-        'a.btn-orange',
-        'button.btn-orange',
         'a[href*="excel" i]',
         'a[href*="export" i]',
+        'a:has(i.fa-file-excel-o)',
+        'button:has(i.fa-file-excel-o)',
+        'a:has(i.fa-file-excel)',
+        'button:has(i.fa-file-excel)',
+        // 2. Fallbacks
         'button:has-text("Export")',
         'a:has-text("Export")',
         'button:has-text("Download")',
