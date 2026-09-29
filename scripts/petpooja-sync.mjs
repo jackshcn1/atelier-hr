@@ -232,31 +232,77 @@ export async function runPetpoojaSync(options = {}) {
     // Helper: download custom report and return sheet rows
     async function fetchCustomReport(url, reportName) {
       console.log(`📥 Fetching ${reportName} (${url})...`);
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 40000 });
-      await page.waitForTimeout(3000);
+      await page.goto(url, { waitUntil: 'load', timeout: 45000 });
+      await page.waitForTimeout(4000);
 
-      // Try setting date inputs if present on page
+      // 1. Try to fill Date Range if datepicker inputs are present
       try {
-        const fromInput = page.locator('input[name*="from_date"], input[name*="start_date"], input#from_date, input#startDate').first();
-        const toInput = page.locator('input[name*="to_date"], input[name*="end_date"], input#to_date, input#endDate').first();
-        if (await fromInput.count() > 0 && await toInput.count() > 0) {
-          await fromInput.fill(cycle.start);
-          await toInput.fill(cycle.end);
-          const filterBtn = page.locator('button:has-text("Search"), button:has-text("Filter"), input[value="Search"]').first();
+        const dateInputs = await page.locator('input[type="text"]:visible, input[name*="date"]:visible, input.datepicker:visible').all();
+        console.log(`  Found ${dateInputs.length} visible text/date input(s) on ${reportName}`);
+
+        if (dateInputs.length >= 2) {
+          // First input = From / Start date, Second input = To / End date
+          await dateInputs[0].fill(cycle.start);
+          await dateInputs[1].fill(cycle.end);
+          console.log(`  ✓ Set date range: ${cycle.start} to ${cycle.end}`);
+
+          // Look for Filter / Search / Submit button next to dates
+          const filterBtn = page.locator('button:has-text("Filter"), button:has-text("Search"), button:has-text("Submit"), input[value*="Filter" i], input[value*="Search" i], button.btn-success, button.btn-primary').first();
           if (await filterBtn.count() > 0) {
             await filterBtn.click();
-            await page.waitForTimeout(2000);
+            console.log('  ✓ Clicked Filter/Search button.');
+            await page.waitForTimeout(3000);
           }
         }
-      } catch (_) {}
+      } catch (dateErr) {
+        console.log('  (Date filter bypassed or not found:', dateErr.message, ')');
+      }
 
-      // Trigger export
-      const exportBtn = page.locator('a:has-text("Export"), button:has-text("Export"), a:has-text("Excel"), a[href*="export"], button:has-text("Download"), a[title*="Export"], a[title*="Excel"]').first();
+      // 2. Locate and trigger Export button (Orange button on top right)
+      console.log(`  Locating Export button on ${reportName}...`);
+      const exportCandidates = page.locator(
+        'button:has-text("Export"), a:has-text("Export"), button:has-text("Download"), a:has-text("Download"), button:has-text("Excel"), a:has-text("Excel"), [id*="export" i], [class*="export" i], a[href*="export" i], a[title*="Export" i], button[title*="Export" i]'
+      );
 
-      const [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: 35000 }),
-        exportBtn.click()
-      ]);
+      const count = await exportCandidates.count();
+      console.log(`  Found ${count} candidate Export button(s) on ${reportName}`);
+
+      let targetBtn = null;
+      if (count > 0) {
+        targetBtn = exportCandidates.first();
+      } else {
+        // Fallback: search by icon or any button containing excel / download svg/i
+        targetBtn = page.locator('button:has(i), a:has(i), .btn-warning, .btn-info, .btn-orange, [onclick*="export" i]').first();
+      }
+
+      if (!targetBtn || (await targetBtn.count()) === 0) {
+        // Save screenshot for diagnosis
+        const debugPath = `scripts/debug-${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+        await page.screenshot({ path: debugPath, fullPage: true });
+        console.error(`  ❌ Export button not found. Saved screenshot to ${debugPath}`);
+        throw new Error(`Export button not found on ${reportName}. Screenshot saved to ${debugPath}`);
+      }
+
+      console.log('  ✓ Clicking Export button...');
+      let download = null;
+
+      try {
+        const downloadPromise = page.waitForEvent('download', { timeout: 35000 });
+        await targetBtn.click({ force: true });
+
+        // Check if an export sub-menu opened (e.g. "Export to Excel" or "Download CSV")
+        const subOption = page.locator('a:has-text("Excel"), button:has-text("Excel"), a:has-text("CSV"), button:has-text("CSV"), li:has-text("Excel"), li:has-text("Export")').first();
+        if (await subOption.isVisible().catch(() => false)) {
+          console.log('  ✓ Sub-menu appeared, clicking Excel/CSV option...');
+          await subOption.click({ force: true });
+        }
+
+        download = await downloadPromise;
+      } catch (dlErr) {
+        const debugPath = `scripts/debug-${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+        await page.screenshot({ path: debugPath, fullPage: true });
+        throw new Error(`Download timed out or failed on ${reportName}: ${dlErr.message}`);
+      }
 
       const downloadStream = await download.createReadStream();
       const chunks = [];
@@ -264,9 +310,12 @@ export async function runPetpoojaSync(options = {}) {
         chunks.push(chunk);
       }
       const buffer = Buffer.concat(chunks);
-      console.log(`  ✓ Downloaded ${reportName} (${buffer.length} bytes)`);
+      console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
       return parseWorkbookBuffer(buffer);
     }
+
+    let successfulReports = 0;
+    let failedReports = 0;
 
     // REPORT 1: Captain Performance Report (#27)
     try {
@@ -287,8 +336,10 @@ export async function runPetpoojaSync(options = {}) {
           scheme_name: 'service_helpers',
           team_total: capResult.teamTotal
         });
+        successfulReports++;
       }
     } catch (e) {
+      failedReports++;
       console.error('⚠️ Could not sync Captain Performance Report:', e.message);
     }
 
@@ -307,8 +358,10 @@ export async function runPetpoojaSync(options = {}) {
             }, emp.employee_id);
           }
         }
+        successfulReports++;
       }
     } catch (e) {
+      failedReports++;
       console.error('⚠️ Could not sync Pax Sales Report:', e.message);
     }
 
@@ -321,8 +374,10 @@ export async function runPetpoojaSync(options = {}) {
           scheme_name: 'b2b_counter',
           byCategory: counterResult.byCategory
         });
+        successfulReports++;
       }
     } catch (e) {
+      failedReports++;
       console.error('⚠️ Could not sync Counter Sales Report:', e.message);
     }
 
@@ -335,8 +390,10 @@ export async function runPetpoojaSync(options = {}) {
           scheme_name: 'accounting',
           byChannel: deliveryResult.byChannel
         });
+        successfulReports++;
       }
     } catch (e) {
+      failedReports++;
       console.error('⚠️ Could not sync Delivery Sales Report:', e.message);
     }
 
@@ -353,8 +410,10 @@ export async function runPetpoojaSync(options = {}) {
           scheme_name: 'b2b_counter',
           newCustomers: b2bResult.newCustomers
         });
+        successfulReports++;
       }
     } catch (e) {
+      failedReports++;
       console.error('⚠️ Could not sync GSTN Orders Report:', e.message);
     }
 
@@ -368,8 +427,10 @@ export async function runPetpoojaSync(options = {}) {
           overdueCount: creditResult.overdueCount,
           outstandingAmount: creditResult.outstandingAmount
         });
+        successfulReports++;
       }
     } catch (e) {
+      failedReports++;
       console.error('⚠️ Could not sync Due Payment Report:', e.message);
     }
 
@@ -402,8 +463,10 @@ export async function runPetpoojaSync(options = {}) {
             scheme_name: 'kitchen',
             entries: wastageResult.entries
           });
+          successfulReports++;
         }
       } catch (we) {
+        failedReports++;
         console.error('⚠️ Could not sync Wastage List:', we.message);
       }
 
@@ -416,15 +479,26 @@ export async function runPetpoojaSync(options = {}) {
             scheme_name: 'b2b_counter',
             entries: returnsResult.entries
           });
+          successfulReports++;
         }
       } catch (re) {
+        failedReports++;
         console.error('⚠️ Could not sync Purchase Returns:', re.message);
       }
     } catch (ie) {
+      failedReports++;
       console.error('⚠️ Could not access Petpooja Inventory:', ie.message);
     }
 
-    console.log('🎉 Petpooja Automated Variable Pay Sync Completed Successfully!');
+    console.log('\n=============================================================');
+    if (failedReports === 0) {
+      console.log(`🎉 Petpooja Sync COMPLETED: All ${successfulReports} reports downloaded and metrics updated!`);
+    } else if (successfulReports > 0) {
+      console.log(`⚠️ Petpooja Sync PARTIALLY COMPLETED: ${successfulReports} reports succeeded, ${failedReports} failed.`);
+    } else {
+      console.log(`❌ Petpooja Sync FAILED: 0 of ${failedReports} reports could be fetched. Check logs above.`);
+    }
+    console.log('=============================================================');
   } catch (fatal) {
     console.error('❌ Sync failed:', fatal.message);
     throw fatal;
