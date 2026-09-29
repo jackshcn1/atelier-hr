@@ -26,6 +26,10 @@ yarn-error.log*
 .env*.local
 .env
 
+# Petpooja local sync credentials — NEVER commit this
+scripts/petpooja-config.json
+scripts/petpooja-sync.log
+
 # vercel
 .vercel
 

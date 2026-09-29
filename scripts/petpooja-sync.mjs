@@ -1,9 +1,12 @@
 // Petpooja Automated Variable Pay Sync Engine
-// Headless Playwright script for GitHub Actions & local scheduled syncs.
-// Reads credentials securely from environment variables.
+// Runs LOCALLY on the office computer (Petpooja blocks cloud/datacenter IPs).
+// Credentials are read from scripts/petpooja-config.json, which is git-ignored.
 
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
+import { existsSync, readFileSync, appendFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   parseCaptainPerformance,
   parsePaxSales,
@@ -15,6 +18,30 @@ import {
   parseDeliverySales,
   parseCounterSales
 } from '../lib/variablePayParsers.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load credentials from the local config file, then let real env vars win.
+function loadLocalConfig() {
+  const cfg = {};
+  const cfgPath = join(__dirname, 'petpooja-config.json');
+  if (!existsSync(cfgPath)) {
+    console.error('❌ Missing scripts/petpooja-config.json');
+    console.error('   Run:  node scripts/setup-petpooja.mjs   (one-time setup)');
+    process.exit(1);
+  }
+  try {
+    Object.assign(cfg, JSON.parse(readFileSync(cfgPath, 'utf8')));
+  } catch (e) {
+    console.error('❌ Could not parse petpooja-config.json:', e.message);
+    process.exit(1);
+  }
+  // Env vars take precedence so the GitHub runner can still use this file.
+  for (const [k, v] of Object.entries(cfg)) {
+    if (process.env[k] === undefined) process.env[k] = String(v ?? '');
+  }
+  return cfg;
+}
 
 // Calculate active 20th–19th payroll cycle
 function getActivePayrollCycle() {
@@ -53,6 +80,8 @@ function parseWorkbookBuffer(buffer) {
 }
 
 export async function runPetpoojaSync(options = {}) {
+  const cfg = loadLocalConfig();
+
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wzxswmopfxnucmeygqeg.supabase.co';
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -112,9 +141,15 @@ export async function runPetpoojaSync(options = {}) {
   // Dynamically import playwright
   const { chromium } = await import('playwright');
 
-  console.log('🌐 Launching headless browser...');
+  // Headed mode (default on local runs) is more reliable — Petpooja is far
+  // less likely to challenge a real visible Chrome window than a headless one.
+  // Set PETPOOJA_HEADLESS=true in the config to run without a visible window.
+  const headless = String(process.env.PETPOOJA_HEADLESS ?? 'false').toLowerCase() === 'true';
+
+  console.log(`🌐 Launching browser (headless=${headless})...`);
   const browser = await chromium.launch({
-    headless: true,
+    headless,
+    channel: headless ? undefined : 'chrome', // use installed Chrome when headed
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -390,17 +425,38 @@ export async function runPetpoojaSync(options = {}) {
     }
 
     console.log('🎉 Petpooja Automated Variable Pay Sync Completed Successfully!');
+  } catch (fatal) {
+    console.error('❌ Sync failed:', fatal.message);
+    throw fatal;
   } finally {
     await browser.close();
   }
 }
 
-// Direct execution from CLI
+// Direct execution from CLI — also mirrors output to a rotating log file so a
+// scheduled run can be inspected later without re-running it.
 if (process.argv[1]?.endsWith('petpooja-sync.mjs') || process.argv[1]?.endsWith('petpooja-sync.js')) {
+  const logPath = join(__dirname, 'petpooja-sync.log');
+  const stamp = () => `[${new Date().toISOString()}]`;
+
+  const write = (level) => {
+    const original = console[level].bind(console);
+    return (...args) => {
+      const line = `${stamp()} ${args.join(' ')}`;
+      original(...args);
+      try {
+        appendFileSync(logPath, line + '\n');
+      } catch { /* logging must never break the sync */ }
+    };
+  };
+  console.log = write('log');
+  console.error = write('error');
+  console.warn = write('warn');
+
   runPetpoojaSync()
     .then(() => process.exit(0))
     .catch(err => {
-      console.error('Fatal Sync Error:', err);
+      console.error('Fatal Sync Error:', err.message);
       process.exit(1);
     });
 }
