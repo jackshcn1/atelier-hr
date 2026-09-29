@@ -20,9 +20,9 @@ const DELIVERY_CHANNELS = ['Swiggy_Atelier', 'Zomato'];
 
 // metric_id -> how its value is obtained and which report feeds it.
 const SOURCE_MAP = {
-  cap_sales:     { source: 'petpooja', parser: 'captain', label: 'Captain Performance Report' },
+  cap_sales:     { source: 'petpooja', parser: 'captain', label: 'Captain Performance Report', individual: true },
   cap_reviews:   { source: 'manual_entry', label: 'Manual check of Google reviews' },
-  cap_pax_avg:   { source: 'petpooja', parser: 'pax', label: 'Pax Sales Report (Biller Wise)' },
+  cap_pax_avg:   { source: 'petpooja', parser: 'pax', label: 'Pax Sales Report (Biller Wise)', individual: true },
   cap_grooming:  { source: 'checklist', label: 'Grooming checklists in this system' },
   cap_quality:   { source: 'feedback_form', label: 'Customer Feedback Form sheet' },
   hlp_team_sales:{ source: 'petpooja', parser: 'captain', label: 'Captain Performance Report (team total)' },
@@ -100,7 +100,7 @@ export default function VariablePayPage() {
   const [schemes, setSchemes] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [kitchenCategories, setKitchenCategories] = useState(DEFAULT_KITCHEN_CATEGORIES);
-  const [inputs, setInputs] = useState({});     // metric_id -> { actual, source_type, source_filename, source_detail }
+  const [inputs, setInputs] = useState({});     // metric_id -> { actual, source_type, source_filename, source_detail } OR per-emp: metric_id -> { empId -> { actual, ... } }
   const [manualDrafts, setManualDrafts] = useState({}); // "metricId::empId" -> string
 
   const [loading, setLoading] = useState(true);
@@ -144,7 +144,9 @@ export default function VariablePayPage() {
         const { data: rows } = await supabase.from('variable_metric_inputs').select('*').eq('period_id', p.id);
         const map = {};
         (rows || []).forEach(r => {
-          map[r.metric_id] = {
+          const key = r.metric_id;
+          if (!map[key]) map[key] = {};
+          map[key][r.employee_id || 'TEAM'] = {
             actual: r.actual_value,
             source_type: r.source_type,
             source_filename: r.source_filename,
@@ -172,7 +174,7 @@ export default function VariablePayPage() {
   }, [schemes, employees]);
 
   // ------------------------------------------------------------- persisting
-  async function saveMetric(metricId, actual, sourceType, filename, detail) {
+  async function saveMetric(metricId, actual, sourceType, filename, detail, employeeId = null) {
     if (!period) return;
     setSaving(true);
     setError('');
@@ -180,7 +182,7 @@ export default function VariablePayPage() {
       period_id: period.id,
       scheme_name: detail?.scheme_name || '',
       metric_id: metricId,
-      employee_id: null,
+      employee_id: employeeId,
       actual_value: actual,
       source_type: sourceType,
       source_filename: filename || null,
@@ -191,7 +193,15 @@ export default function VariablePayPage() {
     });
     setSaving(false);
     if (e) { setError(e.message); return; }
-    setInputs(prev => ({ ...prev, [metricId]: { actual, source_type: sourceType, source_filename: filename, source_detail: detail } }));
+    setInputs(prev => {
+      const key = metricId;
+      const empKey = employeeId || 'TEAM';
+      const newValue = { actual, source_type: sourceType, source_filename: filename, source_detail: detail };
+      return {
+        ...prev,
+        [key]: { ...prev[key], [empKey]: newValue }
+      };
+    });
   }
 
   // ------------------------------------------------------------- uploading
@@ -276,7 +286,22 @@ export default function VariablePayPage() {
         return;
       }
 
-      await saveMetric(metricId, value, 'petpooja', file.name, detail);
+      const cfg = SOURCE_MAP[metricId] || {};
+      // For individual metrics (cap_sales, cap_pax_avg), save one row per captain
+      if (cfg.individual && result.captains) {
+        for (const cap of result.captains) {
+          // Match captain name to employee record
+          const emp = employees.find(e => e.name.toLowerCase() === cap.name.toLowerCase());
+          await saveMetric(metricId, cap.total, 'petpooja', file.name, {
+            ...detail,
+            scheme_name: scheme?.name,
+            captain_name: cap.name,
+            captain_employee_id: emp?.employee_id || null
+          });
+        }
+      } else {
+        await saveMetric(metricId, value, 'petpooja', file.name, detail);
+      }
       setMessage(`✓ ${metric?.name || metricId} updated from ${file.name}.`);
       setBusyParser(null);
     } catch (err) {
@@ -328,24 +353,67 @@ export default function VariablePayPage() {
       (s.metrics || []).forEach(metric => {
         const teamMembers = employeesByScheme[s.name] || [];
         const isIndividual = metric.scope === 'individual';
-        const targets = isIndividual
-          ? teamMembers.map(e => ({ employee_id: e.employee_id, name: e.name, pool: Number(e.current_variable_salary || 0) }))
-          : [{ employee_id: null, name: 'Whole team', pool: 0 }];
 
-        targets.forEach(t => {
+        if (isIndividual) {
+          teamMembers.forEach(e => {
+            const rec = inputs[metric.id];
+            const val = rec ? (rec[e.employee_id]?.actual ?? rec['TEAM']?.actual) : null;
+            const actual = val !== null && val !== undefined && !Number.isNaN(val) ? Number(val) : null;
+            rows.push({
+              scheme: s.display_name,
+              schemeName: s.name,
+              metric,
+              employee: { employee_id: e.employee_id, name: e.name, pool: Number(e.current_variable_salary || 0) },
+              actual,
+              source: (rec?.[e.employee_id]?.source_type ?? rec?.['TEAM']?.source_type) || null,
+              file: (rec?.[e.employee_id]?.source_filename ?? rec?.['TEAM']?.source_filename) || null
+            });
+          });
+        } else {
           const rec = inputs[metric.id];
-          const actual = rec ? Number(rec.actual) : null;
-          rows.push({ scheme: s.display_name, schemeName: s.name, metric, employee: t, actual, source: rec?.source_type || null, file: rec?.source_filename || null });
-        });
+          const val = rec?.['TEAM']?.actual;
+          const actual = val !== null && val !== undefined && !Number.isNaN(val) ? Number(val) : null;
+          rows.push({
+            scheme: s.display_name,
+            schemeName: s.name,
+            metric,
+            employee: { employee_id: null, name: 'Whole team', pool: 0 },
+            actual,
+            source: rec?.['TEAM']?.source_type || null,
+            file: rec?.['TEAM']?.source_filename || null
+          });
+        }
       });
     });
     return rows;
   }, [schemes, employeesByScheme, inputs]);
 
-  const missingMetrics = useMemo(
-    () => preview.filter(r => r.actual === null || Number.isNaN(r.actual)),
-    [preview]
-  );
+  const missingMetrics = useMemo(() => {
+    // For individual metrics, every employee on the scheme must have a value.
+    const missing = [];
+    schemes.forEach(s => {
+      const teamMembers = employeesByScheme[s.name] || [];
+      (s.metrics || []).forEach(metric => {
+        const isIndividual = metric.scope === 'individual';
+        if (isIndividual) {
+          const rec = inputs[metric.id];
+          teamMembers.forEach(e => {
+            const val = rec ? (rec[e.employee_id]?.actual ?? rec['TEAM']?.actual) : null;
+            if (val === null || val === undefined || Number.isNaN(val)) {
+              missing.push({ scheme: s.display_name, metric, employee: { name: e.name, employee_id: e.employee_id } });
+            }
+          });
+        } else {
+          const rec = inputs[metric.id];
+          const val = rec?.['TEAM']?.actual;
+          if (val === null || val === undefined || Number.isNaN(val)) {
+            missing.push({ scheme: s.display_name, metric, employee: { name: 'Whole team', employee_id: null } });
+          }
+        }
+      });
+    });
+    return missing;
+  }, [schemes, employeesByScheme, inputs]);
 
   // ---------------------------------------------------------------- locking
   async function lockPeriod() {
@@ -579,12 +647,23 @@ export default function VariablePayPage() {
                   {/* Per-employee value rows for individual metrics */}
                   {!isTeam && teamMembers.length > 0 && (
                     <div style={{ marginTop: 10, paddingLeft: 12, borderLeft: '2px solid #e5e7eb' }}>
-                      {relevantPeople.map(p => (
-                        <div key={p.employee_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 12 }}>
-                          <span style={{ color: '#374151' }}>{p.name}</span>
-                          <span style={{ color: '#9ca3af', fontSize: 11 }}>uses team value</span>
-                        </div>
-                      ))}
+                      {teamMembers.map(p => {
+                        const rec = inputs[metric.id];
+                        const val = rec ? (rec[p.employee_id]?.actual ?? rec['TEAM']?.actual) : null;
+                        const hasVal = val !== null && val !== undefined && !Number.isNaN(val);
+                        return (
+                          <div key={p.employee_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 12 }}>
+                            <span style={{ color: '#374151' }}>{p.name}</span>
+                            <span style={{
+                              color: hasVal ? '#059669' : '#dc2626',
+                              fontSize: 11,
+                              fontWeight: hasVal ? 600 : 400
+                            }}>
+                              {hasVal ? (val + (metric.unit || '')) : 'Not set'}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
