@@ -38,7 +38,7 @@ const SOURCE_MAP = {
   b2b_rev:      { source: 'petpooja', parser: 'b2b', label: 'Corporate Customers order summary (100-day report; data filtered to payroll period)', link: 'https://billing.petpooja.com/reports/all_restaurant_orders/all' },
   b2b_clients:  { source: 'petpooja', parser: 'b2b', label: 'Corporate Customers order summary (same report as B2B Revenue — new GST clients in period)', link: 'https://billing.petpooja.com/reports/all_restaurant_orders/all' },
   b2b_returns:  { source: 'petpooja', parser: 'returns', label: 'Purchase Return report', link: 'https://inventory.petpooja.com/inventories/purchase_return_list/' },
-  b2b_credit:   { source: 'petpooja', parser: 'credit', label: 'Due Payment report', link: 'https://billing.petpooja.com/reports/order_summary_ho/1' },
+  b2b_credit:   { source: 'petpooja', parser: 'credit', label: 'Due Payment report', link: 'https://billing.petpooja.com/custom_reports/view_report/73' },
   b2b_counter_sales: { source: 'petpooja', parser: 'counter', label: 'Item Report with Customer Order Details (Final Total, filtered categories, exclude delivery)', link: 'https://billing.petpooja.com/custom_reports/view_report/65' },
   hk_checklist: { source: 'checklist', label: 'Housekeeping cleaning checklists' },
   hk_cleanliness:{ source: 'manual_entry', label: 'Manual entry — no cleanliness field in feedback form' },

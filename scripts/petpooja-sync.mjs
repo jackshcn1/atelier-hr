@@ -717,7 +717,7 @@ export async function runPetpoojaSync(options = {}) {
       console.error('⚠️ Could not sync GSTN Orders Report:', e.message);
     }
 
-    // REPORT 6: Due Payment Report (Advance Orders from March 04, 2026 to check aged unpaid invoices)
+    // REPORT 6: Due Payment Report (#73 - from March 04, 2026 to check aged unpaid invoices)
     try {
       const dueQueryCycle = {
         ...cycle,
@@ -725,7 +725,7 @@ export async function runPetpoojaSync(options = {}) {
         queryEnd: cycle.queryEnd || cycle.end
       };
       console.log(`  Pulling Due Payment report from March 04, 2026 (${dueQueryCycle.start} to ${dueQueryCycle.queryEnd})...`);
-      const dueRows = await fetchCustomReport('https://billing.petpooja.com/reports/order_summary_ho/1', 'Due Payment Report', dueQueryCycle);
+      const dueRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/73', 'Due Payment Report', dueQueryCycle);
       const creditResult = parseCreditRecovery(dueRows, { end: cycle.end, maxAgeDays: 30 });
       if (creditResult.ok) {
         console.log(`  📊 B2B Credit Recovery: Pass=${creditResult.pass}, Overdue=${creditResult.overdueCount}, Outstanding=₹${creditResult.outstandingAmount}`);
