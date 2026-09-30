@@ -112,7 +112,10 @@ begin
   -- Clear any previous snapshot for this period so this is a clean rebuild.
   delete from public.variable_pay_snapshot where period_id = p_period_id;
 
-  -- One pass per employee who has a scheme and a variable salary pool.
+  -- One pass per employee who has a scheme. Employees with no variable salary
+  -- pool are included on purpose: their attainment percentages are still
+  -- meaningful, and excluding them would hide them from the admin dashboard
+  -- and drop them out of any closed cycle's history.
   for v_emp in
     select e.employee_id,
            e.name,
@@ -121,7 +124,6 @@ begin
     from public.employees e
     where e.deleted_at is null
       and e.variable_pay_scheme is not null
-      and coalesce(e.current_variable_salary, 0) > 0
     order by e.employee_id
   loop
     for v_metric in
