@@ -115,10 +115,10 @@ export default function Navbar() {
 
   return (
     <nav className="no-print sticky top-0 z-40 border-b border-rule bg-surface/90 backdrop-blur">
-      <div className="mx-auto flex max-w-shell flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 sm:px-8">
+      <div className="mx-auto flex max-w-shell flex-wrap items-center gap-x-3 gap-y-2 px-6 py-4 sm:px-10">
         <a
           href={isAdmin ? '/payroll' : '/my-variable-pay'}
-          className="mr-auto font-serif text-[1.05rem] font-medium tracking-tight text-ink"
+          className="mr-auto font-serif text-[1.25rem] leading-none tracking-tight text-ink"
         >
           Atelier
         </a>

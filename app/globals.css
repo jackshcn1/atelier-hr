@@ -33,29 +33,32 @@
   /* The page frame: title, one line of purpose, and an optional action.
      Used by every redesigned page so they open the same way. */
   .page-head {
-    @apply flex flex-wrap items-start justify-between gap-4 mb-8;
+    @apply flex flex-wrap items-end justify-between gap-6 mb-10;
   }
 
+  /* The serif earns its place here — large, tight, and unmistakably editorial
+     rather than a heading in a UI font. */
   .page-title {
-    @apply font-serif text-[1.75rem] leading-tight tracking-tight text-ink;
+    @apply font-serif text-[2.25rem] leading-[1.05] tracking-tight text-ink;
   }
 
   .page-purpose {
-    @apply text-sm text-ink-muted mt-1 max-w-prose;
+    @apply text-[0.9375rem] text-ink-muted mt-2.5 max-w-prose;
   }
 
-  /* A flat surface. Structure comes from the hairline, not a heavy shadow. */
+  /* A flat surface with a near-square corner. Structure comes from the
+     hairline, not a heavy shadow or a generous radius. */
   .panel {
     @apply bg-surface border border-rule rounded-card;
   }
 
   .panel-body {
-    @apply p-5;
+    @apply p-6;
   }
 
   /* Section heading inside a panel. Sentence case — no ALL-CAPS eyebrows. */
   .panel-title {
-    @apply font-serif text-lg text-ink;
+    @apply font-serif text-xl text-ink;
   }
 
   /* Metric rows are separated by hairlines rather than each being its own
@@ -138,19 +141,26 @@
   .pill-bad  { @apply pill bg-bad-wash text-bad; }
   .pill-quiet{ @apply pill bg-page text-ink-muted border border-rule; }
 
-  /* The one bold moment on a page. Used at most once. */
+  /* The one bold moment on a page. Used at most once. The serif runs large
+     here — this is where it does the heavy lifting, not just on headings. */
   .figure {
-    @apply font-serif text-5xl leading-none tracking-tight text-ink tnum;
+    @apply font-serif text-display text-ink tnum;
   }
 
   .figure-label {
-    @apply text-sm text-ink-muted mt-2;
+    @apply text-[0.9375rem] text-ink-muted mt-3;
   }
 
   /* A note that explains state without shouting — used for empty screens and
      for telling someone what to do next. */
   .note {
-    @apply text-sm text-ink-muted bg-page border border-rule rounded-card p-5;
+    @apply text-sm text-ink-muted bg-page border border-rule rounded-card p-6;
+  }
+
+  /* Display type for a section that opens a page — the one place besides the
+     figure where the serif runs large. */
+  .display {
+    @apply font-serif text-display-sm leading-[1.1] tracking-tight text-ink;
   }
 }
 

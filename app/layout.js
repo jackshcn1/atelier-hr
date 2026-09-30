@@ -27,7 +27,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="font-sans antialiased min-h-screen bg-page text-ink">
         <Navbar />
-        <main className="mx-auto w-full max-w-shell px-5 py-8 sm:px-8">
+        <main className="mx-auto w-full max-w-shell px-6 py-12 sm:px-10 sm:py-16">
           {children}
         </main>
       </body>
