@@ -420,7 +420,14 @@ export async function runPetpoojaSync(options = {}) {
         }
 
         // Locate the latest generated row in the table
-        const downloadLink = page.locator('table tr:first-child a:has-text("Download"), table a:visible:has-text("Download")').first();
+        const rowsWithDownload = page.locator('table tr:has(a:has-text("Download"))');
+        let downloadLink = null;
+        if (await rowsWithDownload.count() > 0) {
+          downloadLink = rowsWithDownload.last().locator('a:has-text("Download")');
+        } else {
+          downloadLink = page.locator('table a:visible:has-text("Download"), a:visible:has-text("Download")').last();
+        }
+
         await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
 
         console.log('  ✓ Clicking Download link in queue table...');
@@ -468,6 +475,36 @@ export async function runPetpoojaSync(options = {}) {
             if (excelBtn) excelBtn.click();
           }
         });
+
+        const download = await downloadPromise;
+        const downloadStream = await download.createReadStream();
+        const chunks = [];
+        for await (const chunk of downloadStream) chunks.push(chunk);
+        const buffer = Buffer.concat(chunks);
+        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
+        return parseWorkbookBuffer(buffer);
+      }
+
+      // Special Handler C: Petpooja Inventory Exports (Wastage & Purchase Returns)
+      if (url.includes('inventory.petpooja.com')) {
+        console.log(`  Handling Inventory Export for ${reportName}...`);
+        const exportBtn = page.locator('.btn-group:visible button:has-text("Export"), button:visible:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export")').first();
+        await exportBtn.waitFor({ state: 'visible', timeout: 25000 });
+        await exportBtn.click({ force: true });
+        await page.waitForTimeout(1000);
+
+        const downloadPromise = new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
+          page.once('download', dl => { clearTimeout(timer); resolve(dl); });
+          context.once('page', async p => {
+            p.once('download', dl => { clearTimeout(timer); resolve(dl); });
+          });
+        });
+
+        const subOption = page.locator('.dropdown-menu a:visible, a:visible:has-text("Excel"), button:visible:has-text("Excel"), a:visible:has-text("CSV"), a:visible:has-text("Export")').first();
+        if (await subOption.count() > 0 && await subOption.isVisible().catch(() => false)) {
+          await subOption.click({ force: true });
+        }
 
         const download = await downloadPromise;
         const downloadStream = await download.createReadStream();
