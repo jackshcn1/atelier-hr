@@ -309,7 +309,7 @@ export async function runPetpoojaSync(options = {}) {
     }
 
     // Helper: download custom report and return sheet rows
-    async function fetchCustomReport(url, reportName) {
+    async function fetchCustomReport(url, reportName, queryCycle = cycle) {
       console.log(`📥 Fetching ${reportName} (${url})...`);
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
@@ -327,8 +327,8 @@ export async function runPetpoojaSync(options = {}) {
         };
       }
 
-      const startDates = formatDates(cycle.start);
-      const endDates = formatDates(cycle.queryEnd || cycle.end);
+      const startDates = formatDates(queryCycle.start);
+      const endDates = formatDates(queryCycle.queryEnd || queryCycle.end);
 
       // 1. Fill Date Range if datepicker inputs are present
       try {
@@ -445,19 +445,20 @@ export async function runPetpoojaSync(options = {}) {
 
       // Special Handler B: Corporate GSTN Summary (/reports/all_restaurant_orders/all)
       if (url.includes('all_restaurant_orders')) {
-        console.log('  Handling Corporate GSTN Orders Export...');
+        console.log('  Handling Corporate GSTN Orders Export (Export all)...');
         const exportBtn = page.locator('button:visible:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export")').first();
         await exportBtn.waitFor({ state: 'visible', timeout: 25000 });
         await exportBtn.click({ force: true });
         await page.waitForTimeout(1500);
 
-        const excelOption = page.locator('.dropdown-menu a:visible, .dropdown-menu button:visible, a:visible:has-text("Excel"), button:visible:has-text("Excel"), li:visible:has-text("Excel"), a:visible:has-text("CSV"), a[href*="excel" i]:visible, a:visible:has-text("Export")').first();
-        await excelOption.waitFor({ state: 'visible', timeout: 15000 });
+        // Click "Export all" to ensure all historical pages are exported
+        const exportAllOption = page.locator('a:visible:has-text("Export all"), a:visible:has-text("Export All"), button:visible:has-text("Export all"), button:visible:has-text("Export All"), .dropdown-menu a:has-text("all"), a:visible:has-text("Excel"), .dropdown-menu a:visible').first();
+        await exportAllOption.waitFor({ state: 'visible', timeout: 15000 });
 
-        console.log('  ✓ Clicking Excel export option...');
+        console.log('  ✓ Clicking "Export all" option...');
         const [download] = await Promise.all([
           page.waitForEvent('download', { timeout: 35000 }),
-          excelOption.click({ force: true })
+          exportAllOption.click({ force: true })
         ]);
         const downloadStream = await download.createReadStream();
         const chunks = [];
@@ -628,11 +629,24 @@ export async function runPetpoojaSync(options = {}) {
       console.error('⚠️ Could not sync Counter & Delivery Sales from Item Report:', e.message);
     }
 
-    // REPORT 5: All Restaurant Orders with GSTN
+    // REPORT 5: All Restaurant Orders with GSTN (pulled for T-99 days to verify new unique clients)
     try {
-      const gstRows = await fetchCustomReport('https://billing.petpooja.com/reports/all_restaurant_orders/all', 'Corporate GSTN Summary');
+      const today = new Date();
+      const past99 = new Date(today);
+      past99.setDate(today.getDate() - 99);
+      const start99 = past99.toISOString().slice(0, 10);
+      const b2bQueryCycle = {
+        ...cycle,
+        start: start99,
+        queryEnd: cycle.queryEnd || cycle.end
+      };
+
+      console.log(`  Pulling Corporate GSTN summary for 100 days history (${start99} to ${b2bQueryCycle.queryEnd})...`);
+      const gstRows = await fetchCustomReport('https://billing.petpooja.com/reports/all_restaurant_orders/all', 'Corporate GSTN Summary', b2bQueryCycle);
       const b2bResult = parseB2bGstOrders(gstRows, cycle);
       if (b2bResult.ok) {
+        console.log(`  📊 B2B Revenue in period: ₹${b2bResult.totalRevenue} across ${b2bResult.ordersInPeriod} orders`);
+        console.log(`  📊 New B2B Clients: ${b2bResult.newCustomerCount} (historical clients seen: ${b2bResult.historicalGstins})`);
         await saveMetric('b2b_rev', b2bResult.totalRevenue, 'petpooja', 'Corporate GSTN Summary', {
           scheme_name: 'b2b_counter',
           ordersInPeriod: b2bResult.ordersInPeriod
