@@ -379,6 +379,11 @@ export async function runPetpoojaSync(options = {}) {
           }, eVal);
 
           console.log(`  ✓ Set date range: ${sVal} to ${eVal}`);
+
+          // Dismiss calendar popup if it stayed open
+          await page.keyboard.press('Escape');
+          await page.locator('label, h1, h2, h3, .page-title, th, .card-header').first().click({ force: true }).catch(() => {});
+          await page.waitForTimeout(500);
         }
 
         // If on All Orders / Corporate GSTN summary page, click "Show All" or "Search"
@@ -425,25 +430,15 @@ export async function runPetpoojaSync(options = {}) {
 
         await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
 
-        const href = await downloadLink.getAttribute('href');
-        let buffer = null;
-
-        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
-          const downloadUrl = new URL(href, page.url()).href;
-          console.log(`  ✓ Fetching direct download URL: ${downloadUrl}`);
-          const response = await page.request.get(downloadUrl);
-          buffer = await response.body();
-        } else {
-          console.log('  ✓ Clicking Download link in queue table...');
-          const [download] = await Promise.all([
-            page.waitForEvent('download', { timeout: 35000 }),
-            downloadLink.click({ force: true })
-          ]);
-          const downloadStream = await download.createReadStream();
-          const chunks = [];
-          for await (const chunk of downloadStream) chunks.push(chunk);
-          buffer = Buffer.concat(chunks);
-        }
+        console.log('  ✓ Clicking Download link in queue table...');
+        const [download] = await Promise.all([
+          page.waitForEvent('download', { timeout: 35000 }),
+          downloadLink.click({ force: true })
+        ]);
+        const downloadStream = await download.createReadStream();
+        const chunks = [];
+        for await (const chunk of downloadStream) chunks.push(chunk);
+        const buffer = Buffer.concat(chunks);
         console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
         return parseWorkbookBuffer(buffer);
       }
@@ -459,24 +454,15 @@ export async function runPetpoojaSync(options = {}) {
         const excelOption = page.locator('.dropdown-menu a:visible, .dropdown-menu button:visible, a:visible:has-text("Excel"), button:visible:has-text("Excel"), li:visible:has-text("Excel"), a:visible:has-text("CSV"), a[href*="excel" i]:visible, a:visible:has-text("Export")').first();
         await excelOption.waitFor({ state: 'visible', timeout: 15000 });
 
-        const href = await excelOption.getAttribute('href');
-        let buffer = null;
-        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
-          const downloadUrl = new URL(href, page.url()).href;
-          console.log(`  ✓ Fetching direct download URL: ${downloadUrl}`);
-          const response = await page.request.get(downloadUrl);
-          buffer = await response.body();
-        } else {
-          console.log('  ✓ Clicking Excel export option...');
-          const [download] = await Promise.all([
-            page.waitForEvent('download', { timeout: 35000 }),
-            excelOption.click({ force: true })
-          ]);
-          const downloadStream = await download.createReadStream();
-          const chunks = [];
-          for await (const chunk of downloadStream) chunks.push(chunk);
-          buffer = Buffer.concat(chunks);
-        }
+        console.log('  ✓ Clicking Excel export option...');
+        const [download] = await Promise.all([
+          page.waitForEvent('download', { timeout: 35000 }),
+          excelOption.click({ force: true })
+        ]);
+        const downloadStream = await download.createReadStream();
+        const chunks = [];
+        for await (const chunk of downloadStream) chunks.push(chunk);
+        const buffer = Buffer.concat(chunks);
         console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
         return parseWorkbookBuffer(buffer);
       }
