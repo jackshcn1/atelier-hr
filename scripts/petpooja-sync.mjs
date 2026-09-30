@@ -407,30 +407,36 @@ export async function runPetpoojaSync(options = {}) {
         console.log('  (Date filter bypassed or not found:', dateErr.message, ')');
       }
 
-      // Special Handler A: Async queue report page (e.g. Advance Orders Summary at /reports/order_summary_ho/1)
+      // Special Handler A: Async queue report page (Advance Orders Summary at /reports/order_summary_ho/1)
       if (url.includes('order_summary_ho')) {
-        console.log('  Handling Async Report Queue on Due Payment Report...');
+        console.log('  Handling Advance Orders / Due Payment Report (From March 04, 2026)...');
+        // Click the white box with blue font that says "Export"
         const exportQueueBtn = page.locator('button:visible:has-text("Export"), input[value*="Export" i]:visible, a.btn:visible:has-text("Export"), .btn-primary:visible:has-text("Export")').first();
         if (await exportQueueBtn.count() > 0) {
           await exportQueueBtn.click({ force: true });
-          console.log('  ✓ Triggered Export generation. Waiting for queue row (12s)...');
-          await page.waitForTimeout(12000);
+          console.log('  ✓ Clicked Export button. Waiting 15s for report generation...');
+          await page.waitForTimeout(15000);
           await page.reload({ waitUntil: 'load' }).catch(() => {});
-          await page.waitForTimeout(3000);
+          await page.waitForTimeout(4000);
         }
 
-        // Locate the latest generated row in the table
-        const rowsWithDownload = page.locator('table tr:has(a:has-text("Download"))');
+        // Find the generated row in the table (matching 2026-03-04 or latest)
+        const matchRow = page.locator('table tr:has(a:has-text("Download"))').filter({ hasText: '2026-03-04' }).first();
         let downloadLink = null;
-        if (await rowsWithDownload.count() > 0) {
-          downloadLink = rowsWithDownload.last().locator('a:has-text("Download")');
+        if (await matchRow.count() > 0) {
+          downloadLink = matchRow.locator('a:has-text("Download")').first();
         } else {
-          downloadLink = page.locator('table a:visible:has-text("Download"), a:visible:has-text("Download")').last();
+          const rowsWithDownload = page.locator('table tr:has(a:has-text("Download"))');
+          if (await rowsWithDownload.count() > 0) {
+            downloadLink = rowsWithDownload.last().locator('a:has-text("Download")');
+          } else {
+            downloadLink = page.locator('table a:visible:has-text("Download"), a:visible:has-text("Download")').first();
+          }
         }
 
         await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
 
-        console.log('  ✓ Clicking Download link in queue table...');
+        console.log('  ✓ Clicking underlined Download link in queue table...');
         const downloadPromise = new Promise((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
           page.once('download', dl => { clearTimeout(timer); resolve(dl); });
@@ -487,7 +493,7 @@ export async function runPetpoojaSync(options = {}) {
 
       // Special Handler C: Petpooja Inventory Exports (Wastage & Purchase Returns)
       if (url.includes('inventory.petpooja.com')) {
-        console.log(`  Handling Inventory Export for ${reportName}...`);
+        console.log(`  Handling Inventory Export for ${reportName} (Export All)...`);
         const exportBtn = page.locator('.btn-group:visible button:has-text("Export"), button:visible:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export")').first();
         await exportBtn.waitFor({ state: 'visible', timeout: 25000 });
         await exportBtn.click({ force: true });
@@ -501,8 +507,10 @@ export async function runPetpoojaSync(options = {}) {
           });
         });
 
-        const subOption = page.locator('.dropdown-menu a:visible, a:visible:has-text("Excel"), button:visible:has-text("Excel"), a:visible:has-text("CSV"), a:visible:has-text("Export")').first();
+        // Click "Export All" in dropdown menu
+        const subOption = page.locator('.dropdown-menu a:visible:has-text("Export All"), .dropdown-menu a:visible:has-text("Export all"), .dropdown-menu a:visible:has-text("All"), .dropdown-menu a:visible:has-text("Excel"), .dropdown-menu a:visible').first();
         if (await subOption.count() > 0 && await subOption.isVisible().catch(() => false)) {
+          console.log('  ✓ Clicking "Export All" in Inventory dropdown...');
           await subOption.click({ force: true });
         }
 
@@ -709,11 +717,18 @@ export async function runPetpoojaSync(options = {}) {
       console.error('⚠️ Could not sync GSTN Orders Report:', e.message);
     }
 
-    // REPORT 6: Due Payment Report
+    // REPORT 6: Due Payment Report (Advance Orders from March 04, 2026 to check aged unpaid invoices)
     try {
-      const dueRows = await fetchCustomReport('https://billing.petpooja.com/reports/order_summary_ho/1', 'Due Payment Report');
+      const dueQueryCycle = {
+        ...cycle,
+        start: '2026-03-04',
+        queryEnd: cycle.queryEnd || cycle.end
+      };
+      console.log(`  Pulling Due Payment report from March 04, 2026 (${dueQueryCycle.start} to ${dueQueryCycle.queryEnd})...`);
+      const dueRows = await fetchCustomReport('https://billing.petpooja.com/reports/order_summary_ho/1', 'Due Payment Report', dueQueryCycle);
       const creditResult = parseCreditRecovery(dueRows, { end: cycle.end, maxAgeDays: 30 });
       if (creditResult.ok) {
+        console.log(`  📊 B2B Credit Recovery: Pass=${creditResult.pass}, Overdue=${creditResult.overdueCount}, Outstanding=₹${creditResult.outstandingAmount}`);
         await saveMetric('b2b_credit', creditResult.pass ? 1 : 0, 'petpooja', 'Due Payment Report', {
           scheme_name: 'b2b_counter',
           overdueCount: creditResult.overdueCount,
