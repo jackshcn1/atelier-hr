@@ -413,21 +413,14 @@ export async function runPetpoojaSync(options = {}) {
         const exportQueueBtn = page.locator('button:visible:has-text("Export"), input[value*="Export" i]:visible, a.btn:visible:has-text("Export"), .btn-primary:visible:has-text("Export")').first();
         if (await exportQueueBtn.count() > 0) {
           await exportQueueBtn.click({ force: true });
-          console.log('  ✓ Triggered Export generation. Waiting for queue row...');
-          await page.waitForTimeout(6000);
+          console.log('  ✓ Triggered Export generation. Waiting for queue row (12s)...');
+          await page.waitForTimeout(12000);
           await page.reload({ waitUntil: 'load' }).catch(() => {});
           await page.waitForTimeout(3000);
         }
 
-        // Locate the latest generated row in the table (or matching current month)
-        const matchRow = page.locator('table tr').filter({ hasText: cycle.start.slice(0, 7) }).first();
-        let downloadLink = null;
-        if (await matchRow.count() > 0 && await matchRow.locator('a:has-text("Download")').count() > 0) {
-          downloadLink = matchRow.locator('a:has-text("Download")').first();
-        } else {
-          downloadLink = page.locator('table tr:last-child a:has-text("Download"), table a:visible:has-text("Download")').first();
-        }
-
+        // Locate the latest generated row in the table
+        const downloadLink = page.locator('table tr:first-child a:has-text("Download"), table a:visible:has-text("Download")').first();
         await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
 
         console.log('  ✓ Clicking Download link in queue table...');
@@ -698,29 +691,33 @@ export async function runPetpoojaSync(options = {}) {
 
     // REPORT 7: Petpooja Inventory (Wastage & Purchase Returns)
     try {
-      console.log('🔐 Navigating to Petpooja Inventory...');
+      console.log('🔐 Navigating to Petpooja Inventory via SSO...');
       await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
       await page.waitForTimeout(2000);
 
-      // In Petpooja Billing sidebar, click Inventory to trigger authenticated SSO session
-      const invLink = page.locator('.sidebar-menu a:has-text("Inventory"), a:has-text("Inventory"), span:has-text("Inventory")').first();
+      let invPage = page;
+      const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
       if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
         console.log('  ✓ Clicking Inventory in sidebar navigation...');
-        const [invPage] = await Promise.all([
-          context.waitForEvent('page', { timeout: 6000 }).catch(() => null),
+        const [newPage] = await Promise.all([
+          context.waitForEvent('page', { timeout: 8000 }).catch(() => null),
           invLink.click({ force: true })
         ]);
-        if (invPage) {
+        if (newPage) {
+          invPage = newPage;
           await invPage.waitForLoadState('load').catch(() => {});
+        } else {
+          await page.waitForURL(/inventory\.petpooja\.com/, { timeout: 15000 }).catch(() => {});
         }
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(4000);
       }
 
       // Wastage download
       try {
-        const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report');
+        const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report', cycle, invPage);
         const wastageResult = parseWastage(wastageRows, cycle);
         if (wastageResult.ok) {
+          console.log(`  📊 Total Kitchen Wastage: ₹${wastageResult.total} across ${wastageResult.entries} entries`);
           await saveMetric('kit_wastage', wastageResult.total, 'petpooja', 'Wastage Report', {
             scheme_name: 'kitchen',
             entries: wastageResult.entries
@@ -734,9 +731,10 @@ export async function runPetpoojaSync(options = {}) {
 
       // Purchase returns download
       try {
-        const returnRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/purchase_return_list/', 'Purchase Returns');
+        const returnRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/purchase_return_list/', 'Purchase Returns', cycle, invPage);
         const returnsResult = parsePurchaseReturns(returnRows, cycle);
         if (returnsResult.ok) {
+          console.log(`  📊 Total Purchase Returns: ₹${returnsResult.total} across ${returnsResult.entries} debit notes`);
           await saveMetric('b2b_returns', returnsResult.total, 'petpooja', 'Purchase Return Report', {
             scheme_name: 'b2b_counter',
             entries: returnsResult.entries
