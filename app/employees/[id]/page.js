@@ -42,6 +42,10 @@ export default function EmployeeDetail() {
   const [resignationLetter, setResignationLetter] = useState(null);
   const [uploadingLetter, setUploadingLetter] = useState(false);
   const [exitRecord, setExitRecord] = useState(null);
+  const [assets, setAssets] = useState([]);
+  const [showAssetForm, setShowAssetForm] = useState(false);
+  const [savingAsset, setSavingAsset] = useState(false);
+  const [assetForm, setAssetForm] = useState({ name: '', asset_number: '', date_handed_over: '' });
   const [documents, setDocuments] = useState([]);
   const [employeePayslips, setEmployeePayslips] = useState([]);
   const [docTemplates, setDocTemplates] = useState([]);
@@ -128,7 +132,12 @@ export default function EmployeeDetail() {
     setResignationLetter(letter);
     const { data: exit } = await supabase.from('exit_records').select('*').eq('employee_id', id).maybeSingle();
     setExitRecord(exit);
-    setUniformReturned(exit?.uniform_returned || false);
+    const { data: assetRows } = await supabase
+      .from('employee_assets')
+      .select('*')
+      .eq('employee_id', id)
+      .order('created_at', { ascending: false });
+    setAssets(assetRows || []);
     const { data: docs } = await supabase.from('documents').select('*').eq('employee_id', id).order('date_added', { ascending: false });
     setDocuments(docs || []);
     if (emp?.department) {
@@ -386,6 +395,36 @@ export default function EmployeeDetail() {
   // Asset and uniform tracking now lives in the exit clearance workspace
   // (/exit-clearance?id=<employee_id>). It writes clearance_status only through
   // the settled path, which the exit_records constraints require.
+
+  async function saveAsset(e) {
+    e.preventDefault();
+    if (!assetForm.name.trim()) return;
+    setSavingAsset(true);
+    setError('');
+    try {
+      const { error: insErr } = await supabase.from('employee_assets').insert({
+        employee_id: id,
+        name: assetForm.name.trim(),
+        asset_number: assetForm.asset_number.trim() || null,
+        date_handed_over: assetForm.date_handed_over || null,
+        returned: false,
+      });
+      if (insErr) { setError(insErr.message); return; }
+      setAssetForm({ name: '', asset_number: '', date_handed_over: '' });
+      setShowAssetForm(false);
+      load();
+    } finally {
+      setSavingAsset(false);
+    }
+  }
+
+  async function removeAsset(assetId) {
+    if (!window.confirm('Remove this asset from the employee record?')) return;
+    setError('');
+    const { error: delErr } = await supabase.from('employee_assets').delete().eq('id', assetId);
+    if (delErr) { setError(delErr.message); return; }
+    load();
+  }
 
   async function uploadDocument(e) {
     e.preventDefault();
@@ -934,40 +973,117 @@ export default function EmployeeDetail() {
       </section>
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
-        <h2>Assets & exit clearance</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 6 }}>
+          <h2 style={{ margin: 0 }}>Assets</h2>
+          <button
+            onClick={() => setShowAssetForm(s => !s)}
+            style={{ background: '#334155', color: 'white', border: 'none', padding: '6px 14px', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          >
+            {showAssetForm ? 'Cancel' : '+ Add asset'}
+          </button>
+        </div>
         <p style={{ color: '#777', fontSize: 14 }}>
-          Clearance is managed in the exit clearance workspace, which tracks outstanding
-          uniform, assets and deposits rather than only a single checkbox.
+          Items currently tagged to this employee. These carry over to their exit handover.
         </p>
-        {employee.status === 'exited' || exitRecord ? (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 13, color: '#374151', marginBottom: 6 }}>
-              Uniform returned:{' '}
-              <strong>{exitRecord?.uniform_returned === true ? 'Yes' : exitRecord?.uniform_returned === false ? 'No' : 'Not confirmed'}</strong>
+
+        {showAssetForm && (
+          <form onSubmit={saveAsset} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                Asset name
+                <input required value={assetForm.name} onChange={e => setAssetForm({ ...assetForm, name: e.target.value })}
+                  placeholder="e.g. Apron, Torch, ID card"
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                Asset number
+                <input value={assetForm.asset_number} onChange={e => setAssetForm({ ...assetForm, asset_number: e.target.value })}
+                  placeholder="Optional — not yet in use"
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                Date handed over
+                <input type="date" value={assetForm.date_handed_over} onChange={e => setAssetForm({ ...assetForm, date_handed_over: e.target.value })}
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
+              </label>
             </div>
-            {(exitRecord?.assets_issued || []).length > 0 && (
-              <ul style={{ fontSize: 13, color: '#374151' }}>
-                {exitRecord.assets_issued.map((a, i) => (
-                  <li key={i}>{a.name} — {a.returned ? 'returned' : 'not returned'}</li>
-                ))}
-              </ul>
-            )}
-            <p style={{ fontSize: 13, marginTop: 8 }}>
-              Clearance status:{' '}
-              <strong style={{ color: exitRecord?.clearance_status === 'cleared' ? '#059669' : '#b45309' }}>
-                {exitRecord?.clearance_status === 'cleared' ? 'Cleared' : 'Pending'}
-              </strong>
-              {exitRecord?.settled_on && <> (settled {exitRecord.settled_on})</>}
-            </p>
-          </div>
-        ) : (
-          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>No clearance record yet — one is created when this employee leaves.</p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button type="submit" disabled={savingAsset}
+                style={{ background: savingAsset ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', padding: '7px 16px', borderRadius: 5, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                {savingAsset ? 'Saving…' : 'Save asset'}
+              </button>
+            </div>
+          </form>
         )}
-        <p style={{ marginTop: 12 }}>
-          <a href={`/exit-clearance?id=${id}`}>Open exit clearance workspace →</a><br />
-          <a href={`/employees/${id}/work-certificate`}>View / print work certificate →</a>
-        </p>
+
+        {error && <p style={{ color: '#b91c1c', fontSize: 13, marginTop: 8 }}>{error}</p>}
+
+        {assets.length === 0 ? (
+          <p style={{ color: '#777', fontSize: 14, marginTop: 10 }}>No assets tagged to this employee.</p>
+        ) : (
+          <div style={{ marginTop: 10, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  {['Asset', 'Number', 'Handed over', 'Status', ''].map((h, i) => (
+                    <th key={i} style={{ textAlign: 'left', padding: '7px 10px', borderBottom: '1px solid #e5e7eb', fontWeight: 700, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {assets.map(a => (
+                  <tr key={a.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '7px 10px', fontWeight: 600, color: '#111827' }}>{a.name}</td>
+                    <td style={{ padding: '7px 10px', color: '#6b7280' }}>{a.asset_number || '—'}</td>
+                    <td style={{ padding: '7px 10px', color: '#374151' }}>{a.date_handed_over || '—'}</td>
+                    <td style={{ padding: '7px 10px' }}>
+                      {employee.status === 'exited' ? (
+                        <span style={{ color: a.returned ? '#059669' : '#b91c1c', fontWeight: 700 }}>
+                          {a.returned ? 'Returned' : 'Not returned'}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#6b7280' }}>With employee</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '7px 10px', textAlign: 'right' }}>
+                      {employee.status !== 'exited' && (
+                        <button onClick={() => removeAsset(a.id)}
+                          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 16 }}>×</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
+
+      {employee.status !== 'active' && (
+        <section style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: 16, borderRadius: 8, marginTop: 20 }}>
+          <h2 style={{ marginTop: 0 }}>Exit clearance</h2>
+          <p style={{ color: '#92400e', fontSize: 14 }}>
+            {employee.status === 'on-notice'
+              ? 'This employee is on notice. Handover and clearance can be phased across the notice period.'
+              : 'This employee has left. Clearance stays here until it is fully settled.'}
+          </p>
+          <div style={{ fontSize: 13, color: '#374151', marginBottom: 6 }}>
+            Uniform returned:{' '}
+            <strong>{exitRecord?.uniform_returned === true ? 'Yes' : exitRecord?.uniform_returned === false ? 'No' : 'Not confirmed'}</strong>
+          </div>
+          <p style={{ fontSize: 13 }}>
+            Clearance status:{' '}
+            <strong style={{ color: exitRecord?.clearance_status === 'cleared' ? '#059669' : '#b45309' }}>
+              {exitRecord?.clearance_status === 'cleared' ? 'Cleared' : 'Pending'}
+            </strong>
+            {exitRecord?.settled_on && <> (settled {exitRecord.settled_on})</>}
+          </p>
+          <p style={{ marginTop: 12 }}>
+            <a href={`/exit-clearance?id=${id}`}>Open exit clearance workspace →</a><br />
+            <a href={`/employees/${id}/work-certificate`}>View / print work certificate →</a>
+          </p>
+        </section>
+      )}
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
         <h2>Documents</h2>

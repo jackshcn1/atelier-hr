@@ -29,25 +29,27 @@ function ExitClearanceInner() {
   const [employee, setEmployee] = useState(null);
   const [record, setRecord] = useState(null);
   const [deposits, setDeposits] = useState([]);
+  const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [showPrint, setShowPrint] = useState(false);
 
-  const [assetRow, setAssetRow] = useState({ name: '', returned: false });
   const [dueRow, setDueRow] = useState({ label: '', amount: '' });
 
   async function load() {
     setLoading(true);
-    const [{ data: emp }, { data: rec }, { data: deps }] = await Promise.all([
+    const [{ data: emp }, { data: rec }, { data: deps }, { data: assetRows }] = await Promise.all([
       supabase.from('employees').select('*').eq('employee_id', id).maybeSingle(),
       supabase.from('exit_records').select('*').eq('employee_id', id).maybeSingle(),
       supabase.from('employee_deposits').select('*').eq('employee_id', id),
+      supabase.from('employee_assets').select('*').eq('employee_id', id).order('created_at', { ascending: false }),
     ]);
     setEmployee(emp || null);
     setRecord(rec || null);
     setDeposits(deps || []);
+    setAssets(assetRows || []);
     setLoading(false);
   }
 
@@ -100,24 +102,26 @@ function ExitClearanceInner() {
     }, '✓ Exit details saved.');
   }
 
-  async function addAsset() {
-    if (!assetRow.name.trim()) return;
-    const current = await ensureRecord();
-    const next = [...(current.assets_issued || []), { name: assetRow.name.trim(), returned: assetRow.returned }];
-    await patch({ assets_issued: next }, '✓ Asset added.');
-    setAssetRow({ name: '', returned: false });
-  }
-
-  async function toggleAsset(index) {
-    const current = await ensureRecord();
-    const next = (current.assets_issued || []).map((a, i) => (i === index ? { ...a, returned: !a.returned } : a));
-    await patch({ assets_issued: next });
-  }
-
-  async function removeAsset(index) {
-    const current = await ensureRecord();
-    const next = (current.assets_issued || []).filter((_, i) => i !== index);
-    await patch({ assets_issued: next });
+  async function toggleAsset(assetId) {
+    setError(''); setMessage('');
+    setSaving(true);
+    try {
+      const target = assets.find(a => a.id === assetId);
+      const nextReturned = !target?.returned;
+      const { error: updErr } = await supabase
+        .from('employee_assets')
+        .update({
+          returned: nextReturned,
+          date_returned: nextReturned ? new Date().toISOString().slice(0, 10) : null,
+        })
+        .eq('id', assetId);
+      if (updErr) throw updErr;
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function addDue() {
@@ -188,7 +192,7 @@ function ExitClearanceInner() {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading exit clearance…</div>;
   if (!employee) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Employee not found.</div>;
 
-  const summary = summariseExitClearance({ exitRecord: record, employee, deposits });
+  const summary = summariseExitClearance({ exitRecord: record, employee, deposits, assets });
   const isExited = employee.status === 'exited';
 
   return (
@@ -338,13 +342,18 @@ function ExitClearanceInner() {
         </div>
 
         {summary.assetsIssued === 0 ? (
-          <p style={{ fontSize: 13, color: '#6b7280' }}>No assets recorded.</p>
+          <p style={{ fontSize: 13, color: '#6b7280' }}>
+            No assets are tagged to this employee. Assets are added from their employee record.
+          </p>
         ) : (
           <div style={{ marginBottom: 12 }}>
-            {(record?.assets_issued || []).map((a, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #f3f4f6' }}>
-                <span style={{ flex: 1, fontSize: 13, color: '#111827' }}>{a.name}</span>
-                <button onClick={() => toggleAsset(i)}
+            {assets.map(a => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid #f3f4f6' }}>
+                <span style={{ flex: 1, fontSize: 13, color: '#111827' }}>
+                  {a.name}
+                  {a.asset_number && <span style={{ color: '#6b7280', fontWeight: 400 }}> · {a.asset_number}</span>}
+                </span>
+                <button onClick={() => toggleAsset(a.id)}
                   style={{
                     padding: '4px 12px', borderRadius: 5, fontWeight: 700, fontSize: 11, cursor: 'pointer',
                     background: a.returned ? '#ecfdf5' : '#fef2f2',
@@ -353,26 +362,10 @@ function ExitClearanceInner() {
                   }}>
                   {a.returned ? '✓ Returned' : '✗ Not returned'}
                 </button>
-                <button onClick={() => removeAsset(i)}
-                  style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
             ))}
           </div>
         )}
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 10 }}>
-          <input value={assetRow.name} onChange={e => setAssetRow({ ...assetRow, name: e.target.value })}
-            placeholder="Asset name (e.g. Apron, ID card, torch)"
-            style={{ flex: '1 1 200px', padding: '7px 10px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontSize: 13 }} />
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#374151' }}>
-            <input type="checkbox" checked={assetRow.returned} onChange={e => setAssetRow({ ...assetRow, returned: e.target.checked })} />
-            Already returned
-          </label>
-          <button onClick={addAsset}
-            style={{ background: '#334155', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-            Add asset
-          </button>
-        </div>
       </div>
 
       {/* Deposits and dues */}
@@ -469,10 +462,15 @@ function ExitClearanceInner() {
           <h3 style={{ fontSize: 14, marginTop: 20 }}>Assets issued and return status</h3>
           {summary.assetsIssued === 0 ? <p style={{ fontSize: 13 }}>No assets recorded.</p> : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead><tr><th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 4 }}>Item</th><th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 4 }}>Returned?</th></tr></thead>
+              <thead><tr><th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 4 }}>Item</th><th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 4 }}>Asset No.</th><th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 4 }}>Handed over</th><th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 4 }}>Returned?</th></tr></thead>
               <tbody>
-                {(record?.assets_issued || []).map((a, i) => (
-                  <tr key={i}><td style={{ padding: 4 }}>{a.name}</td><td style={{ padding: 4 }}>{a.returned ? 'Yes' : 'No'}</td></tr>
+                {assets.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ padding: 4 }}>{a.name}</td>
+                    <td style={{ padding: 4 }}>{a.asset_number || '—'}</td>
+                    <td style={{ padding: 4 }}>{a.date_handed_over || '—'}</td>
+                    <td style={{ padding: 4 }}>{a.returned ? 'Yes' : 'No'}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
