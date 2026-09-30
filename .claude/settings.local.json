@@ -39,7 +39,12 @@
       "Bash(git commit -m 'Add Interactive Daily & Shift Checklists Module with Mobile Camera Proof and Sign-offs *)",
       "Bash(git commit -m 'Add flexible Employee and Group Assignment options to Checklist Builder *)",
       "Bash(git commit -m 'Ensure checklists and history are strictly scoped for regular employee accounts *)",
-      "Bash(git commit -m 'Add Unified Delegated Tasks, Subtasks & Accountability Hub \\(/tasks\\) *)"
+      "Bash(git commit -m 'Add Unified Delegated Tasks, Subtasks & Accountability Hub \\(/tasks\\) *)",
+      "WebSearch",
+      "WebFetch(domain:esic.gov.in)",
+      "WebFetch(domain:www.esic.gov.in)",
+      "WebFetch(domain:www.epfindia.gov.in)",
+      "WebFetch(domain:www.epfo.gov.in)"
     ]
   }
 }

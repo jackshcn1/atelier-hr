@@ -161,12 +161,41 @@ export default function EmployeeDetail() {
     setError('');
     const { data: settings } = await supabase.from('payroll_settings').select('*').eq('id', 1).single();
     const split = computeSalarySplit(newSalary.fixed, settings);
-    const { error } = await supabase.from('salary_history').insert([{ ...newSalary, ...split, employee_id: id }]);
+
+    // Capture the outgoing figures before overwriting them. Salary is the most
+    // sensitive number on the record, so every change is written to the audit
+    // trail with both sides of the move.
+    const prevFixed = Number(employee?.current_fixed_salary || 0);
+    const prevVariable = Number(employee?.current_variable_salary || 0);
+    const nextFixed = Number(newSalary.fixed || 0);
+    const nextVariable = Number(newSalary.variable || 0);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const actorEmail = user?.email || 'unknown';
+
+    const { error } = await supabase.from('salary_history').insert([{
+      ...newSalary,
+      ...split,
+      employee_id: id,
+      changed_by: actorEmail
+    }]);
     if (error) { setError(error.message); return; }
+
     await supabase.from('employees').update({
       current_fixed_salary: newSalary.fixed,
       current_variable_salary: newSalary.variable
     }).eq('employee_id', id);
+
+    await supabase.from('audit_log').insert([{
+      actor: actorEmail,
+      action: 'changed salary',
+      record_affected:
+        `${id} (${employee?.name || ''}) — fixed ₹${prevFixed.toLocaleString('en-IN')} → ₹${nextFixed.toLocaleString('en-IN')}, ` +
+        `variable ₹${prevVariable.toLocaleString('en-IN')} → ₹${nextVariable.toLocaleString('en-IN')}` +
+        (newSalary.reason ? ` — reason: ${newSalary.reason}` : '') +
+        (newSalary.effective_from ? ` — effective ${newSalary.effective_from}` : '')
+    }]);
+
     setNewSalary({ fixed: '', variable: '', effective_from: '', reason: '' });
     load();
   }
@@ -295,6 +324,27 @@ export default function EmployeeDetail() {
     if (!newId) return;
     setRenaming(true);
     setError('');
+
+    // Every child table cascades on employee_id, so renaming rewrites the ID
+    // inside historical payslips and salary history. Those records are what
+    // payroll and statutory reporting are built on, so once a person has been
+    // paid we refuse the rename rather than silently rewriting their history.
+    const { data: paidRuns } = await supabase
+      .from('payroll_line_items')
+      .select('id, payroll_run_id')
+      .eq('employee_id', id)
+      .limit(1);
+
+    if (paidRuns && paidRuns.length > 0) {
+      setRenaming(false);
+      setError(
+        `${employee.name} has already been through payroll, so their ID can no longer be changed. ` +
+        `Renaming would rewrite the ID inside their existing payslips and salary history. ` +
+        `If the ID was issued incorrectly, correct it through a database migration so the change is reviewed.`
+      );
+      return;
+    }
+
     const { error } = await supabase.from('employees').update({ employee_id: newId }).eq('employee_id', id);
     if (error) { setError(error.message); setRenaming(false); return; }
     await supabase.from('audit_log').insert([{
@@ -540,6 +590,16 @@ export default function EmployeeDetail() {
             }}
           >
             📄 Onboarding Doc →
+          </a>
+          <a
+            href={`/employees/${id}/appraisal`}
+            style={{
+              background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155',
+              padding: '6px 14px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 6
+            }}
+          >
+            ⭐ Appraisals →
           </a>
           {uploadingPhoto && <span style={{ fontSize: 11, color: '#2563eb' }}>Uploading photo…</span>}
         </div>
