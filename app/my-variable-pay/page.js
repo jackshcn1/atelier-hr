@@ -6,7 +6,7 @@ import { computeEmployeeVariablePayout } from '../../lib/variablePayCalculator';
 function getDefaultPayrollCycle() {
   const today = new Date();
   const y = today.getFullYear();
-  const m = today.getMonth(); // 0-indexed
+  const m = today.getMonth();
   const d = today.getDate();
   let ey = y, em = m;
   if (d < 20) {
@@ -21,16 +21,54 @@ function getDefaultPayrollCycle() {
   };
 }
 
+// Cycle ranges read as "20 Aug – 19 Sep". The year only appears when a cycle
+// straddles two years, otherwise it is just noise.
+function formatPeriodDates(p) {
+  if (!p) return '—';
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const one = (iso) => {
+    const [y, m, d] = String(iso).split('-');
+    return `${Number(d)} ${MONTHS[Number(m) - 1]}`;
+  };
+  const sy = String(p.period_start).slice(0, 4);
+  const ey = String(p.period_end).slice(0, 4);
+  const range = `${one(p.period_start)} – ${one(p.period_end)}`;
+  return sy === ey ? range : `${range} ${ey}`;
+}
+
+// Money gets abbreviated so a figure stays scannable; exact values are still
+// available on the metric rows below.
+function formatMoney(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v === 0) return '—';
+  if (Math.abs(v) >= 10000000) return `₹${(v / 10000000).toFixed(2)}Cr`;
+  if (Math.abs(v) >= 100000) return `₹${(v / 100000).toFixed(2)}L`;
+  if (Math.abs(v) >= 1000) return `₹${(v / 1000).toFixed(1)}k`;
+  return `₹${v.toLocaleString('en-IN')}`;
+}
+
+function formatValue(value, unit) {
+  if (value === null || value === undefined) return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  if (unit === '₹') return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  if (unit === '%') return `${(n * 100).toFixed(0)}%`;
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+function attainmentTone(pct) {
+  if (pct >= 100) return { text: 'text-good', fill: 'bg-good', pill: 'pill-good' };
+  if (pct > 0) return { text: 'text-warn', fill: 'bg-warn', pill: 'pill-warn' };
+  return { text: 'text-ink-muted', fill: 'bg-rule', pill: 'pill-quiet' };
+}
+
 function MyVariablePayContent() {
   const supabase = createClient();
-  const defaultCycle = getDefaultPayrollCycle();
 
-  // User & permissions
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [isManager, setIsManager] = useState(false);
 
-  // Data
   const [periods, setPeriods] = useState([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState(null);
   const [allEmployees, setAllEmployees] = useState([]);
@@ -41,7 +79,6 @@ function MyVariablePayContent() {
   const [snapshotRows, setSnapshotRows] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     loadUserAndInit();
@@ -49,9 +86,7 @@ function MyVariablePayContent() {
 
   async function loadUserAndInit() {
     setLoading(true);
-    setError('');
 
-    // 1. Get authenticated user
     const { data: { user } } = await supabase.auth.getUser();
     setCurrentUser(user);
 
@@ -77,13 +112,11 @@ function MyVariablePayContent() {
       if (prof?.employee_id) {
         targetEmpId = prof.employee_id;
       } else {
-        // Find employee by email match
         const { data: empMatch } = await supabase.from('employees').select('employee_id').ilike('email', user.email).maybeSingle();
         if (empMatch) targetEmpId = empMatch.employee_id;
       }
     }
 
-    // 2. Fetch periods
     const { data: pList } = await supabase
       .from('variable_pay_periods')
       .select('*')
@@ -92,19 +125,14 @@ function MyVariablePayContent() {
     const periodRows = pList || [];
     setPeriods(periodRows);
 
-    let activePeriod = periodRows.find(p => p.status === 'open') || periodRows[0];
-    if (activePeriod) {
-      setSelectedPeriodId(activePeriod.id);
-    }
+    const activePeriod = periodRows.find(p => p.status === 'open') || periodRows[0];
+    if (activePeriod) setSelectedPeriodId(activePeriod.id);
 
-    // 3. Fetch schemes
     const { data: sList } = await supabase.from('variable_pay_schemes').select('*').eq('is_active', true);
     setSchemes(sList || []);
 
-    // 4. Fetch the employee record.
-    // A regular employee may only ever load their OWN row — we never issue the
-    // bulk "select all employees" query on their behalf, because that would
-    // hand the browser a list of colleagues we have no reason to expose.
+    // A regular employee only ever loads their OWN row. We never issue the
+    // bulk "select all employees" query on their behalf.
     if (targetEmpId) {
       const { data: ownEmp } = await supabase
         .from('employees')
@@ -114,8 +142,7 @@ function MyVariablePayContent() {
       if (ownEmp) setMyEmployee(ownEmp);
     }
 
-    // Admins and managers legitimately need the full roster to power the
-    // employee switcher, so only they run this query.
+    // Admins and managers legitimately need the full roster for the switcher.
     if (privileged) {
       const { data: eList } = await supabase
         .from('employees')
@@ -129,11 +156,7 @@ function MyVariablePayContent() {
 
     setSelectedEmpId(targetEmpId);
 
-    // 5. Fetch metric inputs for active period
-    if (activePeriod) {
-      await loadInputsForPeriod(activePeriod.id);
-    }
-
+    if (activePeriod) await loadInputsForPeriod(activePeriod.id);
     setLoading(false);
   }
 
@@ -143,9 +166,8 @@ function MyVariablePayContent() {
     const isClosed = period?.status === 'locked' || period?.status === 'paid';
 
     if (isClosed) {
-      // A closed cycle is frozen. Read the snapshot rather than the live input
-      // rows, so later edits or re-syncs can never change what this employee
-      // saw for that cycle. RLS limits this to their own rows.
+      // A closed cycle is frozen: read the snapshot, so later edits or re-syncs
+      // can never change what this employee saw for that cycle.
       const { data: snap } = await supabase
         .from('variable_pay_snapshot')
         .select('*')
@@ -155,7 +177,6 @@ function MyVariablePayContent() {
       return;
     }
 
-    // Current cycle: live attainment from the values the sync just pulled.
     const { data: inputs } = await supabase
       .from('variable_metric_inputs')
       .select('*')
@@ -170,34 +191,27 @@ function MyVariablePayContent() {
     await loadInputsForPeriod(pId);
   }
 
-  // Active viewing employee record.
   // For a regular employee this is always their own record — the switcher
-  // exists solely for admins, and `selectedEmpId` is never allowed to point
-  // anywhere else for anyone else.
+  // exists solely for admins.
   const currentEmp = useMemo(() => {
     if (isManager) return allEmployees.find(e => e.employee_id === selectedEmpId) || null;
     return myEmployee;
   }, [allEmployees, selectedEmpId, myEmployee, isManager]);
 
-  // Selected period object
-  const currentPeriod = useMemo(() => {
-    return periods.find(p => p.id === selectedPeriodId) || null;
-  }, [periods, selectedPeriodId]);
+  const currentPeriod = useMemo(
+    () => periods.find(p => p.id === selectedPeriodId) || null,
+    [periods, selectedPeriodId]
+  );
 
   const isClosedCycle = currentPeriod?.status === 'locked' || currentPeriod?.status === 'paid';
 
-  // Assigned scheme for current employee
   const currentScheme = useMemo(() => {
     if (!currentEmp?.variable_pay_scheme) return null;
     return schemes.find(s => s.name === currentEmp.variable_pay_scheme) || null;
   }, [currentEmp, schemes]);
 
-  // Build the calculation. A closed cycle reads its frozen snapshot; the
-  // current cycle is computed live from the freshly synced metric inputs.
   const liveCalculation = useMemo(() => {
     if (!currentScheme || !currentEmp) return null;
-
-    const pool = Number(currentEmp.current_variable_salary || 0);
 
     if (isClosedCycle) {
       const mine = snapshotRows.filter(s => s.employee_id === currentEmp.employee_id);
@@ -206,8 +220,8 @@ function MyVariablePayContent() {
       return {
         fromSnapshot: true,
         totalPayoutAmount: totalPayout,
-        totalEarnedFraction: pool > 0 ? totalPayout / pool : 0,
-        totalEarnedPct: pool > 0 ? Math.round((totalPayout / pool) * 1000) / 10 : 0,
+        totalEarnedFraction: 0,
+        totalEarnedPct: 0,
         breakdown: mine.map(r => ({
           metric_id: r.metric_id,
           metric_name: r.metric_name,
@@ -221,14 +235,12 @@ function MyVariablePayContent() {
           direction: r.metric_direction,
           attainmentRate: Number(r.attainment_rate || 0),
           attainmentPct: Number(r.attainment_pct || 0),
-          payoutAmount: Number(r.payout_amount || 0)
-        }))
+          payoutAmount: Number(r.payout_amount || 0),
+        })),
       };
     }
 
     const actualInputs = {};
-
-    // Match metric inputs for this employee (individual row OR team row)
     (currentScheme.metrics || []).forEach(m => {
       const row = metricInputs.find(
         i => i.metric_id === m.id && (i.employee_id === currentEmp.employee_id || i.employee_id === null)
@@ -236,363 +248,217 @@ function MyVariablePayContent() {
       actualInputs[m.id] = row?.actual_value ?? null;
     });
 
-    return { fromSnapshot: false, ...computeEmployeeVariablePayout(currentScheme, actualInputs, pool) };
+    return { fromSnapshot: false, ...computeEmployeeVariablePayout(currentScheme, actualInputs, Number(currentEmp.current_variable_salary || 0)) };
   }, [currentScheme, currentEmp, metricInputs, snapshotRows, isClosedCycle]);
-
-  // Format date range nicely, e.g. "20 Aug – 19 Sep". The year is only shown
-  // when a cycle straddles two years, otherwise it is just noise.
-  function formatPeriodDates(p) {
-    if (!p) return '—';
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const fmtOne = (iso) => {
-      const [y, m, d] = String(iso).split('-');
-      return `${Number(d)} ${MONTHS[Number(m) - 1]}`;
-    };
-    const startYear = String(p.period_start).slice(0, 4);
-    const endYear = String(p.period_end).slice(0, 4);
-    const range = `${fmtOne(p.period_start)} – ${fmtOne(p.period_end)}`;
-    return startYear === endYear ? range : `${range} ${endYear}`;
-  }
 
   if (loading) {
     return (
-      <div style={{ padding: 60, textAlign: 'center', color: '#6b7280' }}>
-        Loading live variable pay tracker…
+      <div className="py-24 text-center">
+        <p className="text-sm text-ink-muted">Loading your variable pay…</p>
       </div>
     );
   }
 
   if (!currentUser) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <p>Please log in to view your variable pay tracker.</p>
-        <a href="/login" style={{ color: '#2563eb', fontWeight: 600 }}>Go to Login →</a>
+      <div className="panel panel-body max-w-md mx-auto text-center">
+        <p className="text-sm text-ink">Sign in to see your variable pay.</p>
+        <a href="/login" className="btn-primary mt-4">Sign in</a>
       </div>
     );
   }
 
-  const isLiveCycle = currentPeriod?.status === 'open';
+  const overall = liveCalculation?.totalEarnedPct || 0;
+  const overallTone = attainmentTone(overall);
+  const noData = !liveCalculation;
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 60 }}>
-      {/* Top Header & Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+    <div className="pb-20">
+      {/* Page head */}
+      <div className="page-head">
         <div>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: 24, fontWeight: 800, color: '#111827' }}>
-            🎯 Live Variable Pay Tracker
-          </h1>
-          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
-            Track your live performance metrics, qualification status, and monthly bonus attainment in real time.
+          <h1 className="page-title">Variable pay</h1>
+          <p className="page-purpose">
+            How you are tracking against this cycle&rsquo;s targets. Updates each time the
+            nightly sync runs.
           </p>
         </div>
-
-        {/* Period Selector & Manager Links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
-              Cycle:
-            </label>
-            <select
-              value={selectedPeriodId || ''}
-              onChange={e => handlePeriodChange(Number(e.target.value))}
-              style={{
-                padding: '7px 12px', borderRadius: 6, border: '1.5px solid #cbd5e1',
-                background: 'white', fontWeight: 700, fontSize: 13, color: '#111827'
-              }}
-            >
-              {periods.map(p => (
-                <option key={p.id} value={p.id}>
-                  {formatPeriodDates(p)} ({p.status === 'open' ? '🟢 Live Cycle' : p.status === 'locked' ? '🔒 Locked' : '✅ Paid'})
-                </option>
-              ))}
-            </select>
-          </div>
-
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedPeriodId || ''}
+            onChange={e => handlePeriodChange(Number(e.target.value))}
+            aria-label="Pay cycle"
+            className="field w-auto min-w-[13rem] py-1.5 text-xs"
+          >
+            {periods.map(p => (
+              <option key={p.id} value={p.id}>
+                {formatPeriodDates(p)} — {p.status === 'open' ? 'Live' : p.status === 'locked' ? 'Closed' : 'Paid'}
+              </option>
+            ))}
+          </select>
           {isManager && (
-            <a
-              href="/payroll/variable-pay"
-              style={{
-                background: '#2563eb', color: 'white', padding: '7px 14px', borderRadius: 6,
-                textDecoration: 'none', fontWeight: 700, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4
-              }}
-            >
-              📤 Data Upload Hub →
-            </a>
+            <a href="/payroll/variable-pay/attainment" className="btn-secondary">All employees</a>
           )}
         </div>
       </div>
 
-      {/* Manager Employee Switcher Bar (Admins / Managers only) */}
-      {isManager && (
-        <div style={{
-          background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8,
-          padding: '10px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>👑 Manager View:</span>
-            <span>Inspecting Employee Performance</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: '#64748b' }}>Select Employee:</span>
-            <select
-              value={selectedEmpId || ''}
-              onChange={e => setSelectedEmpId(e.target.value)}
-              style={{
-                padding: '5px 10px', borderRadius: 5, border: '1px solid #94a3b8',
-                background: 'white', fontWeight: 700, fontSize: 12
-              }}
-            >
-              {allEmployees.map(emp => (
-                <option key={emp.employee_id} value={emp.employee_id}>
-                  {emp.name} ({emp.designation || 'Staff'} • {emp.variable_pay_scheme || 'No Scheme'})
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Manager switcher */}
+      {isManager && allEmployees.length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-card border border-rule bg-page px-4 py-3">
+          <span className="text-xs font-medium text-ink-muted">Viewing</span>
+          <select
+            value={selectedEmpId || ''}
+            onChange={e => setSelectedEmpId(e.target.value)}
+            aria-label="Select employee"
+            className="field w-auto min-w-[16rem] py-1.5 text-xs"
+          >
+            {allEmployees.map(emp => (
+              <option key={emp.employee_id} value={emp.employee_id}>
+                {emp.name} — {emp.designation || 'Staff'}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
-      {/* Top Employee Profile & Live Attainment Banner */}
-      {currentEmp ? (
-        <div style={{
-          background: 'white', border: '1px solid #e5e7eb', borderRadius: 10,
-          padding: '20px 24px', marginBottom: 24, boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-            {/* Left: Employee Info */}
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: '50%',
-                background: '#eff6ff', color: '#1d4ed8', border: '2px solid #bfdbfe',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 800, fontSize: 18, flexShrink: 0
-              }}>
-                {currentEmp.passport_photo_url ? (
-                  <img
-                    src={`https://wzxswmopfxnucmeygqeg.supabase.co/storage/v1/object/public/documents/${currentEmp.passport_photo_url}`}
-                    alt=""
-                    onError={e => { e.target.style.display = 'none'; }}
-                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  String(currentEmp.name || 'E').slice(0, 2).toUpperCase()
-                )}
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#111827' }}>
-                    {currentEmp.name}
-                  </h2>
-                  <span style={{ background: '#f3f4f6', color: '#374151', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-                    {currentEmp.designation || 'Staff'}
-                  </span>
-                  <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-                    {currentEmp.department || 'All'}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                  Assigned Scheme: <strong style={{ color: '#0369a1' }}>{currentScheme?.display_name || 'None Assigned'}</strong> • ID: <code>{currentEmp.employee_id}</code>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Target Pool & Live Payout Summary */}
-            <div style={{ textAlign: 'right', minWidth: 200 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>
-                Overall Attainment
-              </div>
-              <div style={{
-                fontSize: 26, fontWeight: 900, margin: '2px 0 6px 0',
-                color: (liveCalculation?.totalEarnedPct || 0) >= 100 ? '#059669'
-                  : (liveCalculation?.totalEarnedPct || 0) > 0 ? '#d97706' : '#6b7280'
-              }}>
-                {liveCalculation?.totalEarnedPct || 0}%
-              </div>
-              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>
-                {isClosedCycle ? 'Finalised for this cycle' : 'Live — updates with each sync'}
-              </div>
-            </div>
-          </div>
-
-          {/* Cycle Refresh Status Bar */}
-          <div style={{
-            marginTop: 16, paddingTop: 12, borderTop: '1px solid #f3f4f6',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11, color: '#6b7280'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: isLiveCycle ? '#10b981' : '#6b7280' }} />
-              <span>
-                {isLiveCycle
-                ? 'Live tracking cycle — figures update with each daily sync'
-                : 'Archived cycle — figures were finalised when the cycle closed on the 19th'}
-              </span>
-            </div>
-            <div>
-              Pay Cycle Range: <strong>{formatPeriodDates(currentPeriod)}</strong>
-            </div>
-          </div>
+      {!currentEmp ? (
+        <div className="note">
+          <p className="text-ink">No employee record is linked to this login yet.</p>
+          <p className="mt-1">An administrator can link it under Employees → View / Edit.</p>
         </div>
-      ) : (
-        <div style={{ background: 'white', padding: 30, textAlign: 'center', borderRadius: 8, color: '#6b7280' }}>
-          No employee profile selected or found.
-        </div>
-      )}
-
-      {/* No Scheme Configured Notice */}
-      {currentEmp && !currentScheme && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: 18, textAlign: 'center', color: '#92400e' }}>
-          <strong>⚠️ No Variable Pay Scheme Assigned</strong>
-          <p style={{ margin: '6px 0 0 0', fontSize: 13 }}>
-            This employee currently does not have an active variable pay scheme linked to their profile. An administrator can assign a scheme under <strong>Employees → View / Edit → Payroll & Variable Pay Info</strong>.
+      ) : currentEmp && !currentScheme ? (
+        <div className="note">
+          <p className="text-ink">No variable pay scheme is assigned yet.</p>
+          <p className="mt-1">
+            An administrator assigns schemes under Employees → View / Edit → Payroll.
           </p>
         </div>
-      )}
-
-      {/* Breakdown of Metrics Cards */}
-      {currentScheme && liveCalculation && (
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#111827', textTransform: 'uppercase', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Metric Scorecards ({currentScheme.metrics?.length || 0})</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>
-              Weights total 100% of your variable target
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {liveCalculation.breakdown.map(item => {
-              const metric = (currentScheme.metrics || []).find(m => m.id === item.metric_id) || item;
-              const isProportional = metric.type === 'proportional';
-              const isBinary = metric.type === 'binary';
-              const hasFloor = isProportional && metric.floor !== null && metric.floor !== undefined;
-              const isBelowFloor = hasFloor && item.actual !== null && item.actual < Number(metric.floor);
-              const isOverachieved = isProportional && item.attainmentPct > 100;
-              const isQualified = item.attainmentRate >= 1 || (!isBelowFloor && item.attainmentRate > 0);
-
-              // Progress percentage capped at 100% for the visual bar (overachievement is shown in badge)
-              const visualProgressPct = Math.min(Math.max(item.attainmentPct || 0, 0), 100);
-
-              return (
-                <div
-                  key={item.metric_id}
-                  style={{
-                    background: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 10,
-                    padding: 18,
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                    {/* Metric Title & Badges */}
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#111827' }}>
-                          {item.metric_name}
-                        </h3>
-                        <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
-                          {Math.round(Number(item.weight || 0) * 100)}% of your target
-                        </span>
-                        <span style={{
-                          background: isBinary ? '#fef3c7' : '#e0f2fe',
-                          color: isBinary ? '#92400e' : '#0369a1',
-                          padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700
-                        }}>
-                          {isBinary ? '🎯 Hit / Miss' : '📈 Proportional'}
-                        </span>
-                        {metric.scope === 'team' && (
-                          <span style={{ background: '#f3e8ff', color: '#7c3aed', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
-                            👥 Team-wide
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                        Target: <strong>{metric.target}{metric.unit || ''}</strong>
-                        {hasFloor && <span> • Min Floor: <strong>{metric.floor}{metric.unit || ''}</strong></span>}
-                        {metric.ceiling && <span> • Max Cap: <strong>{metric.ceiling}{metric.unit || ''}</strong></span>}
-                      </div>
-                    </div>
-
-                    {/* Attainment Status */}
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>
-                        Attained
-                      </div>
-                      <div style={{
-                        fontSize: 18, fontWeight: 900,
-                        color: isBelowFloor ? '#dc2626' : (item.attainmentPct || 0) >= 100 ? '#059669' : '#d97706'
-                      }}>
-                        {item.attainmentPct || 0}%
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Visual Progress Bar */}
-                  <div style={{ marginTop: 12, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                      <span style={{ color: '#4b5563', fontWeight: 600 }}>
-                        Current Progress: <strong style={{ color: '#111827' }}>
-                          {item.actual !== null && item.actual !== undefined ? `${item.actual} ${metric.unit || ''}` : 'Pending data pull'}
-                        </strong>
-                      </span>
-                      <span style={{
-                        fontWeight: 800,
-                        color: isBelowFloor ? '#dc2626' : item.attainmentPct >= 100 ? '#059669' : '#d97706'
-                      }}>
-                        {item.attainmentPct || 0}% Attained
-                      </span>
-                    </div>
-
-                    <div style={{
-                      width: '100%', height: 10, background: '#f1f5f9',
-                      borderRadius: 6, overflow: 'hidden', border: '1px solid #e2e8f0'
-                    }}>
-                      <div style={{
-                        width: `${visualProgressPct}%`,
-                        height: '100%',
-                        background: isBelowFloor
-                          ? '#f87171'
-                          : item.attainmentPct >= 100
-                            ? 'linear-gradient(90deg, #10b981, #059669)'
-                            : 'linear-gradient(90deg, #3b82f6, #2563eb)',
-                        borderRadius: 6,
-                        transition: 'width 0.4s ease'
-                      }} />
-                    </div>
-                  </div>
-
-                  {/* Status Banner / Explanation Note */}
-                  <div style={{ fontSize: 11, marginTop: 8 }}>
-                    {isBelowFloor ? (
-                      <span style={{ color: '#dc2626', fontWeight: 700, background: '#fef2f2', padding: '3px 8px', borderRadius: 4 }}>
-                        ⚠️ Below qualification floor of {metric.floor}{metric.unit || ''} — no credit for this metric
-                      </span>
-                    ) : isOverachieved ? (
-                      <span style={{ color: '#065f46', fontWeight: 700, background: '#ecfdf5', padding: '3px 8px', borderRadius: 4 }}>
-                        🌟 Overachieved — {item.attainmentPct}% of target
-                      </span>
-                    ) : item.attainmentRate >= 1 ? (
-                      <span style={{ color: '#065f46', fontWeight: 700, background: '#ecfdf5', padding: '3px 8px', borderRadius: 4 }}>
-                        ✓ Target met
-                      </span>
-                    ) : item.attainmentRate > 0 ? (
-                      <span style={{ color: '#92400e', fontWeight: 700, background: '#fffbeb', padding: '3px 8px', borderRadius: 4 }}>
-                        ⏳ Partway there — {item.attainmentPct}% of target
-                      </span>
-                    ) : (
-                      <span style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                        {item.actual === null || item.actual === 0
-                          ? 'Waiting for the nightly Petpooja sync or a manager entry'
-                          : 'Target not yet reached'}
-                      </span>
-                    )}
-                  </div>
+      ) : (
+        <>
+          {/* The one bold moment on the page. Everything else stays quiet so this
+              number is the thing you actually came to read. */}
+          <section className="panel mb-8 overflow-hidden">
+            <div className="flex flex-wrap items-end justify-between gap-6 px-6 py-7">
+              <div>
+                <div className="text-xs font-medium text-ink-muted">
+                  {currentEmp.name} · {formatPeriodDates(currentPeriod)}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+                <div className={`figure mt-2 ${noData ? 'text-ink-muted' : overallTone.text}`}>
+                  {noData ? '—' : `${overall}%`}
+                </div>
+                <div className="figure-label">
+                  of target {isClosedCycle ? '· finalised' : '· live'}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <div className="text-xs font-medium text-ink-muted">Scheme</div>
+                <div className="mt-1 text-sm text-ink">{currentScheme?.display_name}</div>
+                {liveCalculation && !noData && (
+                  <span className={`${overallTone.pill} mt-3`}>
+                    {overall >= 100 ? 'On target' : overall > 0 ? 'In progress' : 'Not started'}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* A single hairline rule separates live from finalised. */}
+            <div className="border-t border-rule-soft px-6 py-3">
+              <span className="text-xs text-ink-muted">
+                {isClosedCycle
+                  ? 'Figures were frozen when this cycle closed on the 19th.'
+                  : 'Live figures — refreshes with each nightly sync.'}
+              </span>
+            </div>
+          </section>
+
+          {/* Metric scorecards: flat rows separated by hairlines rather than
+              individual cards, so a dozen can be scanned at once. */}
+          {liveCalculation && (
+            <section>
+              <div className="mb-3 flex items-baseline justify-between">
+                <h2 className="panel-title">Your metrics</h2>
+                <span className="text-xs text-ink-muted">
+                  Weights total 100% of your variable target
+                </span>
+              </div>
+
+              <div className="panel overflow-hidden">
+                <div className="hairline-list">
+                  {liveCalculation.breakdown.map(item => {
+                    const metric = (currentScheme.metrics || []).find(m => m.id === item.metric_id) || item;
+                    const isProportional = metric.type === 'proportional';
+                    const hasFloor = isProportional && metric.floor !== null && metric.floor !== undefined;
+                    const isBelowFloor = hasFloor && item.actual !== null && item.actual < Number(metric.floor);
+                    const tone = isBelowFloor
+                      ? { text: 'text-bad', fill: 'bg-bad', pill: 'pill-bad' }
+                      : attainmentTone(item.attainmentPct);
+                    const visual = Math.min(Math.max(item.attainmentPct || 0, 0), 100);
+
+                    return (
+                      <div key={item.metric_id} className="px-5 py-4">
+                        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-medium text-ink">{item.metric_name}</span>
+                              <span className="pill-quiet">{Math.round(Number(item.weight || 0) * 100)}% of target</span>
+                              {isProportional
+                                ? <span className="pill-quiet">Proportional</span>
+                                : <span className="pill-quiet">Hit or miss</span>}
+                              {metric.scope === 'team' && <span className="pill-quiet">Team-wide</span>}
+                            </div>
+                            <div className="mt-1 text-xs text-ink-muted">
+                              Target {formatValue(item.target, metric.unit || item.unit)}
+                              {hasFloor && ` · Floor ${formatValue(metric.floor, metric.unit || item.unit)}`}
+                              {metric.ceiling != null && ` · Cap ${formatValue(metric.ceiling, metric.unit || item.unit)}`}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className={`tnum text-lg font-medium ${tone.text}`}>
+                              {item.attainmentPct || 0}%
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-3">
+                          <div className="meter flex-1">
+                            <div className={`meter-fill ${tone.fill}`} style={{ width: `${visual}%` }} />
+                          </div>
+                          <span className="tnum whitespace-nowrap text-xs text-ink-muted">
+                            {formatValue(item.actual, metric.unit || item.unit)}
+                            <span className="mx-1.5 text-rule">/</span>
+                            {formatValue(item.target, metric.unit || item.unit)}
+                          </span>
+                        </div>
+
+                        <div className="mt-2">
+                          {isBelowFloor ? (
+                            <span className="text-xs text-bad">
+                              Below the qualification floor of {formatValue(metric.floor, metric.unit || item.unit)} — no credit for this metric
+                            </span>
+                          ) : (item.attainmentPct || 0) > 100 ? (
+                            <span className="text-xs text-good">Above target</span>
+                          ) : (item.attainmentRate || 0) >= 1 ? (
+                            <span className="text-xs text-good">Target met</span>
+                          ) : (item.attainmentRate || 0) > 0 ? (
+                            <span className="text-xs text-warn">Partway there</span>
+                          ) : (
+                            <span className="text-xs text-ink-muted">
+                              {item.actual === null || item.actual === 0
+                                ? 'Waiting for the nightly sync or a manager entry'
+                                : 'Target not yet reached'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );
@@ -600,7 +466,7 @@ function MyVariablePayContent() {
 
 export default function MyVariablePayPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading tracker…</div>}>
+    <Suspense fallback={<div className="py-24 text-center text-sm text-ink-muted">Loading…</div>}>
       <MyVariablePayContent />
     </Suspense>
   );

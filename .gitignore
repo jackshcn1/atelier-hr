@@ -45,3 +45,6 @@ next-env.d.ts
 
 # claude local
 .claude/settings.local.json
+
+# local preview env
+.env.local

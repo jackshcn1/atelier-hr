@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: theme('colors.page');
+    color: theme('colors.ink.DEFAULT');
+  }
+
+  /* Every figure in this app gets compared against another figure — payouts,
+     targets, attainment percentages. Tabular numerals keep those columns from
+     wobbling as the digits change. */
+  table,
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Visible keyboard focus, everywhere. */
+  :focus-visible {
+    outline: 2px solid theme('colors.accent.DEFAULT');
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  /* The page frame: title, one line of purpose, and an optional action.
+     Used by every redesigned page so they open the same way. */
+  .page-head {
+    @apply flex flex-wrap items-start justify-between gap-4 mb-8;
+  }
+
+  .page-title {
+    @apply font-serif text-[1.75rem] leading-tight tracking-tight text-ink;
+  }
+
+  .page-purpose {
+    @apply text-sm text-ink-muted mt-1 max-w-prose;
+  }
+
+  /* A flat surface. Structure comes from the hairline, not a heavy shadow. */
+  .panel {
+    @apply bg-surface border border-rule rounded-card;
+  }
+
+  .panel-body {
+    @apply p-5;
+  }
+
+  /* Section heading inside a panel. Sentence case — no ALL-CAPS eyebrows. */
+  .panel-title {
+    @apply font-serif text-lg text-ink;
+  }
+
+  /* Metric rows are separated by hairlines rather than each being its own
+     card, so a manager can scan a dozen of them without the page becoming a
+     card mosaic. */
+  .hairline-list > * + * {
+    @apply border-t border-rule-soft;
+  }
+
+  /* ---------------------------------------------------------------------
+     Controls
+     ------------------------------------------------------------------ */
+
+  .btn {
+    @apply inline-flex items-center gap-1.5 text-sm font-medium rounded-control
+           px-3.5 py-2 transition-colors select-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-ink text-white hover:bg-ink-soft disabled:opacity-40
+           disabled:cursor-not-allowed;
+  }
+
+  /* The accent is reserved for the single figure that matters, so buttons stay
+     near-black. A terracotta button on every screen would date the app. */
+  .btn-secondary {
+    @apply btn bg-surface text-ink border border-rule hover:bg-page
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-quiet {
+    @apply btn text-ink-muted hover:text-ink hover:bg-page;
+  }
+
+  .btn-danger {
+    @apply btn bg-bad text-white hover:brightness-95 disabled:opacity-40
+           disabled:cursor-not-allowed;
+  }
+
+  .field {
+    @apply w-full text-sm text-ink bg-surface border border-rule rounded-control
+           px-3 py-2 placeholder:text-ink-muted/60
+           focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent;
+  }
+
+  .field-label {
+    @apply block text-xs font-medium text-ink-muted mb-1.5;
+  }
+
+  /* ---------------------------------------------------------------------
+     Data
+     ------------------------------------------------------------------ */
+
+  .table-head {
+    @apply text-left text-2xs font-medium uppercase tracking-wide text-ink-muted
+           py-2 px-3 border-b border-rule;
+  }
+
+  .table-cell {
+    @apply py-2.5 px-3 border-b border-rule-soft text-sm text-ink;
+  }
+
+  /* A thin progress rule rather than a chunky bar — it reads as a measurement,
+     not a badge. */
+  .meter {
+    @apply h-1.5 bg-rule-soft rounded-full overflow-hidden;
+  }
+
+  .meter-fill {
+    @apply h-full rounded-full transition-[width] duration-500 ease-out;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5
+           text-xs font-medium;
+  }
+
+  .pill-good { @apply pill bg-good-wash text-good; }
+  .pill-warn { @apply pill bg-warn-wash text-warn; }
+  .pill-bad  { @apply pill bg-bad-wash text-bad; }
+  .pill-quiet{ @apply pill bg-page text-ink-muted border border-rule; }
+
+  /* The one bold moment on a page. Used at most once. */
+  .figure {
+    @apply font-serif text-5xl leading-none tracking-tight text-ink tnum;
+  }
+
+  .figure-label {
+    @apply text-sm text-ink-muted mt-2;
+  }
+
+  /* A note that explains state without shouting — used for empty screens and
+     for telling someone what to do next. */
+  .note {
+    @apply text-sm text-ink-muted bg-page border border-rule rounded-card p-5;
+  }
+}
+
+@layer utilities {
+  /* Motion is reserved for user-triggered change. Honours the OS setting. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
