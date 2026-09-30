@@ -3,6 +3,21 @@ import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '../../../../lib/supabaseClient';
 import { computeEmployeeVariablePayout } from '../../../../lib/variablePayCalculator';
 
+// Format a cycle range as "20 Aug – 19 Sep", showing the year only when the
+// cycle straddles two years.
+function fmtPeriodRange(p) {
+  if (!p) return '—';
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const one = (iso) => {
+    const [y, m, d] = String(iso).split('-');
+    return `${Number(d)} ${MONTHS[Number(m) - 1]}`;
+  };
+  const sy = String(p.period_start).slice(0, 4);
+  const ey = String(p.period_end).slice(0, 4);
+  const range = `${one(p.period_start)} – ${one(p.period_end)}`;
+  return sy === ey ? range : `${range} ${ey}`;
+}
+
 function attainmentTone(pct) {
   if (pct >= 100) return { bg: '#ecfdf5', fg: '#065f46', bar: '#10b981' };
   if (pct > 0) return { bg: '#fffbeb', fg: '#92400e', bar: '#f59e0b' };
@@ -226,7 +241,7 @@ export default function VariablePayAttainmentPage() {
             style={{ padding: '7px 12px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontWeight: 700, fontSize: 13 }}>
             {periods.map(p => (
               <option key={p.id} value={p.id}>
-                {p.period_start} to {p.period_end} ({p.status === 'open' ? '🟢 Live' : p.status === 'locked' ? '🔒 Closed' : '✅ Paid'})
+                {fmtPeriodRange(p)} ({p.status === 'open' ? '🟢 Live' : p.status === 'locked' ? '🔒 Closed' : '✅ Paid'})
               </option>
             ))}
           </select>
@@ -249,7 +264,7 @@ export default function VariablePayAttainmentPage() {
       {/* Cycle status + snapshot controls */}
       <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 14, marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontSize: 13, color: '#374151' }}>
-          <strong>Cycle {currentPeriod?.period_start} → {currentPeriod?.period_end}</strong>
+          <strong>Cycle {fmtPeriodRange(currentPeriod)}</strong>
           <span style={{ marginLeft: 10, color: '#6b7280' }}>
             {isClosed
               ? '🔒 Closed — figures are frozen from the snapshot taken when the cycle ended.'

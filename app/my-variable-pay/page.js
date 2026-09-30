@@ -239,10 +239,19 @@ function MyVariablePayContent() {
     return { fromSnapshot: false, ...computeEmployeeVariablePayout(currentScheme, actualInputs, pool) };
   }, [currentScheme, currentEmp, metricInputs, snapshotRows, isClosedCycle]);
 
-  // Format date range nicely
+  // Format date range nicely, e.g. "20 Aug – 19 Sep". The year is only shown
+  // when a cycle straddles two years, otherwise it is just noise.
   function formatPeriodDates(p) {
     if (!p) return '—';
-    return `${p.period_start} to ${p.period_end}`;
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fmtOne = (iso) => {
+      const [y, m, d] = String(iso).split('-');
+      return `${Number(d)} ${MONTHS[Number(m) - 1]}`;
+    };
+    const startYear = String(p.period_start).slice(0, 4);
+    const endYear = String(p.period_end).slice(0, 4);
+    const range = `${fmtOne(p.period_start)} – ${fmtOne(p.period_end)}`;
+    return startYear === endYear ? range : `${range} ${endYear}`;
   }
 
   if (loading) {
@@ -293,7 +302,7 @@ function MyVariablePayContent() {
             >
               {periods.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.period_start} to {p.period_end} ({p.status === 'open' ? '🟢 Live Cycle' : p.status === 'locked' ? '🔒 Locked' : '✅ Paid'})
+                  {formatPeriodDates(p)} ({p.status === 'open' ? '🟢 Live Cycle' : p.status === 'locked' ? '🔒 Locked' : '✅ Paid'})
                 </option>
               ))}
             </select>
