@@ -1059,7 +1059,7 @@ export default function EmployeeDetail() {
         )}
       </section>
 
-      {employee.status !== 'active' && (
+      {['on-notice', 'exited'].includes(employee.status) && (
         <section style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: 16, borderRadius: 8, marginTop: 20 }}>
           <h2 style={{ marginTop: 0 }}>Exit clearance</h2>
           <p style={{ color: '#92400e', fontSize: 14 }}>
