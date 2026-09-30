@@ -1,0 +1,5 @@
+REM Open VS Code terminal, navigate to project, run sync
+REM Copy-paste these lines one at a time in VS Code terminal (Terminal > New Terminal)
+
+cd "D:\Claude Code Project - Sep 2026"
+node scripts/petpooja-sync.mjs

@@ -107,7 +107,8 @@ export default function Navbar() {
             <a href="/employees" style={{ color: pathname === '/employees' ? '#93c5fd' : 'white', textDecoration: 'none' }}>Employees</a>
             <a href="/orgchart" style={{ color: pathname === '/orgchart' ? '#93c5fd' : '#e2e8f0', textDecoration: 'none' }}>Org Chart</a>
             <a href="/tasks" style={{ color: pathname === '/tasks' || pathname === '/checklists' ? '#86efac' : '#bbf7d0', textDecoration: 'none', fontWeight: 600 }}>✅ Tasks & Checklists</a>
-            <a href="/my-variable-pay" style={{ color: pathname === '/my-variable-pay' || pathname?.startsWith('/payroll/variable-pay') ? '#6ee7b7' : '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>🎯 Variable Pay</a>
+            <a href="/my-variable-pay" style={{ color: pathname === '/my-variable-pay' ? '#6ee7b7' : '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>🎯 Variable Pay</a>
+            <a href="/payroll/variable-pay/attainment" style={{ color: pathname === '/payroll/variable-pay/attainment' ? '#6ee7b7' : '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>📊 Attainment</a>
             <a href="/payroll" style={{ color: pathname === '/payroll' ? '#93c5fd' : '#f9fafb', textDecoration: 'none', fontWeight: pathname === '/payroll' ? 700 : 500 }}>Payroll</a>
             <a href="/payroll/processing" style={{ color: pathname === '/payroll/processing' ? '#6ee7b7' : '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>Salary Processing</a>
             <a href="/payslips" style={{ color: pathname === '/payslips' ? '#6ee7b7' : '#e5e7eb', textDecoration: 'none', fontWeight: 600 }}>Payslips</a>

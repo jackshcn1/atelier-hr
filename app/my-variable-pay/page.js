@@ -35,8 +35,10 @@ function MyVariablePayContent() {
   const [selectedPeriodId, setSelectedPeriodId] = useState(null);
   const [allEmployees, setAllEmployees] = useState([]);
   const [selectedEmpId, setSelectedEmpId] = useState(null);
+  const [myEmployee, setMyEmployee] = useState(null);
   const [schemes, setSchemes] = useState([]);
   const [metricInputs, setMetricInputs] = useState([]);
+  const [snapshotRows, setSnapshotRows] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -99,21 +101,32 @@ function MyVariablePayContent() {
     const { data: sList } = await supabase.from('variable_pay_schemes').select('*').eq('is_active', true);
     setSchemes(sList || []);
 
-    // 4. Fetch employees
-    const { data: eList } = await supabase
-      .from('employees')
-      .select('*')
-      .is('deleted_at', null)
-      .order('name');
-
-    const emps = eList || [];
-    setAllEmployees(emps);
-
-    // If privileged and no personal employee_id, default to first employee on a scheme
-    if (!targetEmpId) {
-      const firstWithScheme = emps.find(e => e.variable_pay_scheme) || emps[0];
-      targetEmpId = firstWithScheme?.employee_id || null;
+    // 4. Fetch the employee record.
+    // A regular employee may only ever load their OWN row — we never issue the
+    // bulk "select all employees" query on their behalf, because that would
+    // hand the browser a list of colleagues we have no reason to expose.
+    if (targetEmpId) {
+      const { data: ownEmp } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('employee_id', targetEmpId)
+        .maybeSingle();
+      if (ownEmp) setMyEmployee(ownEmp);
     }
+
+    // Admins and managers legitimately need the full roster to power the
+    // employee switcher, so only they run this query.
+    if (privileged) {
+      const { data: eList } = await supabase
+        .from('employees')
+        .select('*')
+        .is('deleted_at', null)
+        .order('name');
+      setAllEmployees(eList || []);
+    } else {
+      setAllEmployees([]);
+    }
+
     setSelectedEmpId(targetEmpId);
 
     // 5. Fetch metric inputs for active period
@@ -126,11 +139,29 @@ function MyVariablePayContent() {
 
   async function loadInputsForPeriod(periodId) {
     if (!periodId) return;
+    const period = periods.find(p => p.id === periodId);
+    const isClosed = period?.status === 'locked' || period?.status === 'paid';
+
+    if (isClosed) {
+      // A closed cycle is frozen. Read the snapshot rather than the live input
+      // rows, so later edits or re-syncs can never change what this employee
+      // saw for that cycle. RLS limits this to their own rows.
+      const { data: snap } = await supabase
+        .from('variable_pay_snapshot')
+        .select('*')
+        .eq('period_id', periodId);
+      setSnapshotRows(snap || []);
+      setMetricInputs([]);
+      return;
+    }
+
+    // Current cycle: live attainment from the values the sync just pulled.
     const { data: inputs } = await supabase
       .from('variable_metric_inputs')
       .select('*')
       .eq('period_id', periodId);
 
+    setSnapshotRows([]);
     setMetricInputs(inputs || []);
   }
 
@@ -139,15 +170,21 @@ function MyVariablePayContent() {
     await loadInputsForPeriod(pId);
   }
 
-  // Active viewing employee record
+  // Active viewing employee record.
+  // For a regular employee this is always their own record — the switcher
+  // exists solely for admins, and `selectedEmpId` is never allowed to point
+  // anywhere else for anyone else.
   const currentEmp = useMemo(() => {
-    return allEmployees.find(e => e.employee_id === selectedEmpId) || null;
-  }, [allEmployees, selectedEmpId]);
+    if (isManager) return allEmployees.find(e => e.employee_id === selectedEmpId) || null;
+    return myEmployee;
+  }, [allEmployees, selectedEmpId, myEmployee, isManager]);
 
   // Selected period object
   const currentPeriod = useMemo(() => {
     return periods.find(p => p.id === selectedPeriodId) || null;
   }, [periods, selectedPeriodId]);
+
+  const isClosedCycle = currentPeriod?.status === 'locked' || currentPeriod?.status === 'paid';
 
   // Assigned scheme for current employee
   const currentScheme = useMemo(() => {
@@ -155,11 +192,40 @@ function MyVariablePayContent() {
     return schemes.find(s => s.name === currentEmp.variable_pay_scheme) || null;
   }, [currentEmp, schemes]);
 
-  // Build live calculation
+  // Build the calculation. A closed cycle reads its frozen snapshot; the
+  // current cycle is computed live from the freshly synced metric inputs.
   const liveCalculation = useMemo(() => {
     if (!currentScheme || !currentEmp) return null;
 
     const pool = Number(currentEmp.current_variable_salary || 0);
+
+    if (isClosedCycle) {
+      const mine = snapshotRows.filter(s => s.employee_id === currentEmp.employee_id);
+      if (mine.length === 0) return null;
+      const totalPayout = mine.reduce((sum, r) => sum + Number(r.payout_amount || 0), 0);
+      return {
+        fromSnapshot: true,
+        totalPayoutAmount: totalPayout,
+        totalEarnedFraction: pool > 0 ? totalPayout / pool : 0,
+        totalEarnedPct: pool > 0 ? Math.round((totalPayout / pool) * 1000) / 10 : 0,
+        breakdown: mine.map(r => ({
+          metric_id: r.metric_id,
+          metric_name: r.metric_name,
+          actual: Number(r.actual_value || 0),
+          target: Number(r.target_value || 0),
+          floor: r.floor_value !== null ? Number(r.floor_value) : null,
+          ceiling: r.ceiling_value !== null ? Number(r.ceiling_value) : null,
+          weight: Number(r.weight || 0),
+          unit: r.metric_unit || '',
+          type: r.metric_type,
+          direction: r.metric_direction,
+          attainmentRate: Number(r.attainment_rate || 0),
+          attainmentPct: Number(r.attainment_pct || 0),
+          payoutAmount: Number(r.payout_amount || 0)
+        }))
+      };
+    }
+
     const actualInputs = {};
 
     // Match metric inputs for this employee (individual row OR team row)
@@ -170,8 +236,8 @@ function MyVariablePayContent() {
       actualInputs[m.id] = row?.actual_value ?? null;
     });
 
-    return computeEmployeeVariablePayout(currentScheme, actualInputs, pool);
-  }, [currentScheme, currentEmp, metricInputs]);
+    return { fromSnapshot: false, ...computeEmployeeVariablePayout(currentScheme, actualInputs, pool) };
+  }, [currentScheme, currentEmp, metricInputs, snapshotRows, isClosedCycle]);
 
   // Format date range nicely
   function formatPeriodDates(p) {
@@ -325,21 +391,17 @@ function MyVariablePayContent() {
             {/* Right: Target Pool & Live Payout Summary */}
             <div style={{ textAlign: 'right', minWidth: 200 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>
-                Monthly Target Pool
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#111827', margin: '2px 0 6px 0' }}>
-                ₹{Number(currentEmp.current_variable_salary || 0).toLocaleString('en-IN')}
+                Overall Attainment
               </div>
               <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 800,
-                background: (liveCalculation?.totalEarnedPct || 0) >= 100 ? '#ecfdf5' : (liveCalculation?.totalEarnedPct || 0) > 0 ? '#fffbeb' : '#f3f4f6',
-                color: (liveCalculation?.totalEarnedPct || 0) >= 100 ? '#065f46' : (liveCalculation?.totalEarnedPct || 0) > 0 ? '#92400e' : '#4b5563',
-                border: `1px solid ${(liveCalculation?.totalEarnedPct || 0) >= 100 ? '#a7f3d0' : (liveCalculation?.totalEarnedPct || 0) > 0 ? '#fde68a' : '#e5e7eb'}`
+                fontSize: 26, fontWeight: 900, margin: '2px 0 6px 0',
+                color: (liveCalculation?.totalEarnedPct || 0) >= 100 ? '#059669'
+                  : (liveCalculation?.totalEarnedPct || 0) > 0 ? '#d97706' : '#6b7280'
               }}>
-                <span>Overall: {liveCalculation?.totalEarnedPct || 0}% Attained</span>
-                <span>•</span>
-                <span>Earned: ₹{(liveCalculation?.totalPayoutAmount || 0).toLocaleString('en-IN')}</span>
+                {liveCalculation?.totalEarnedPct || 0}%
+              </div>
+              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>
+                {isClosedCycle ? 'Finalised for this cycle' : 'Live — updates with each sync'}
               </div>
             </div>
           </div>
@@ -352,7 +414,9 @@ function MyVariablePayContent() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: isLiveCycle ? '#10b981' : '#6b7280' }} />
               <span>
-                {isLiveCycle ? 'Live tracking cycle (Refreshes nightly at 2:30 AM IST)' : 'Archived finalized pay cycle'}
+                {isLiveCycle
+                ? 'Live tracking cycle — figures update with each daily sync'
+                : 'Archived cycle — figures were finalised when the cycle closed on the 19th'}
               </span>
             </div>
             <div>
@@ -382,14 +446,13 @@ function MyVariablePayContent() {
           <div style={{ fontSize: 14, fontWeight: 800, color: '#111827', textTransform: 'uppercase', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Metric Scorecards ({currentScheme.metrics?.length || 0})</span>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>
-              Weights sum to 100% of ₹{Number(currentEmp.current_variable_salary || 0).toLocaleString('en-IN')}
+              Weights total 100% of your variable target
             </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {liveCalculation.breakdown.map(item => {
               const metric = (currentScheme.metrics || []).find(m => m.id === item.metric_id) || item;
-              const weightShare = Math.round(Number(metric.weight || 0) * Number(currentEmp.current_variable_salary || 0));
               const isProportional = metric.type === 'proportional';
               const isBinary = metric.type === 'binary';
               const hasFloor = isProportional && metric.floor !== null && metric.floor !== undefined;
@@ -419,7 +482,7 @@ function MyVariablePayContent() {
                           {item.metric_name}
                         </h3>
                         <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
-                          {Math.round(Number(item.weight || 0) * 100)}% Weight (₹{weightShare.toLocaleString('en-IN')} Base)
+                          {Math.round(Number(item.weight || 0) * 100)}% of your target
                         </span>
                         <span style={{
                           background: isBinary ? '#fef3c7' : '#e0f2fe',
@@ -442,16 +505,16 @@ function MyVariablePayContent() {
                       </div>
                     </div>
 
-                    {/* Attainment Status Pill & Rupee Payout */}
+                    {/* Attainment Status */}
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>
-                        Earned Payout
+                        Attained
                       </div>
                       <div style={{
                         fontSize: 18, fontWeight: 900,
-                        color: item.payoutAmount > 0 ? '#059669' : isBelowFloor ? '#dc2626' : '#6b7280'
+                        color: isBelowFloor ? '#dc2626' : (item.attainmentPct || 0) >= 100 ? '#059669' : '#d97706'
                       }}>
-                        ₹{Number(item.payoutAmount || 0).toLocaleString('en-IN')}
+                        {item.attainmentPct || 0}%
                       </div>
                     </div>
                   </div>
@@ -494,23 +557,25 @@ function MyVariablePayContent() {
                   <div style={{ fontSize: 11, marginTop: 8 }}>
                     {isBelowFloor ? (
                       <span style={{ color: '#dc2626', fontWeight: 700, background: '#fef2f2', padding: '3px 8px', borderRadius: 4 }}>
-                        ⚠️ Below qualification floor of {metric.floor}{metric.unit || ''} (₹0 payout currently)
+                        ⚠️ Below qualification floor of {metric.floor}{metric.unit || ''} — no credit for this metric
                       </span>
                     ) : isOverachieved ? (
                       <span style={{ color: '#065f46', fontWeight: 700, background: '#ecfdf5', padding: '3px 8px', borderRadius: 4 }}>
-                        🌟 Overachieved! {item.attainmentPct}% of target earned (Bonus ₹{item.payoutAmount})
+                        🌟 Overachieved — {item.attainmentPct}% of target
                       </span>
                     ) : item.attainmentRate >= 1 ? (
                       <span style={{ color: '#065f46', fontWeight: 700, background: '#ecfdf5', padding: '3px 8px', borderRadius: 4 }}>
-                        ✓ 100% Target Met (Full ₹{item.payoutAmount} earned)
+                        ✓ Target met
                       </span>
                     ) : item.attainmentRate > 0 ? (
                       <span style={{ color: '#92400e', fontWeight: 700, background: '#fffbeb', padding: '3px 8px', borderRadius: 4 }}>
-                        ⏳ Partial Attainment: {item.attainmentPct}% (Earned ₹{item.payoutAmount})
+                        ⏳ Partway there — {item.attainmentPct}% of target
                       </span>
                     ) : (
                       <span style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                        {item.actual === null ? 'Waiting for nightly Petpooja sync or manager entry' : 'Target not yet reached (0% payout)'}
+                        {item.actual === null || item.actual === 0
+                          ? 'Waiting for the nightly Petpooja sync or a manager entry'
+                          : 'Target not yet reached'}
                       </span>
                     )}
                   </div>

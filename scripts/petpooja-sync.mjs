@@ -18,6 +18,9 @@ import {
   parseDeliverySales,
   parseCounterSales
 } from '../lib/variablePayParsers.js';
+import { parseCustomerFeedback } from '../lib/feedbackParsers.js';
+import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
+import { sendFailureEmail } from '../lib/notificationService.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -251,6 +254,26 @@ export async function runPetpoojaSync(options = {}) {
     }
   }
 
+  function findEmployeeByName(name, empList) {
+    if (!name) return null;
+    const n = name.trim().toLowerCase();
+    // 1. Exact match
+    let match = empList.find(e => e.name.toLowerCase() === n);
+    if (match) return match;
+    // 2. Substring match (e.g. "Chingaap" vs "Chingaap Gangmei")
+    match = empList.find(e => {
+      const en = e.name.toLowerCase();
+      return en.includes(n) || n.includes(en);
+    });
+    if (match) return match;
+    // 3. First name match
+    const firstWord = n.split(/\s+/)[0];
+    if (firstWord && firstWord.length > 2) {
+      match = empList.find(e => e.name.toLowerCase().startsWith(firstWord));
+    }
+    return match || null;
+  }
+
   try {
     // 3. Login to Petpooja Billing (2-Step Form)
     console.log('🔐 Navigating to Petpooja Billing (https://billing.petpooja.com/)...');
@@ -287,26 +310,6 @@ export async function runPetpoojaSync(options = {}) {
     await page.waitForNavigation({ timeout: 35000 }).catch(() => {});
     await page.waitForTimeout(5000);
     console.log(`✓ Post-login URL: ${page.url()} ("${await page.title()}")`);
-
-    function findEmployeeByName(name, empList) {
-      if (!name) return null;
-      const n = name.trim().toLowerCase();
-      // 1. Exact match
-      let match = empList.find(e => e.name.toLowerCase() === n);
-      if (match) return match;
-      // 2. Substring match (e.g. "Chingaap" vs "Chingaap Gangmei")
-      match = empList.find(e => {
-        const en = e.name.toLowerCase();
-        return en.includes(n) || n.includes(en);
-      });
-      if (match) return match;
-      // 3. First name match
-      const firstWord = n.split(/\s+/)[0];
-      if (firstWord && firstWord.length > 2) {
-        match = empList.find(e => e.name.toLowerCase().startsWith(firstWord));
-      }
-      return match || null;
-    }
 
     // Helper: download custom report and return sheet rows
     async function fetchCustomReport(url, reportName, queryCycle = cycle) {
@@ -494,10 +497,31 @@ export async function runPetpoojaSync(options = {}) {
       // Special Handler C: Petpooja Inventory Exports (Wastage & Purchase Returns)
       if (url.includes('inventory.petpooja.com')) {
         console.log(`  Handling Inventory Export for ${reportName} (Export All)...`);
-        const exportBtn = page.locator('.btn-group:visible button:has-text("Export"), button:visible:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export")').first();
-        await exportBtn.waitFor({ state: 'visible', timeout: 25000 });
+
+        // For Wastage page specifically, we need to click Search first to load results
+        if (url.includes('wastage_list')) {
+          console.log('  Looking for Search button on Wastage page...');
+          const searchBtn = page.locator('button:visible:has-text("Search"), input[type="submit"]:visible[value*="Search"], .btn-primary:visible:has-text("Search"), button.btn-success:visible, input[type="submit"]:visible').first();
+          if (await searchBtn.count() > 0 && await searchBtn.isVisible().catch(() => false)) {
+            console.log('  ✓ Clicking Search button on Wastage page...');
+            await searchBtn.click({ force: true });
+            await page.waitForTimeout(4000);
+          } else {
+            console.log('  ℹ️ No Search button found, proceeding to look for Export...');
+          }
+
+          // Take a debug screenshot before looking for Export
+          const debugPath = `scripts/debug-Wastage-before-export.png`;
+          await page.screenshot({ path: debugPath, fullPage: false });
+          console.log(`  📸 Saved screenshot to ${debugPath}`);
+        }
+
+        // Look for the Export button (it's a dropdown toggle)
+        const exportBtn = page.locator('button:visible:has-text("Export"), .btn-group:visible button:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export"), button.btn:visible:has-text("Export")').first();
+        await exportBtn.waitFor({ state: 'visible', timeout: 30000 });
         await exportBtn.click({ force: true });
-        await page.waitForTimeout(1000);
+        console.log('  ✓ Clicked Export dropdown button');
+        await page.waitForTimeout(1500);
 
         const downloadPromise = new Promise((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
@@ -507,11 +531,18 @@ export async function runPetpoojaSync(options = {}) {
           });
         });
 
-        // Click "Export All" in dropdown menu
-        const subOption = page.locator('.dropdown-menu a:visible:has-text("Export All"), .dropdown-menu a:visible:has-text("Export all"), .dropdown-menu a:visible:has-text("All"), .dropdown-menu a:visible:has-text("Excel"), .dropdown-menu a:visible').first();
+        // Click "Export All" in dropdown menu - try multiple selectors
+        const subOption = page.locator('.dropdown-menu:visible a:has-text("Export all"), .dropdown-menu:visible a:has-text("Export All"), .dropdown-menu:visible li:has-text("Export all"), ul.dropdown-menu:visible a:has-text("all")').first();
         if (await subOption.count() > 0 && await subOption.isVisible().catch(() => false)) {
           console.log('  ✓ Clicking "Export All" in Inventory dropdown...');
           await subOption.click({ force: true });
+        } else {
+          // Fallback: look for any visible dropdown option
+          const anyOption = page.locator('.dropdown-menu:visible a, ul.dropdown-menu:visible a').first();
+          if (await anyOption.count() > 0) {
+            console.log('  ✓ Clicking first available export option...');
+            await anyOption.click({ force: true });
+          }
         }
 
         const download = await downloadPromise;
@@ -741,13 +772,178 @@ export async function runPetpoojaSync(options = {}) {
       console.error('⚠️ Could not sync Due Payment Report:', e.message);
     }
 
+    // REPORT 6B: Kitchen Prep Time Report (#78 - KOT itemwise with preparation times)
+    try {
+      console.log('📥 Fetching Kitchen Prep Time Report...');
+
+      // Base Menu cache directory
+      const cacheDir = join(__dirname, '../.claude/base-menu-cache');
+      const cacheFile = join(cacheDir, 'base-menu.json');
+      const CACHE_DAYS = 15; // Refresh Base Menu every 15 days
+
+      let baseMenuRows = null;
+      let usedCache = false;
+
+      // Check if cached Base Menu exists and is fresh
+      if (existsSync(cacheFile)) {
+        try {
+          const cache = JSON.parse(readFileSync(cacheFile, 'utf8'));
+          const cacheAge = Math.floor((Date.now() - new Date(cache.timestamp)) / (1000 * 60 * 60 * 24));
+
+          if (cacheAge < CACHE_DAYS) {
+            baseMenuRows = cache.rows;
+            usedCache = true;
+            console.log(`  ✓ Using cached Base Menu (${cacheAge} days old, ${baseMenuRows.length} rows)`);
+          } else {
+            console.log(`  ℹ️ Base Menu cache is ${cacheAge} days old (>${CACHE_DAYS} days), will refresh...`);
+          }
+        } catch (e) {
+          console.log('  ⚠️ Could not read Base Menu cache, will download fresh:', e.message);
+        }
+      }
+
+      // Download Base Menu if not cached or cache is stale
+      if (!baseMenuRows) {
+        try {
+          console.log('  📥 Fetching Base Menu export from menu.petpooja.com...');
+          await page.goto('https://menu.petpooja.com/menus/menu_item_list_new', { waitUntil: 'load', timeout: 30000 });
+          await page.waitForTimeout(3000);
+
+          // Step 1: Click "Quick Actions" button
+          const quickActionsBtn = page.locator('button:visible:has-text("Quick Actions"), a:visible:has-text("Quick Actions"), .btn:visible:has-text("Quick Actions")').first();
+          await quickActionsBtn.waitFor({ state: 'visible', timeout: 15000 });
+          await quickActionsBtn.click({ force: true });
+          console.log('  ✓ Clicked Quick Actions button');
+          await page.waitForTimeout(2000);
+
+          // Step 2: Click "Download Base Menu [Backup]"
+          const downloadMenuBtn = page.locator('a:visible:has-text("Download Base Menu"), button:visible:has-text("Download Base Menu"), li:visible:has-text("Download Base Menu")').first();
+          await downloadMenuBtn.waitFor({ state: 'visible', timeout: 15000 });
+          await downloadMenuBtn.click({ force: true });
+          console.log('  ✓ Clicked Download Base Menu [Backup]');
+          await page.waitForTimeout(3000);
+
+          // Step 3: Select all Group Categories - CRITICAL STEP
+          // Look for "Select All" checkbox or link
+          const selectAllOptions = [
+            'input[type="checkbox"][id*="select" i][id*="all" i]:visible',
+            'input[type="checkbox"]:visible[value*="all" i]',
+            'label:visible:has-text("Select All")',
+            'a:visible:has-text("Select All")',
+            'button:visible:has-text("Select All")',
+            '.select-all:visible',
+            '#select_all:visible',
+            'input[name="select_all"]:visible'
+          ];
+
+          let selectAllClicked = false;
+          for (const selector of selectAllOptions) {
+            const elem = page.locator(selector).first();
+            if (await elem.count() > 0 && await elem.isVisible().catch(() => false)) {
+              await elem.click({ force: true });
+              console.log(`  ✓ Selected all Group Categories using selector: ${selector}`);
+              selectAllClicked = true;
+              await page.waitForTimeout(1000);
+              break;
+            }
+          }
+
+          if (!selectAllClicked) {
+            // Fallback: find all checkboxes and click them individually
+            const allCheckboxes = page.locator('input[type="checkbox"]:visible');
+            const checkboxCount = await allCheckboxes.count();
+            if (checkboxCount > 0) {
+              console.log(`  ℹ️ Select All not found, clicking ${checkboxCount} checkboxes individually...`);
+              for (let i = 0; i < checkboxCount; i++) {
+                await allCheckboxes.nth(i).click({ force: true }).catch(() => {});
+              }
+              console.log('  ✓ Clicked all category checkboxes');
+            }
+          }
+
+          // Step 4: Click Save/Submit to download the zip
+          const saveBtn = page.locator('button:visible:has-text("Save"), button:visible:has-text("Download"), button[type="submit"]:visible, input[type="submit"]:visible[value*="Save"]').first();
+
+          // Set up download listener before clicking
+          const menuZipPromise = page.waitForEvent('download', { timeout: 45000 });
+
+          console.log('  ✓ Clicking Save button, waiting for download...');
+          await saveBtn.click({ force: true });
+          await page.waitForTimeout(2000);
+
+          const menuZipDownload = await menuZipPromise;
+          const menuZipPath = await menuZipDownload.path();
+          console.log(`  ✓ Downloaded Base Menu zip`);
+
+          // Step 5: Unzip and find the "items" file
+          const AdmZip = await import('adm-zip').then(m => m.default);
+          const zip = new AdmZip(menuZipPath);
+          const zipEntries = zip.getEntries();
+
+          let itemsFile = null;
+          for (const entry of zipEntries) {
+            if (entry.entryName.toLowerCase().startsWith('items') && !entry.isDirectory) {
+              itemsFile = entry;
+              break;
+            }
+          }
+
+          if (itemsFile) {
+            const itemsBuffer = itemsFile.getData();
+            console.log(`  ✓ Found items file: ${itemsFile.entryName} (${itemsBuffer.length} bytes)`);
+            baseMenuRows = parseWorkbookBuffer(itemsBuffer);
+            console.log(`  ✓ Parsed Base Menu: ${baseMenuRows.length} rows`);
+
+            // Cache the Base Menu for future runs
+            const { mkdirSync } = await import('node:fs');
+            mkdirSync(cacheDir, { recursive: true });
+            const cacheData = {
+              timestamp: new Date().toISOString(),
+              rows: baseMenuRows
+            };
+            const { writeFileSync } = await import('node:fs');
+            writeFileSync(cacheFile, JSON.stringify(cacheData));
+            console.log(`  💾 Cached Base Menu for next ${CACHE_DAYS} days`);
+          } else {
+            console.log('  ⚠️ Could not find "items" file in Base Menu zip');
+          }
+        } catch (menuErr) {
+          console.log('  ⚠️ Could not fetch Base Menu, will skip kitchen prep time:', menuErr.message);
+        }
+      }
+
+      if (baseMenuRows && baseMenuRows.length > 0) {
+        // Now fetch the KOT report #78
+        const kotRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/78', 'KOT Preparation Time Report', cycle);
+        const prepResult = parseKitchenPrepTime(kotRows, baseMenuRows, { ...cycle, kitchenCategories });
+        if (prepResult.ok && prepResult.averageMinutes !== null) {
+          console.log(`  📊 Kitchen Prep Time: ${prepResult.averageMinutes} minutes average across ${prepResult.itemsCounted} items`);
+          console.log(`  📊 Breakdown by category:`, JSON.stringify(prepResult.byCategory));
+          if (prepResult.skipped.notOnMenu > 0) console.log(`  ℹ️ Skipped ${prepResult.skipped.notOnMenu} items not found in Base Menu`);
+          if (prepResult.skipped.nonKitchen > 0) console.log(`  ℹ️ Skipped ${prepResult.skipped.nonKitchen} items not in approved kitchen categories`);
+
+          await saveMetric('kit_prep_time', prepResult.averageMinutes, 'petpooja', 'KOT Preparation Time Report', {
+            scheme_name: 'kitchen',
+            itemsCounted: prepResult.itemsCounted,
+            byCategory: prepResult.byCategory,
+            skipped: prepResult.skipped,
+            usedCachedMenu: usedCache
+          });
+          successfulReports++;
+        }
+      }
+    } catch (e) {
+      failedReports++;
+      console.error('⚠️ Could not sync Kitchen Prep Time Report:', e.message);
+    }
+
     // REPORT 7: Petpooja Inventory (Wastage & Purchase Returns)
     try {
       console.log('🔐 Navigating to Petpooja Inventory via SSO...');
       await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
       await page.waitForTimeout(2000);
 
-      let invPage = page;
+      // Navigate to Inventory module (opens in same page or new tab)
       const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
       if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
         console.log('  ✓ Clicking Inventory in sidebar navigation...');
@@ -756,23 +952,27 @@ export async function runPetpoojaSync(options = {}) {
           invLink.click({ force: true })
         ]);
         if (newPage) {
-          invPage = newPage;
-          await invPage.waitForLoadState('load').catch(() => {});
+          await newPage.waitForLoadState('load').catch(() => {});
+          await newPage.waitForTimeout(3000);
         } else {
           await page.waitForURL(/inventory\.petpooja\.com/, { timeout: 15000 }).catch(() => {});
+          await page.waitForTimeout(3000);
         }
-        await page.waitForTimeout(4000);
       }
 
       // Wastage download
       try {
-        const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report', cycle, invPage);
+        const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report', cycle);
         const wastageResult = parseWastage(wastageRows, cycle);
         if (wastageResult.ok) {
           console.log(`  📊 Total Kitchen Wastage: ₹${wastageResult.total} across ${wastageResult.entries} entries`);
+          if (wastageResult.skippedCancelled > 0) {
+            console.log(`  ℹ️ Skipped ${wastageResult.skippedCancelled} cancelled wastage entries`);
+          }
           await saveMetric('kit_wastage', wastageResult.total, 'petpooja', 'Wastage Report', {
             scheme_name: 'kitchen',
-            entries: wastageResult.entries
+            entries: wastageResult.entries,
+            skippedCancelled: wastageResult.skippedCancelled
           });
           successfulReports++;
         }
@@ -783,13 +983,17 @@ export async function runPetpoojaSync(options = {}) {
 
       // Purchase returns download
       try {
-        const returnRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/purchase_return_list/', 'Purchase Returns', cycle, invPage);
+        const returnRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/purchase_return_list/', 'Purchase Returns', cycle);
         const returnsResult = parsePurchaseReturns(returnRows, cycle);
         if (returnsResult.ok) {
           console.log(`  📊 Total Purchase Returns: ₹${returnsResult.total} across ${returnsResult.entries} debit notes`);
+          if (returnsResult.skippedCancelled > 0) {
+            console.log(`  ℹ️ Skipped ${returnsResult.skippedCancelled} cancelled return entries`);
+          }
           await saveMetric('b2b_returns', returnsResult.total, 'petpooja', 'Purchase Return Report', {
             scheme_name: 'b2b_counter',
-            entries: returnsResult.entries
+            entries: returnsResult.entries,
+            skippedCancelled: returnsResult.skippedCancelled
           });
           successfulReports++;
         }
@@ -811,12 +1015,98 @@ export async function runPetpoojaSync(options = {}) {
       console.log(`❌ Petpooja Sync FAILED: 0 of ${failedReports} reports could be fetched. Check logs above.`);
     }
     console.log('=============================================================');
+
+    // If there were fatal failures, trigger failure notification
+    if (failedReports > 0) {
+      await sendFailureEmail({
+        message: `${failedReports} Petpooja report(s) failed during synchronization.`,
+        errorDetails: `Successful reports: ${successfulReports}, Failed reports: ${failedReports}`
+      });
+    }
   } catch (fatal) {
     console.error('❌ Sync failed:', fatal.message);
+    await sendFailureEmail({
+      message: 'Fatal error occurred during Petpooja Sync execution.',
+      errorDetails: fatal.stack || fatal.message
+    });
     throw fatal;
   } finally {
     await browser.close();
   }
+
+  // REPORT 9: Customer Feedback Integration (Google Sheets)
+  // Runs after browser closes; uses its own success/failure counters
+  let feedbackSuccess = false;
+  try {
+    console.log('\n📊 Fetching Customer Feedback from Google Sheets...');
+
+    const feedbackRows = await fetchGoogleSheetsData({
+      spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU',
+      sheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1',
+      range: process.env.GOOGLE_SHEETS_RANGE || 'A:K'
+    });
+
+    const feedbackResult = parseCustomerFeedback(feedbackRows, { start: cycle.start, end: cycle.end });
+    if (feedbackResult.ok) {
+      console.log(`  📊 Customer Feedback: Processed ${feedbackResult.totalResponses} responses in period`);
+
+      // 1. Kitchen Food Quality & Consistency (Team Target: >= 80% / 0.80)
+      if (feedbackResult.kitFoodPercent !== null) {
+        await saveMetric('kit_food_quality', feedbackResult.kitFoodPercent, 'feedback_form', 'Guest Feedback Google Sheet', {
+          scheme_name: 'kitchen',
+          responses: feedbackResult.totalResponses,
+          percent: feedbackResult.kitFoodPercent
+        });
+      }
+
+      // 2. Service Helper Quality Feedback (Team Target: >= 80% / 0.80)
+      if (feedbackResult.hlpServicePercent !== null) {
+        await saveMetric('hlp_quality', feedbackResult.hlpServicePercent, 'feedback_form', 'Guest Feedback Google Sheet', {
+          scheme_name: 'service_helpers',
+          responses: feedbackResult.totalResponses,
+          percent: feedbackResult.hlpServicePercent
+        });
+      }
+
+      // 3. Service Captain Quality Feedback (Individual Target: >= 80% / 0.80)
+      if (feedbackResult.captains) {
+        for (const [capName, cData] of Object.entries(feedbackResult.captains)) {
+          const emp = findEmployeeByName(capName, employees);
+          if (emp) {
+            await saveMetric('cap_quality', cData.percent, 'feedback_form', 'Guest Feedback Google Sheet', {
+              scheme_name: 'service_captain',
+              captain_name: capName,
+              score_avg: cData.scoreAvg,
+              entries: cData.entries
+            }, emp.employee_id);
+          } else {
+            console.log(`  ℹ️ Feedback recorded for captain "${capName}" (${cData.percent * 100}%) — no exact employee match.`);
+          }
+        }
+      }
+
+      feedbackSuccess = true;
+    }
+  } catch (e) {
+    console.error('⚠️ Could not sync Customer Feedback:', e.message);
+  }
+
+  console.log('\n=============================================================');
+  console.log(`🎉 Sync Engine Complete: Petpooja + Google Sheets Active!`);
+  console.log('=============================================================');
+
+  // Record today's sync completion state
+  try {
+    const stateFile = join(__dirname, 'last-successful-sync.json');
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(stateFile, JSON.stringify({
+      lastDate: todayStr,
+      status: 'success',
+      timestamp: new Date().toLocaleTimeString('en-IN')
+    }, null, 2));
+  } catch {}
 }
 
 // Direct execution from CLI — also mirrors output to a rotating log file so a

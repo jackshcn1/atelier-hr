@@ -30,6 +30,12 @@ yarn-error.log*
 scripts/petpooja-config.json
 scripts/petpooja-sync.log
 
+# local sync runtime artifacts — regenerated on every run
+scripts/last-successful-sync.json
+scripts/startup-sync.log
+scripts/debug-*.png
+.claude/base-menu-cache/
+
 # vercel
 .vercel
 
