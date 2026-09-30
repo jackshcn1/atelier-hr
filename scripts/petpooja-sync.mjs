@@ -431,10 +431,17 @@ export async function runPetpoojaSync(options = {}) {
         await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
 
         console.log('  ✓ Clicking Download link in queue table...');
-        const [download] = await Promise.all([
-          page.waitForEvent('download', { timeout: 35000 }),
-          downloadLink.click({ force: true })
-        ]);
+        const downloadPromise = new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
+          page.once('download', dl => { clearTimeout(timer); resolve(dl); });
+          context.once('page', async p => {
+            p.once('download', dl => { clearTimeout(timer); resolve(dl); });
+          });
+        });
+
+        await downloadLink.click({ force: true });
+        const download = await downloadPromise;
+
         const downloadStream = await download.createReadStream();
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);
@@ -446,20 +453,30 @@ export async function runPetpoojaSync(options = {}) {
       // Special Handler B: Corporate GSTN Summary (/reports/all_restaurant_orders/all)
       if (url.includes('all_restaurant_orders')) {
         console.log('  Handling Corporate GSTN Orders Export (Export all)...');
-        const exportBtn = page.locator('button:visible:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export")').first();
-        await exportBtn.waitFor({ state: 'visible', timeout: 25000 });
-        await exportBtn.click({ force: true });
-        await page.waitForTimeout(1500);
+        const downloadPromise = new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
+          page.once('download', dl => { clearTimeout(timer); resolve(dl); });
+          context.once('page', async p => {
+            p.once('download', dl => { clearTimeout(timer); resolve(dl); });
+          });
+        });
 
-        // Click "Export all" to ensure all historical pages are exported
-        const exportAllOption = page.locator('a:visible:has-text("Export all"), a:visible:has-text("Export All"), button:visible:has-text("Export all"), button:visible:has-text("Export All"), .dropdown-menu a:has-text("all"), a:visible:has-text("Excel"), .dropdown-menu a:visible').first();
-        await exportAllOption.waitFor({ state: 'visible', timeout: 15000 });
+        // Trigger native export_csv('all') function directly or click Export All link
+        await page.evaluate(() => {
+          const allLink = document.querySelector('a[onclick*="export_csv"][onclick*="all"], a[onclick*="export_csv"]');
+          if (allLink) {
+            allLink.click();
+          } else if (typeof window.export_csv === 'function') {
+            window.export_csv('all');
+          } else {
+            const expBtn = document.querySelector('.dropdown-toggle, button:has-text("Export")');
+            if (expBtn) expBtn.click();
+            const excelBtn = document.querySelector('.dropdown-menu a');
+            if (excelBtn) excelBtn.click();
+          }
+        });
 
-        console.log('  ✓ Clicking "Export all" option...');
-        const [download] = await Promise.all([
-          page.waitForEvent('download', { timeout: 35000 }),
-          exportAllOption.click({ force: true })
-        ]);
+        const download = await downloadPromise;
         const downloadStream = await download.createReadStream();
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);
