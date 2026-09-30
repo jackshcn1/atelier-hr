@@ -42,8 +42,6 @@ export default function EmployeeDetail() {
   const [resignationLetter, setResignationLetter] = useState(null);
   const [uploadingLetter, setUploadingLetter] = useState(false);
   const [exitRecord, setExitRecord] = useState(null);
-  const [newAsset, setNewAsset] = useState('');
-  const [uniformReturned, setUniformReturned] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [employeePayslips, setEmployeePayslips] = useState([]);
   const [docTemplates, setDocTemplates] = useState([]);
@@ -385,34 +383,9 @@ export default function EmployeeDetail() {
     load();
   }
 
-  async function addAsset(e) {
-    e.preventDefault();
-    if (!newAsset.trim()) return;
-    const currentAssets = exitRecord?.assets_issued || [];
-    const updatedAssets = [...currentAssets, { name: newAsset.trim(), returned: false }];
-    const { error } = await supabase.from('exit_records').upsert([{ employee_id: id, assets_issued: updatedAssets }]);
-    if (error) { setError(error.message); return; }
-    setNewAsset('');
-    load();
-  }
-
-  async function toggleAssetReturned(index) {
-    const assets = [...(exitRecord?.assets_issued || [])];
-    assets[index] = { ...assets[index], returned: !assets[index].returned };
-    const { error } = await supabase.from('exit_records').upsert([{ employee_id: id, assets_issued: assets }]);
-    if (error) { setError(error.message); return; }
-    load();
-  }
-
-  async function saveUniformReturned() {
-    const allAssetsReturned = (exitRecord?.assets_issued || []).every(a => a.returned);
-    const clearance_status = allAssetsReturned && uniformReturned ? 'cleared' : 'pending';
-    const { error } = await supabase.from('exit_records').upsert([{
-      employee_id: id, uniform_returned: uniformReturned, clearance_status
-    }]);
-    if (error) { setError(error.message); return; }
-    load();
-  }
+  // Asset and uniform tracking now lives in the exit clearance workspace
+  // (/exit-clearance?id=<employee_id>). It writes clearance_status only through
+  // the settled path, which the exit_records constraints require.
 
   async function uploadDocument(e) {
     e.preventDefault();
@@ -962,27 +935,36 @@ export default function EmployeeDetail() {
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
         <h2>Assets & exit clearance</h2>
-        <p style={{ color: '#777', fontSize: 14 }}>Track anything issued to this employee (laptop, keys, etc.) and check them off as returned at exit.</p>
-        <ul>
-          {(exitRecord?.assets_issued || []).map((a, i) => (
-            <li key={i}>
-              <label>
-                <input type="checkbox" checked={!!a.returned} onChange={() => toggleAssetReturned(i)} /> {a.name} {a.returned ? '(returned)' : ''}
-              </label>
-            </li>
-          ))}
-        </ul>
-        <form onSubmit={addAsset} style={{ display: 'flex', gap: 8 }}>
-          <input placeholder="Asset name (e.g. Laptop)" value={newAsset} onChange={e => setNewAsset(e.target.value)} />
-          <button type="submit">Add asset</button>
-        </form>
-        <label style={{ display: 'block', marginTop: 12 }}>
-          <input type="checkbox" checked={uniformReturned} onChange={e => setUniformReturned(e.target.checked)} /> Uniform returned
-        </label>
-        <button onClick={saveUniformReturned} style={{ marginTop: 8 }}>Save clearance status</button>
-        <p style={{ marginTop: 8 }}>Clearance status: <strong>{exitRecord?.clearance_status || 'pending'}</strong></p>
+        <p style={{ color: '#777', fontSize: 14 }}>
+          Clearance is managed in the exit clearance workspace, which tracks outstanding
+          uniform, assets and deposits rather than only a single checkbox.
+        </p>
+        {employee.status === 'exited' || exitRecord ? (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 13, color: '#374151', marginBottom: 6 }}>
+              Uniform returned:{' '}
+              <strong>{exitRecord?.uniform_returned === true ? 'Yes' : exitRecord?.uniform_returned === false ? 'No' : 'Not confirmed'}</strong>
+            </div>
+            {(exitRecord?.assets_issued || []).length > 0 && (
+              <ul style={{ fontSize: 13, color: '#374151' }}>
+                {exitRecord.assets_issued.map((a, i) => (
+                  <li key={i}>{a.name} — {a.returned ? 'returned' : 'not returned'}</li>
+                ))}
+              </ul>
+            )}
+            <p style={{ fontSize: 13, marginTop: 8 }}>
+              Clearance status:{' '}
+              <strong style={{ color: exitRecord?.clearance_status === 'cleared' ? '#059669' : '#b45309' }}>
+                {exitRecord?.clearance_status === 'cleared' ? 'Cleared' : 'Pending'}
+              </strong>
+              {exitRecord?.settled_on && <> (settled {exitRecord.settled_on})</>}
+            </p>
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>No clearance record yet — one is created when this employee leaves.</p>
+        )}
         <p style={{ marginTop: 12 }}>
-          <a href={`/employees/${id}/exit-clearance`}>View / print exit clearance document →</a><br />
+          <a href={`/exit-clearance?id=${id}`}>Open exit clearance workspace →</a><br />
           <a href={`/employees/${id}/work-certificate`}>View / print work certificate →</a>
         </p>
       </section>
