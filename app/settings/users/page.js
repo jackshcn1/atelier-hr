@@ -123,8 +123,70 @@ function UserManagementContent() {
   const [expandedUserId, setExpandedUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  // Create new user form state
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPreset, setNewUserPreset] = useState('employee');
+  const [newUserScope, setNewUserScope] = useState('own_department');
+  const [newUserMakeSuper, setNewUserMakeSuper] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
+
+  async function createNewUser() {
+    if (!newUserEmail || !newUserEmail.includes('@')) {
+      setError('Please enter a valid email for the new user.');
+      return;
+    }
+    setCreatingUser(true); setError(''); setMessage('');
+
+    // Note: actual Supabase Auth user must be created in Supabase Auth
+    // dashboard first (this page can only add the profiles record).
+    // We insert into profiles with the provided email reference.
+    try {
+      const preset = PRESETS[newUserPreset] || PRESETS.employee;
+      const { error: insertErr } = await supabase.from('profiles').insert({
+        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+        email: newUserEmail,
+        role: newUserMakeSuper ? 'super_admin' : (preset.role || 'employee'),
+        department_scope: newUserScope,
+        permissions: preset.perms || {},
+        is_super_admin: newUserMakeSuper,
+        access_status: 'active',
+        display_name: newUserEmail.split('@')[0],
+        updated_at: new Date().toISOString()
+      }).select();
+
+      if (insertErr) setError(insertErr.message);
+      else {
+        setMessage(`✓ User record created for ${newUserEmail}. Create the Auth account in Supabase Dashboard (Authentication → Users) to complete login.`);
+        setNewUserEmail('');
+        setNewUserPreset('employee');
+        setNewUserMakeSuper(false);
+        loadData();
+      }
+    } catch (e) { setError(e.message); }
+    setCreatingUser(false);
+  }
+
+  // Promote user to super admin (only existing super admin can do this)
+  async function promoteToSuperAdmin(profile) {
+    if (!currentUserProfile?.is_super_admin) {
+      setError('Only the primary Super Admin can promote accounts.');
+      return;
+    }
+    if (profile.is_super_admin) {
+      setError('Already a Super Admin.');
+      return;
+    }
+    setSavingId(profile.id); setError('');
+    const { error: err } = await supabase.from('profiles').update({
+      is_super_admin: true,
+      role: 'super_admin',
+      permissions: { ...PRESETS.super_admin.perms },
+      updated_at: new Date().toISOString()
+    }).eq('id', profile.id);
+    setSavingId(null);
+    if (err) setError(err.message);
+    else { setMessage(`✓ Promoted ${profile.display_name || profile.email} to Super Admin.`); loadData(); }
+  }
 
   // Editing state per user: { [userId]: { scope, perms, role } }
   const [editState, setEditState] = useState({});
@@ -438,6 +500,63 @@ function UserManagementContent() {
         </div>
       </div>
 
+      {/* Create New User Section */}
+      <div style={{ background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, padding: 16, marginBottom: 20 }}>
+        <h2 style={{ margin: '0 0 4px 0', fontSize: 18, color: '#065f46' }}>➕ Create New User</h2>
+        <p style={{ color: '#059669', fontSize: 13, margin: '0 0 12px 0' }}>
+          Creates the profile record. You must then create the Auth account in Supabase Dashboard (Authentication → Users) so they can log in.
+        </p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Email</label>
+            <input
+              type="text"
+              value={newUserEmail}
+              onChange={e => setNewUserEmail(e.target.value)}
+              placeholder="user@atelier.com"
+              style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, width: 240 }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Preset</label>
+            <select
+              value={newUserPreset}
+              onChange={e => setNewUserPreset(e.target.value)}
+              style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: 'white' }}
+            >
+              <option value="employee">Employee</option>
+              <option value="department_head">Department Head</option>
+              <option value="hr_manager">HR / Finance Manager</option>
+              <option value="super_admin">Super Admin</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Scope</label>
+            <select
+              value={newUserScope}
+              onChange={e => setNewUserScope(e.target.value)}
+              style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: 'white' }}
+            >
+              <option value="own_department">Own Department</option>
+              <option value="all_departments">All Departments</option>
+            </select>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#7c3aed', cursor: 'pointer', paddingBottom: 6 }}>
+            <input type="checkbox" checked={newUserMakeSuper} onChange={e => setNewUserMakeSuper(e.target.checked)} />
+            Make Super Admin
+          </label>
+          <button
+            onClick={createNewUser}
+            disabled={creatingUser}
+            style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: '#059669', color: 'white', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+          >
+            {creatingUser ? 'Creating...' : 'Create User Record'}
+          </button>
+        </div>
+        {message && <div style={{ marginTop: 10, color: '#059669', fontSize: 13, fontWeight: 500 }}>{message}</div>}
+        {error && <div style={{ marginTop: 10, color: '#dc2626', fontSize: 13, fontWeight: 500 }}>{error}</div>}
+      </div>
+
       {/* Tabs & Search Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -568,6 +687,20 @@ function UserManagementContent() {
                         }}
                       >
                         Revoke Access
+                      </button>
+                    )}
+
+                    {currentUserProfile?.is_super_admin && !isSuperAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => promoteToSuperAdmin(profile)}
+                        disabled={savingId === profile.id}
+                        style={{
+                          background: '#7c3aed', color: 'white', border: 'none',
+                          padding: '4px 10px', borderRadius: 4, fontSize: 12, cursor: 'pointer', fontWeight: 600
+                        }}
+                      >
+                        {savingId === profile.id ? 'Promoting...' : '👑 Promote to Super Admin'}
                       </button>
                     )}
 
