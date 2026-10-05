@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabaseClient';
 
 const CATEGORIES = [
@@ -20,13 +21,22 @@ function DocumentsHubContent() {
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [canManageDocs, setCanManageDocs] = useState(false);
 
+  const searchParams = useSearchParams();
+  const catQuery = searchParams.get('category');
+
   // Filters
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState(catQuery || 'all');
   const [selectedDept, setSelectedDept] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (catQuery && (CATEGORIES.some(c => c.id === catQuery) || catQuery === 'all')) {
+      setSelectedCategory(catQuery);
+    }
+  }, [catQuery]);
 
   // Upload/Create Modal state
   const [showModal, setShowModal] = useState(false);

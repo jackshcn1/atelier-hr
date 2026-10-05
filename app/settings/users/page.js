@@ -45,14 +45,14 @@ const PERMISSION_DEFINITIONS = [
 
 const PRESETS = {
   employee: {
-    label: '👤 Regular Employee (Default)',
+    label: 'Regular Employee (Default)',
     desc: 'View own payslips only (no management access)',
     scope: 'own_department',
     role: 'employee',
     perms: {}
   },
   department_head: {
-    label: '👨‍🍳 Department Head',
+    label: 'Department Head',
     desc: 'Manage team notes, training & docs for own department; no salary/bank/payroll',
     scope: 'own_department',
     role: 'department_head',
@@ -64,7 +64,7 @@ const PRESETS = {
     }
   },
   hr_manager: {
-    label: '💼 HR / Finance Manager',
+    label: 'HR / Finance Manager',
     desc: 'Manage all staff, payroll, bank processing & payslips (no super-admin rights)',
     scope: 'all_departments',
     role: 'hr_manager',
@@ -85,7 +85,7 @@ const PRESETS = {
     }
   },
   super_admin: {
-    label: '👑 Super Admin',
+    label: 'Super Admin',
     desc: 'Full unrestricted access across all system modules',
     scope: 'all_departments',
     role: 'super_admin',
@@ -123,70 +123,18 @@ function UserManagementContent() {
   const [expandedUserId, setExpandedUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
   // Create new user form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserName, setNewUserName] = useState('');
   const [newUserPreset, setNewUserPreset] = useState('employee');
   const [newUserScope, setNewUserScope] = useState('own_department');
   const [newUserMakeSuper, setNewUserMakeSuper] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
-
-  async function createNewUser() {
-    if (!newUserEmail || !newUserEmail.includes('@')) {
-      setError('Please enter a valid email for the new user.');
-      return;
-    }
-    setCreatingUser(true); setError(''); setMessage('');
-
-    // Note: actual Supabase Auth user must be created in Supabase Auth
-    // dashboard first (this page can only add the profiles record).
-    // We insert into profiles with the provided email reference.
-    try {
-      const preset = PRESETS[newUserPreset] || PRESETS.employee;
-      const { error: insertErr } = await supabase.from('profiles').insert({
-        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
-        email: newUserEmail,
-        role: newUserMakeSuper ? 'super_admin' : (preset.role || 'employee'),
-        department_scope: newUserScope,
-        permissions: preset.perms || {},
-        is_super_admin: newUserMakeSuper,
-        access_status: 'active',
-        display_name: newUserEmail.split('@')[0],
-        updated_at: new Date().toISOString()
-      }).select();
-
-      if (insertErr) setError(insertErr.message);
-      else {
-        setMessage(`✓ User record created for ${newUserEmail}. Create the Auth account in Supabase Dashboard (Authentication → Users) to complete login.`);
-        setNewUserEmail('');
-        setNewUserPreset('employee');
-        setNewUserMakeSuper(false);
-        loadData();
-      }
-    } catch (e) { setError(e.message); }
-    setCreatingUser(false);
-  }
-
-  // Promote user to super admin (only existing super admin can do this)
-  async function promoteToSuperAdmin(profile) {
-    if (!currentUserProfile?.is_super_admin) {
-      setError('Only the primary Super Admin can promote accounts.');
-      return;
-    }
-    if (profile.is_super_admin) {
-      setError('Already a Super Admin.');
-      return;
-    }
-    setSavingId(profile.id); setError('');
-    const { error: err } = await supabase.from('profiles').update({
-      is_super_admin: true,
-      role: 'super_admin',
-      permissions: { ...PRESETS.super_admin.perms },
-      updated_at: new Date().toISOString()
-    }).eq('id', profile.id);
-    setSavingId(null);
-    if (err) setError(err.message);
-    else { setMessage(`✓ Promoted ${profile.display_name || profile.email} to Super Admin.`); loadData(); }
-  }
 
   // Editing state per user: { [userId]: { scope, perms, role } }
   const [editState, setEditState] = useState({});
@@ -310,6 +258,65 @@ function UserManagementContent() {
     }));
   }
 
+  // Create new user via admin backend API
+  async function handleCreateUser(e) {
+    e.preventDefault();
+    if (!newUserEmail || !newUserEmail.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!newUserPassword || newUserPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setCreatingUser(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
+      const preset = PRESETS[newUserPreset] || PRESETS.employee;
+
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: newUserEmail.trim(),
+          password: newUserPassword,
+          display_name: newUserName.trim() || undefined,
+          role: newUserMakeSuper ? 'super_admin' : preset.role,
+          department_scope: newUserScope,
+          is_super_admin: newUserMakeSuper,
+          permissions: preset.perms || {}
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create user account.');
+      }
+
+      setMessage(`✓ User account ${newUserEmail} created successfully.`);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserName('');
+      setNewUserPreset('employee');
+      setNewUserMakeSuper(false);
+      setShowCreateForm(false);
+      await loadData();
+    } catch (err) {
+      setError(err.message || 'Error creating user');
+    } finally {
+      setCreatingUser(false);
+    }
+  }
+
   // Save permission changes
   async function handleSavePermissions(profile) {
     if (profile.is_super_admin && currentUserProfile?.id !== profile.id) {
@@ -355,6 +362,36 @@ function UserManagementContent() {
     }
   }
 
+  // Promote user to super admin
+  async function handlePromoteToSuperAdmin(profile) {
+    if (!currentUserProfile?.is_super_admin) {
+      setError('Only an existing Super Admin can promote accounts.');
+      return;
+    }
+    if (!window.confirm(`Promote ${profile.display_name || profile.email} to Super Admin? They will receive full unrestricted access.`)) {
+      return;
+    }
+
+    setSavingId(profile.id);
+    setError('');
+    setMessage('');
+
+    const { error: err } = await supabase.from('profiles').update({
+      is_super_admin: true,
+      role: 'super_admin',
+      permissions: { ...PRESETS.super_admin.perms },
+      updated_at: new Date().toISOString()
+    }).eq('id', profile.id);
+
+    setSavingId(null);
+    if (err) {
+      setError(err.message);
+    } else {
+      setMessage(`✓ Promoted ${profile.display_name || profile.email} to Super Admin.`);
+      loadData();
+    }
+  }
+
   // Revoke Access
   async function handleRevokeAccess(profile) {
     if (profile.is_super_admin) {
@@ -362,7 +399,7 @@ function UserManagementContent() {
       return;
     }
 
-    if (!window.confirm(`Revoke all platform access for ${profile.display_name || profile.email}? They will immediately be logged out and unable to sign in.`)) return;
+    if (!window.confirm(`Revoke all platform access for ${profile.display_name || profile.email}? They will immediately be logged out.`)) return;
 
     setSavingId(profile.id);
     const { error: err } = await supabase
@@ -373,12 +410,12 @@ function UserManagementContent() {
     setSavingId(null);
     if (err) setError(err.message);
     else {
-      setMessage(`🚫 Access revoked for ${profile.display_name || profile.email}`);
+      setMessage(`Access revoked for ${profile.display_name || profile.email}`);
       loadData();
     }
   }
 
-  // Reactivate Account (Admin Only)
+  // Reactivate Account
   async function handleReactivate(profile) {
     setSavingId(profile.id);
     const { error: err } = await supabase
@@ -405,7 +442,7 @@ function UserManagementContent() {
       else active.push(p);
     });
 
-    // Sort Active: Super Admin & Elevated Permissions ALWAYS at the TOP
+    // Sort Active: Super Admin & Elevated Permissions at the top
     active.sort((a, b) => {
       if (a.is_super_admin) return -1;
       if (b.is_super_admin) return 1;
@@ -441,165 +478,209 @@ function UserManagementContent() {
   }, [activeTab, activeUsersList, inactiveUsersList, searchQuery, empMap]);
 
   return (
-    <div>
+    <div className="pb-20">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h1 style={{ margin: '0 0 4px 0' }}>User Management & Access Control</h1>
-          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
-            Assign custom permission toggles, department scopes, manage role presets, and handle access revocations.
+          <h1 className="page-title">Users & access control</h1>
+          <p className="page-purpose">
+            Create accounts, assign permission presets, configure scopes, and manage access status.
           </p>
         </div>
-        <a
-          href="/settings"
-          style={{
-            background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db',
-            padding: '8px 16px', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: 13
-          }}
-        >
-          ← Back to Settings
-        </a>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateForm(o => !o)}
+            className="btn-primary"
+          >
+            {showCreateForm ? 'Cancel' : '+ Add new user'}
+          </button>
+          <a href="/settings" className="btn-secondary">
+            Settings
+          </a>
+        </div>
       </div>
 
       {/* Notifications */}
       {message && (
-        <div style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#065f46', padding: '10px 16px', borderRadius: 6, marginBottom: 16, fontWeight: 500 }}>
+        <div className="mb-6 rounded-card border border-good/30 bg-good-wash px-4 py-3 text-sm text-good">
           {message}
         </div>
       )}
       {error && (
-        <div style={{ background: '#fee2e2', border: '1px solid #f87171', color: '#991b1b', padding: '10px 16px', borderRadius: 6, marginBottom: 16, fontWeight: 500 }}>
+        <div className="mb-6 rounded-card border border-bad/30 bg-bad-wash px-4 py-3 text-sm text-bad">
           {error}
         </div>
       )}
 
+      {/* Create User Form Drawer/Modal Panel */}
+      {showCreateForm && (
+        <form onSubmit={handleCreateUser} className="panel panel-body mb-8 animate-settle">
+          <div className="flex items-baseline justify-between border-b border-rule-soft pb-4 mb-6">
+            <h2 className="panel-title">Add user account</h2>
+            <span className="text-xs text-ink-muted">Creates both login credentials and access profile</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div>
+              <label className="field-label">Email address *</label>
+              <input
+                type="email"
+                required
+                value={newUserEmail}
+                onChange={e => setNewUserEmail(e.target.value)}
+                placeholder="colleague@atelier.com"
+                className="field"
+              />
+            </div>
+
+            <div>
+              <label className="field-label">Password * (min 6 chars)</label>
+              <input
+                type="text"
+                required
+                value={newUserPassword}
+                onChange={e => setNewUserPassword(e.target.value)}
+                placeholder="Temporary login password"
+                className="field"
+              />
+            </div>
+
+            <div>
+              <label className="field-label">Display name</label>
+              <input
+                type="text"
+                value={newUserName}
+                onChange={e => setNewUserName(e.target.value)}
+                placeholder="e.g. John Doe"
+                className="field"
+              />
+            </div>
+
+            <div>
+              <label className="field-label">Role preset</label>
+              <select
+                value={newUserPreset}
+                onChange={e => setNewUserPreset(e.target.value)}
+                className="field"
+              >
+                {Object.entries(PRESETS).map(([k, p]) => (
+                  <option key={k} value={k}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="field-label">Department access scope</label>
+              <select
+                value={newUserScope}
+                onChange={e => setNewUserScope(e.target.value)}
+                className="field"
+              >
+                <option value="own_department">Own Department Only</option>
+                <option value="all_departments">All Departments (Company-wide)</option>
+              </select>
+            </div>
+
+            {currentUserProfile?.is_super_admin && (
+              <div className="flex items-center pt-6">
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-accent">
+                  <input
+                    type="checkbox"
+                    checked={newUserMakeSuper}
+                    onChange={e => setNewUserMakeSuper(e.target.checked)}
+                    className="rounded border-rule text-accent focus:ring-accent"
+                  />
+                  <span>Make Super Admin (Full master rights)</span>
+                </label>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3 border-t border-rule-soft pt-4">
+            <button
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={creatingUser}
+              className="btn-primary"
+            >
+              {creatingUser ? 'Creating user...' : 'Create user account'}
+            </button>
+          </div>
+        </form>
+      )}
+
       {/* Stats Summary Bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <div style={{ background: 'white', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Active Users</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginTop: 2 }}>{activeUsersList.length}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="panel p-4">
+          <div className="text-2xs font-medium uppercase tracking-wide text-ink-muted">Active Users</div>
+          <div className="text-2xl font-serif mt-1 text-ink">{activeUsersList.length}</div>
         </div>
 
-        <div style={{ background: '#fdf4ff', padding: 14, borderRadius: 8, border: '1px solid #f0abfc', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#a21caf', textTransform: 'uppercase' }}>Elevated / Managers</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#86198f', marginTop: 2 }}>
+        <div className="panel p-4">
+          <div className="text-2xs font-medium uppercase tracking-wide text-accent">Elevated / Managers</div>
+          <div className="text-2xl font-serif mt-1 text-accent">
             {activeUsersList.filter(p => p.is_super_admin || countActivePerms(p.permissions) > 0).length}
           </div>
         </div>
 
-        <div style={{ background: 'white', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Standard Employees</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginTop: 2 }}>
+        <div className="panel p-4">
+          <div className="text-2xs font-medium uppercase tracking-wide text-ink-muted">Standard Employees</div>
+          <div className="text-2xl font-serif mt-1 text-ink">
             {activeUsersList.filter(p => !p.is_super_admin && countActivePerms(p.permissions) === 0).length}
           </div>
         </div>
 
-        <div style={{ background: '#fef2f2', padding: 14, borderRadius: 8, border: '1px solid #fecaca', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#991b1b', textTransform: 'uppercase' }}>Inactive / Exited</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#b91c1c', marginTop: 2 }}>{inactiveUsersList.length}</div>
+        <div className="panel p-4">
+          <div className="text-2xs font-medium uppercase tracking-wide text-bad">Inactive / Revoked</div>
+          <div className="text-2xl font-serif mt-1 text-bad">{inactiveUsersList.length}</div>
         </div>
-      </div>
-
-      {/* Create New User Section */}
-      <div style={{ background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, padding: 16, marginBottom: 20 }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: 18, color: '#065f46' }}>➕ Create New User</h2>
-        <p style={{ color: '#059669', fontSize: 13, margin: '0 0 12px 0' }}>
-          Creates the profile record. You must then create the Auth account in Supabase Dashboard (Authentication → Users) so they can log in.
-        </p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Email</label>
-            <input
-              type="text"
-              value={newUserEmail}
-              onChange={e => setNewUserEmail(e.target.value)}
-              placeholder="user@atelier.com"
-              style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, width: 240 }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Preset</label>
-            <select
-              value={newUserPreset}
-              onChange={e => setNewUserPreset(e.target.value)}
-              style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: 'white' }}
-            >
-              <option value="employee">Employee</option>
-              <option value="department_head">Department Head</option>
-              <option value="hr_manager">HR / Finance Manager</option>
-              <option value="super_admin">Super Admin</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Scope</label>
-            <select
-              value={newUserScope}
-              onChange={e => setNewUserScope(e.target.value)}
-              style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: 'white' }}
-            >
-              <option value="own_department">Own Department</option>
-              <option value="all_departments">All Departments</option>
-            </select>
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#7c3aed', cursor: 'pointer', paddingBottom: 6 }}>
-            <input type="checkbox" checked={newUserMakeSuper} onChange={e => setNewUserMakeSuper(e.target.checked)} />
-            Make Super Admin
-          </label>
-          <button
-            onClick={createNewUser}
-            disabled={creatingUser}
-            style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: '#059669', color: 'white', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
-          >
-            {creatingUser ? 'Creating...' : 'Create User Record'}
-          </button>
-        </div>
-        {message && <div style={{ marginTop: 10, color: '#059669', fontSize: 13, fontWeight: 500 }}>{message}</div>}
-        {error && <div style={{ marginTop: 10, color: '#dc2626', fontSize: 13, fontWeight: 500 }}>{error}</div>}
       </div>
 
       {/* Tabs & Search Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex gap-2">
           <button
             onClick={() => setActiveTab('active')}
-            style={{
-              padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              background: activeTab === 'active' ? '#1f2937' : '#e5e7eb', color: activeTab === 'active' ? 'white' : '#374151'
-            }}
+            className={activeTab === 'active' ? 'btn-primary text-xs' : 'btn-secondary text-xs'}
           >
             Active Users ({activeUsersList.length})
           </button>
           <button
             onClick={() => setActiveTab('inactive')}
-            style={{
-              padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              background: activeTab === 'inactive' ? '#dc2626' : '#e5e7eb', color: activeTab === 'inactive' ? 'white' : '#374151'
-            }}
+            className={activeTab === 'inactive' ? 'btn-danger text-xs' : 'btn-secondary text-xs'}
           >
-            🚫 Inactive & Revoked ({inactiveUsersList.length})
+            Inactive & Revoked ({inactiveUsersList.length})
           </button>
         </div>
 
-        <input
-          type="text"
-          placeholder="🔍 Search name, email, employee ID, role..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #d1d5db', width: 280, fontSize: 13 }}
-        />
+        <div className="w-full sm:w-auto min-w-[16rem]">
+          <input
+            type="text"
+            placeholder="Search name, email, department..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="field text-xs py-1.5"
+          />
+        </div>
       </div>
 
-      {/* Users List Accordion */}
+      {/* Users List */}
       {loading ? (
-        <div style={{ background: 'white', padding: 40, textAlign: 'center', borderRadius: 8, color: '#6b7280' }}>
-          Loading user accounts...
+        <div className="panel panel-body text-center py-16">
+          <p className="text-sm text-ink-muted">Loading user accounts…</p>
         </div>
       ) : displayedUsers.length === 0 ? (
-        <div style={{ background: 'white', padding: 40, textAlign: 'center', borderRadius: 8, color: '#6b7280' }}>
-          No user accounts found in this category.
+        <div className="note text-center py-12">
+          <p className="text-ink">No user accounts found in this category.</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="flex flex-col gap-3">
           {displayedUsers.map(profile => {
             const emp = profile.employee_id ? empMap[profile.employee_id] : profile.email ? empMap[profile.email.toLowerCase()] : null;
             const isSuperAdmin = profile.is_super_admin;
@@ -612,95 +693,75 @@ function UserManagementContent() {
             return (
               <div
                 key={profile.id}
-                style={{
-                  background: isInactive ? '#fafafa' : hasElevated ? '#ffffff' : '#ffffff',
-                  border: isSuperAdmin ? '2px solid #7c3aed' : hasElevated ? '1px solid #c084fc' : isInactive ? '1px solid #e5e7eb' : '1px solid #e5e7eb',
-                  borderRadius: 10,
-                  boxShadow: hasElevated ? '0 2px 6px rgba(124, 58, 237, 0.08)' : '0 1px 3px rgba(0,0,0,0.04)',
-                  overflow: 'hidden'
-                }}
+                className={`panel overflow-hidden transition-colors ${
+                  isSuperAdmin
+                    ? 'border-accent/40 bg-surface'
+                    : isInactive
+                    ? 'opacity-70 bg-page'
+                    : 'bg-surface'
+                }`}
               >
                 {/* User Row Header */}
                 <div
                   onClick={() => setExpandedUserId(isExpanded ? null : profile.id)}
-                  style={{
-                    padding: '14px 18px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                    background: isSuperAdmin ? '#faf5ff' : hasElevated ? '#fdf4ff' : 'white',
-                    flexWrap: 'wrap',
-                    gap: 10
-                  }}
+                  className="flex flex-wrap items-center justify-between gap-4 p-4 cursor-pointer hover:bg-page/50 transition-colors"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                    {/* Role / Elevation Badge */}
+                  <div className="flex items-center gap-3 flex-1 min-w-[16rem]">
+                    {/* Badge */}
                     <div>
                       {isSuperAdmin ? (
-                        <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 'bold', background: '#7c3aed', color: 'white' }}>
-                          👑 Super Admin
-                        </span>
+                        <span className="pill-good font-semibold">Super Admin</span>
                       ) : isInactive ? (
-                        <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 'bold', background: '#fee2e2', color: '#991b1b' }}>
-                          🚫 Inactive / Revoked
-                        </span>
+                        <span className="pill-bad">Inactive / Revoked</span>
                       ) : hasElevated ? (
-                        <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 'bold', background: '#f3e8ff', color: '#7c3aed' }}>
-                          ⚡ {profile.role ? profile.role.replace('_', ' ').toUpperCase() : 'MANAGEMENT'} ({activePermCount} perms)
+                        <span className="pill-warn">
+                          {profile.role ? profile.role.replace('_', ' ').toUpperCase() : 'MANAGEMENT'} ({activePermCount} perms)
                         </span>
                       ) : (
-                        <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 'bold', background: '#f3f4f6', color: '#4b5563' }}>
-                          👤 Employee (Slips only)
-                        </span>
+                        <span className="pill-quiet">Employee (Slips only)</span>
                       )}
                     </div>
 
                     {/* Name & Details */}
                     <div>
-                      <div style={{ fontWeight: 'bold', fontSize: 15, color: isInactive ? '#6b7280' : '#111827' }}>
+                      <div className="text-sm font-medium text-ink">
                         {profile.display_name || emp?.name || profile.email}
                         {profile.employee_id && (
-                          <span style={{ fontWeight: 'normal', fontSize: 12, color: '#6b7280', marginLeft: 8 }}>
+                          <span className="text-xs text-ink-muted ml-2 font-normal">
                             (ID: {profile.employee_id})
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>
-                        {profile.email} • {profile.department || emp?.department || 'All Depts'}
-                        {profile.department_scope === 'all_departments' && <span style={{ color: '#7c3aed', fontWeight: 600, marginLeft: 6 }}>[Scope: All Depts]</span>}
+                      <div className="text-xs text-ink-muted mt-0.5">
+                        {profile.email} · {profile.department || emp?.department || 'All Depts'}
+                        {profile.department_scope === 'all_departments' && (
+                          <span className="text-accent ml-2 font-medium">[Scope: All Depts]</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions & Chevron */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }} onClick={e => e.stopPropagation()}>
+                  {/* Actions */}
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     {!isInactive && !isSuperAdmin && (
                       <button
                         type="button"
                         onClick={() => handleRevokeAccess(profile)}
                         disabled={savingId === profile.id}
-                        style={{
-                          background: 'transparent', color: '#dc2626', border: '1px solid #fecaca',
-                          padding: '4px 10px', borderRadius: 4, fontSize: 12, cursor: 'pointer', fontWeight: 500
-                        }}
+                        className="btn-quiet text-bad hover:bg-bad-wash text-xs px-2.5 py-1"
                       >
-                        Revoke Access
+                        Revoke access
                       </button>
                     )}
 
                     {currentUserProfile?.is_super_admin && !isSuperAdmin && (
                       <button
                         type="button"
-                        onClick={() => promoteToSuperAdmin(profile)}
+                        onClick={() => handlePromoteToSuperAdmin(profile)}
                         disabled={savingId === profile.id}
-                        style={{
-                          background: '#7c3aed', color: 'white', border: 'none',
-                          padding: '4px 10px', borderRadius: 4, fontSize: 12, cursor: 'pointer', fontWeight: 600
-                        }}
+                        className="btn-secondary text-accent text-xs px-2.5 py-1"
                       >
-                        {savingId === profile.id ? 'Promoting...' : '👑 Promote to Super Admin'}
+                        Make Super Admin
                       </button>
                     )}
 
@@ -709,147 +770,124 @@ function UserManagementContent() {
                         type="button"
                         onClick={() => handleReactivate(profile)}
                         disabled={savingId === profile.id}
-                        style={{
-                          background: '#059669', color: 'white', border: 'none',
-                          padding: '4px 12px', borderRadius: 4, fontSize: 12, cursor: 'pointer', fontWeight: 600
-                        }}
+                        className="btn-secondary text-good text-xs px-2.5 py-1"
                       >
-                        ✓ Reactivate
+                        Reactivate
                       </button>
                     )}
 
                     <button
                       type="button"
                       onClick={() => setExpandedUserId(isExpanded ? null : profile.id)}
-                      style={{
-                        background: isExpanded ? '#1f2937' : '#e5e7eb',
-                        color: isExpanded ? 'white' : '#374151',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
+                      className={isExpanded ? 'btn-primary text-xs py-1' : 'btn-secondary text-xs py-1'}
                     >
-                      {isExpanded ? '▲ Hide Settings' : '🎛️ Permissions'}
+                      {isExpanded ? 'Hide' : 'Permissions'}
                     </button>
                   </div>
                 </div>
 
                 {/* Expanded Permission Configurator */}
                 {isExpanded && (
-                  <div style={{ padding: 20, borderTop: '1px solid #e5e7eb', background: '#fafafa' }}>
+                  <div className="border-t border-rule-soft bg-page p-6">
                     {isSuperAdmin ? (
-                      <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', padding: 14, borderRadius: 8, color: '#5b21b6', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 20 }}>👑</span>
-                        <div>
-                          <strong>Protected Primary Super Admin Account</strong>
-                          <p style={{ margin: '2px 0 0 0', fontSize: 12, color: '#6d28d9' }}>
-                            This account holds unrestricted master access across all company databases, payroll, settings, and user permissions. For security, it cannot be revoked.
-                          </p>
-                        </div>
+                      <div className="note">
+                        <p className="font-medium text-ink">Super Admin Account</p>
+                        <p className="mt-1">
+                          This account holds unrestricted master access across all company databases, payroll, settings, and user permissions.
+                        </p>
                       </div>
                     ) : (
-                      <>
-                        {/* Section 1: Department Scope Toggle */}
-                        <div style={{ background: 'white', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 16 }}>
-                          <div style={{ fontSize: 13, fontWeight: 'bold', color: '#111827', marginBottom: 6 }}>
-                            🏢 Department Access Scope
-                          </div>
-                          <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <div className="space-y-6">
+                        {/* Department Scope */}
+                        <div className="panel panel-body">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
+                            Department Access Scope
+                          </h3>
+                          <div className="flex flex-wrap gap-6 text-sm text-ink">
+                            <label className="flex items-center gap-2 cursor-pointer">
                               <input
                                 type="radio"
                                 name={`scope-${profile.id}`}
                                 value="own_department"
                                 checked={currentEdit.scope !== 'all_departments'}
                                 onChange={() => setScope(profile.id, 'own_department')}
+                                className="text-ink focus:ring-accent"
                               />
                               <span><strong>Own Department Only</strong> ({profile.department || emp?.department || 'Assigned Department'})</span>
                             </label>
 
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                            <label className="flex items-center gap-2 cursor-pointer">
                               <input
                                 type="radio"
                                 name={`scope-${profile.id}`}
                                 value="all_departments"
                                 checked={currentEdit.scope === 'all_departments'}
                                 onChange={() => setScope(profile.id, 'all_departments')}
+                                className="text-ink focus:ring-accent"
                               />
                               <span><strong>All Departments</strong> (Company-Wide Access)</span>
                             </label>
                           </div>
                         </div>
 
-                        {/* Section 2: 1-Click Role Presets */}
-                        <div style={{ background: 'white', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 16 }}>
-                          <div style={{ fontSize: 13, fontWeight: 'bold', color: '#111827', marginBottom: 8 }}>
-                            ⚡ Apply 1-Click Role Preset
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+                        {/* 1-Click Presets */}
+                        <div className="panel panel-body">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
+                            Apply Role Preset
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                             {Object.entries(PRESETS).map(([key, preset]) => (
                               <button
                                 key={key}
                                 type="button"
                                 onClick={() => applyPreset(profile.id, key)}
-                                style={{
-                                  textAlign: 'left',
-                                  padding: '8px 12px',
-                                  borderRadius: 6,
-                                  border: '1px solid #d1d5db',
-                                  background: '#f9fafb',
-                                  cursor: 'pointer'
-                                }}
+                                className="text-left p-3 rounded-control border border-rule bg-surface hover:bg-page transition-colors"
                               >
-                                <div style={{ fontWeight: 'bold', fontSize: 12, color: '#111827' }}>{preset.label}</div>
-                                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{preset.desc}</div>
+                                <div className="text-xs font-semibold text-ink">{preset.label}</div>
+                                <div className="text-2xs text-ink-muted mt-1 leading-snug">{preset.desc}</div>
                               </button>
                             ))}
                           </div>
                         </div>
 
-                        {/* Section 3: Detailed Permission Toggles */}
-                        <div style={{ background: 'white', padding: 16, borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 16 }}>
-                          <div style={{ fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 12 }}>
-                            🎛️ Custom Permission Toggles
-                          </div>
+                        {/* Custom Toggles */}
+                        <div className="panel panel-body">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-4">
+                            Custom Permission Toggles
+                          </h3>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                          <div className="space-y-6">
                             {PERMISSION_DEFINITIONS.map(cat => (
                               <div key={cat.category}>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
+                                <div className="text-2xs font-medium uppercase tracking-wide text-ink-muted mb-2">
                                   {cat.category}
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8 }}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                   {cat.items.map(item => {
                                     const isChecked = !!currentEdit.perms?.[item.key];
                                     return (
                                       <label
                                         key={item.key}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'flex-start',
-                                          gap: 10,
-                                          padding: '8px 10px',
-                                          borderRadius: 6,
-                                          border: isChecked ? '1px solid #c084fc' : '1px solid #f3f4f6',
-                                          background: isChecked ? '#faf5ff' : '#ffffff',
-                                          cursor: 'pointer'
-                                        }}
+                                        className={`flex items-start gap-2.5 p-2.5 rounded-control border cursor-pointer transition-colors ${
+                                          isChecked
+                                            ? 'border-accent/40 bg-accent/5'
+                                            : 'border-rule bg-surface hover:bg-page'
+                                        }`}
                                       >
                                         <input
                                           type="checkbox"
                                           checked={isChecked}
                                           onChange={() => togglePermission(profile.id, item.key)}
-                                          style={{ marginTop: 2 }}
+                                          className="mt-0.5 rounded border-rule text-ink focus:ring-accent"
                                         />
                                         <div>
-                                          <div style={{ fontSize: 13, fontWeight: 600, color: isChecked ? '#7c3aed' : '#1f2937' }}>
+                                          <div className="text-xs font-medium text-ink">
                                             {item.label}
-                                            {item.highSecurity && <span style={{ fontSize: 10, color: '#dc2626', marginLeft: 4 }}>[High Security]</span>}
+                                            {item.highSecurity && (
+                                              <span className="text-bad ml-1.5 text-2xs font-normal">[High Security]</span>
+                                            )}
                                           </div>
-                                          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{item.desc}</div>
+                                          <div className="text-2xs text-ink-muted mt-0.5">{item.desc}</div>
                                         </div>
                                       </label>
                                     );
@@ -861,14 +899,11 @@ function UserManagementContent() {
                         </div>
 
                         {/* Save Actions */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                        <div className="flex justify-end gap-3 pt-2">
                           <button
                             type="button"
                             onClick={() => setExpandedUserId(null)}
-                            style={{
-                              padding: '8px 16px', borderRadius: 6, border: '1px solid #d1d5db',
-                              background: 'white', color: '#4b5563', cursor: 'pointer', fontSize: 13
-                            }}
+                            className="btn-secondary"
                           >
                             Cancel
                           </button>
@@ -876,15 +911,12 @@ function UserManagementContent() {
                             type="button"
                             onClick={() => handleSavePermissions(profile)}
                             disabled={savingId === profile.id}
-                            style={{
-                              padding: '8px 20px', borderRadius: 6, border: 'none',
-                              background: '#7c3aed', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: 13
-                            }}
+                            className="btn-primary"
                           >
-                            {savingId === profile.id ? 'Saving...' : '💾 Save Permission Changes'}
+                            {savingId === profile.id ? 'Saving…' : 'Save permissions'}
                           </button>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 )}
@@ -899,7 +931,7 @@ function UserManagementContent() {
 
 export default function UserManagementPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading user management portal...</div>}>
+    <Suspense fallback={<div className="py-24 text-center text-sm text-ink-muted">Loading user management portal…</div>}>
       <UserManagementContent />
     </Suspense>
   );

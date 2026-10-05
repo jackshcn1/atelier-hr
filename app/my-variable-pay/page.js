@@ -143,18 +143,27 @@ function MyVariablePayContent() {
     }
 
     // Admins and managers legitimately need the full roster for the switcher.
+    let effectiveSelectedId = targetEmpId;
     if (privileged) {
       const { data: eList } = await supabase
         .from('employees')
         .select('*')
         .is('deleted_at', null)
         .order('name');
-      setAllEmployees(eList || []);
+      const empRows = eList || [];
+      setAllEmployees(empRows);
+
+      // If the admin doesn't have their own employee record with variable pay,
+      // default the selector to the first employee who actually has a variable scheme (e.g. Amol).
+      if (!targetEmpId || !empRows.some(e => e.employee_id === targetEmpId && e.variable_pay_scheme)) {
+        const firstWithScheme = empRows.find(e => e.variable_pay_scheme);
+        effectiveSelectedId = firstWithScheme?.employee_id || empRows[0]?.employee_id || null;
+      }
     } else {
       setAllEmployees([]);
     }
 
-    setSelectedEmpId(targetEmpId);
+    setSelectedEmpId(effectiveSelectedId);
 
     if (activePeriod) await loadInputsForPeriod(activePeriod.id);
     setLoading(false);
@@ -194,7 +203,13 @@ function MyVariablePayContent() {
   // For a regular employee this is always their own record — the switcher
   // exists solely for admins.
   const currentEmp = useMemo(() => {
-    if (isManager) return allEmployees.find(e => e.employee_id === selectedEmpId) || null;
+    if (isManager) {
+      if (selectedEmpId) {
+        const found = allEmployees.find(e => e.employee_id === selectedEmpId);
+        if (found) return found;
+      }
+      return allEmployees.find(e => e.variable_pay_scheme) || allEmployees[0] || null;
+    }
     return myEmployee;
   }, [allEmployees, selectedEmpId, myEmployee, isManager]);
 

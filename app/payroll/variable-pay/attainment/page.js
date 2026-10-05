@@ -19,9 +19,9 @@ function fmtPeriodRange(p) {
 }
 
 function attainmentTone(pct) {
-  if (pct >= 100) return { bg: '#ecfdf5', fg: '#065f46', bar: '#10b981' };
-  if (pct > 0) return { bg: '#fffbeb', fg: '#92400e', bar: '#f59e0b' };
-  return { bg: '#f9fafb', fg: '#6b7280', bar: '#d1d5db' };
+  if (pct >= 100) return { pill: 'pill-good', text: 'text-good', bar: 'bg-good' };
+  if (pct > 0) return { pill: 'pill-warn', text: 'text-warn', bar: 'bg-warn' };
+  return { pill: 'pill-quiet', text: 'text-ink-muted', bar: 'bg-rule' };
 }
 
 function fmt(value, unit) {
@@ -120,10 +120,12 @@ export default function VariablePayAttainmentPage() {
 
     setBusy(true); setError(''); setMessage('');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch('/api/payroll/variable-pay/snapshot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user?.access_token || ''}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ periodId }),
       });
       const body = await res.json();
@@ -156,7 +158,6 @@ export default function VariablePayAttainmentPage() {
         if (isClosed) {
           const mine = snapshots.filter(s => s.employee_id === emp.employee_id);
           if (mine.length === 0) return;
-          const total = mine.reduce((s, r) => s + Number(r.payout_amount || 0), 0);
           breakdown = mine.map(r => ({
             metric_id: r.metric_id, metric_name: r.metric_name,
             actual: Number(r.actual_value || 0), target: Number(r.target_value || 0),
@@ -221,182 +222,225 @@ export default function VariablePayAttainmentPage() {
   }, [filtered]);
 
   if (loading) {
-    return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading attainment dashboard…</div>;
+    return (
+      <div className="py-24 text-center">
+        <p className="text-sm text-ink-muted">Loading attainment dashboard…</p>
+      </div>
+    );
   }
 
   return (
-    <div style={{ paddingBottom: 60 }}>
+    <div className="pb-20">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+      <div className="page-head">
         <div>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: 24, fontWeight: 800, color: '#111827' }}>
-            📊 Variable Pay Attainment
-          </h1>
-          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
-            Every employee's attainment against target for the selected cycle.
+          <h1 className="page-title">Variable pay attainment</h1>
+          <p className="page-purpose">
+            Every employee&rsquo;s attainment against target for the selected cycle.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={periodId || ''} onChange={e => handlePeriodChange(e.target.value)}
-            style={{ padding: '7px 12px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontWeight: 700, fontSize: 13 }}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={periodId || ''}
+            onChange={e => handlePeriodChange(Number(e.target.value))}
+            aria-label="Cycle selector"
+            className="field w-auto min-w-[14rem] text-xs py-1.5"
+          >
             {periods.map(p => (
               <option key={p.id} value={p.id}>
-                {fmtPeriodRange(p)} ({p.status === 'open' ? '🟢 Live' : p.status === 'locked' ? '🔒 Closed' : '✅ Paid'})
+                {fmtPeriodRange(p)} ({p.status === 'open' ? 'Live' : p.status === 'locked' ? 'Closed' : 'Paid'})
               </option>
             ))}
           </select>
-          <a href="/payroll/variable-pay"
-            style={{ background: '#6b7280', color: 'white', padding: '7px 14px', borderRadius: 6, textDecoration: 'none', fontWeight: 700, fontSize: 12 }}>
-            ⬅ Data Upload Hub
+          <a href="/my-variable-pay" className="btn-secondary text-xs">
+            My Variable Pay
           </a>
         </div>
       </div>
 
       {!isAdmin && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 14, marginBottom: 16, color: '#991b1b', fontSize: 13 }}>
-          ⚠️ This page is for payroll administrators. Your own figures are on the Variable Pay page.
+        <div className="note mb-6">
+          <p className="text-ink">This page is for payroll administrators.</p>
+          <p className="mt-1">Your own figures and metrics are on the My Variable Pay page.</p>
         </div>
       )}
 
-      {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: 12, marginBottom: 14, color: '#991b1b', fontSize: 13 }}>{error}</div>}
-      {message && <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 6, padding: 12, marginBottom: 14, color: '#065f46', fontSize: 13 }}>{message}</div>}
+      {error && (
+        <div className="mb-6 rounded-card border border-bad/30 bg-bad-wash px-4 py-3 text-sm text-bad">
+          {error}
+        </div>
+      )}
+      {message && (
+        <div className="mb-6 rounded-card border border-good/30 bg-good-wash px-4 py-3 text-sm text-good">
+          {message}
+        </div>
+      )}
 
       {/* Cycle status + snapshot controls */}
-      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 14, marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ fontSize: 13, color: '#374151' }}>
+      <div className="panel panel-body mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="text-sm text-ink">
           <strong>Cycle {fmtPeriodRange(currentPeriod)}</strong>
-          <span style={{ marginLeft: 10, color: '#6b7280' }}>
+          <span className="ml-3 text-ink-muted text-xs">
             {isClosed
-              ? '🔒 Closed — figures are frozen from the snapshot taken when the cycle ended.'
-              : '🟢 Live — recalculates from the current sync data.'}
+              ? 'Frozen snapshot from when the cycle closed.'
+              : 'Live calculation based on current metrics.'}
           </span>
           {currentPeriod?.snapshot_at && (
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+            <div className="text-2xs text-ink-muted mt-1">
               Snapshot taken {new Date(currentPeriod.snapshot_at).toLocaleString('en-IN')} by {currentPeriod.snapshot_generated_by}
             </div>
           )}
         </div>
-        {isAdmin && (
-          <button onClick={regenerateSnapshot} disabled={busy}
-            style={{ background: busy ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer' }}>
-            {busy ? 'Regenerating…' : '🔄 Regenerate Snapshot'}
+        {isAdmin && isClosed && (
+          <button
+            onClick={regenerateSnapshot}
+            disabled={busy}
+            className="btn-secondary text-xs"
+          >
+            {busy ? 'Regenerating…' : 'Regenerate Snapshot'}
           </button>
         )}
       </div>
 
       {/* Filters */}
-      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 14, marginBottom: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, ID or department…"
-          style={{ flex: '1 1 220px', padding: '7px 12px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontSize: 13 }} />
-        <select value={schemeFilter} onChange={e => setSchemeFilter(e.target.value)}
-          style={{ padding: '7px 12px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontSize: 13 }}>
+      <div className="panel p-4 mb-6 flex flex-wrap gap-3 items-center">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search name, ID or department…"
+          className="field flex-1 min-w-[14rem] text-xs py-1.5"
+        />
+        <select
+          value={schemeFilter}
+          onChange={e => setSchemeFilter(e.target.value)}
+          aria-label="Filter scheme"
+          className="field w-auto min-w-[10rem] text-xs py-1.5"
+        >
           <option value="all">All schemes</option>
           {schemes.map(s => <option key={s.id} value={s.name}>{s.display_name}</option>)}
         </select>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-          style={{ padding: '7px 12px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontSize: 13 }}>
-          <option value="attainment">Sort: attainment (high → low)</option>
-          <option value="payout">Sort: payout (high → low)</option>
-          <option value="name">Sort: name (A → Z)</option>
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value)}
+          aria-label="Sort by"
+          className="field w-auto min-w-[11rem] text-xs py-1.5"
+        >
+          <option value="attainment">Sort: Attainment (high → low)</option>
+          <option value="payout">Sort: Payout (high → low)</option>
+          <option value="name">Sort: Name (A → Z)</option>
         </select>
       </div>
 
-      {/* Summary */}
+      {/* Summary KPI row */}
       {summary && (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
-          {[
-            { label: 'Employees on schemes', value: summary.count },
-            { label: 'Average attainment', value: `${summary.avg}%` },
-            { label: 'At or above target', value: summary.full },
-            { label: 'Total variable payout', value: '₹' + summary.totalPayout.toLocaleString('en-IN') },
-          ].map(s => (
-            <div key={s.label} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: '12px 18px', flex: '1 1 180px' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>{s.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginTop: 2 }}>{s.value}</div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="panel p-4">
+            <div className="text-2xs font-medium uppercase tracking-wide text-ink-muted">Employees on Schemes</div>
+            <div className="text-2xl font-serif mt-1 text-ink">{summary.count}</div>
+          </div>
+          <div className="panel p-4">
+            <div className="text-2xs font-medium uppercase tracking-wide text-ink-muted">Average Attainment</div>
+            <div className="text-2xl font-serif mt-1 text-accent">{summary.avg}%</div>
+          </div>
+          <div className="panel p-4">
+            <div className="text-2xs font-medium uppercase tracking-wide text-ink-muted">At or Above Target</div>
+            <div className="text-2xl font-serif mt-1 text-good">{summary.full}</div>
+          </div>
+          <div className="panel p-4">
+            <div className="text-2xs font-medium uppercase tracking-wide text-ink-muted">Total Payout Pool</div>
+            <div className="text-2xl font-serif mt-1 text-ink">₹{summary.totalPayout.toLocaleString('en-IN')}</div>
+          </div>
         </div>
       )}
 
       {filtered.length === 0 ? (
-        <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 40, textAlign: 'center', color: '#6b7280' }}>
-          {rows.length === 0
-            ? 'No employees currently have a variable pay scheme assigned. Assign schemes under Employees → View / Edit.'
-            : 'No employees match your filters.'}
+        <div className="note text-center py-12">
+          <p className="text-ink">
+            {rows.length === 0
+              ? 'No employees currently have a variable pay scheme assigned. Assign schemes under Employees → View / Edit.'
+              : 'No employees match your filters.'}
+          </p>
         </div>
       ) : (
-        filtered.map(r => {
-          const tone = attainmentTone(r.attainmentPct);
-          return (
-            <div key={r.employee.employee_id} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 10, padding: 18, marginBottom: 14 }}>
-              {/* Employee header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>{r.employee.name}</span>
-                    <span style={{ background: '#f3f4f6', color: '#374151', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{r.employee.designation || 'Staff'}</span>
-                    <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{r.employee.department || 'All'}</span>
-                    <span style={{ background: '#ede9fe', color: '#6d28d9', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{r.schemeDisplay}</span>
+        <div className="space-y-4">
+          {filtered.map(r => {
+            const tone = attainmentTone(r.attainmentPct);
+            return (
+              <div key={r.employee.employee_id} className="panel overflow-hidden">
+                {/* Employee header */}
+                <div className="flex flex-wrap items-center justify-between gap-4 p-5 border-b border-rule-soft bg-surface">
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="text-base font-semibold text-ink">{r.employee.name}</span>
+                      <span className="pill-quiet">{r.employee.designation || 'Staff'}</span>
+                      <span className="pill-quiet">{r.employee.department || 'All'}</span>
+                      <span className="pill bg-accent/10 text-accent font-medium">{r.schemeDisplay}</span>
+                    </div>
+                    <div className="text-xs text-ink-muted mt-1">
+                      ID {r.employee.employee_id} · Variable pool ₹{r.pool.toLocaleString('en-IN')}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                    ID {r.employee.employee_id} · Variable pool ₹{r.pool.toLocaleString('en-IN')}
+                  <div className="text-right">
+                    <div className={tone.pill}>
+                      {r.attainmentPct}% attained
+                    </div>
+                    <div className="text-base font-semibold text-ink mt-1">
+                      ₹{r.totalPayout.toLocaleString('en-IN')}
+                    </div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'inline-flex', padding: '4px 14px', borderRadius: 20, fontSize: 13, fontWeight: 800, background: tone.bg, color: tone.fg }}>
-                    {r.attainmentPct}% attained
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#111827', marginTop: 4 }}>
-                    ₹{r.totalPayout.toLocaleString('en-IN')}
-                  </div>
-                </div>
-              </div>
 
-              {/* Per-metric table */}
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: '#f9fafb' }}>
-                      {['Metric', 'Actual', 'Target', 'Floor', 'Weight', 'Attainment', 'Payout'].map(h => (
-                        <th key={h} style={{ textAlign: 'left', padding: '7px 10px', borderBottom: '1px solid #e5e7eb', fontWeight: 700, color: '#6b7280', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {r.breakdown.map(b => {
-                      const m = (schemes.find(s => s.name === r.schemeName)?.metrics || []).find(x => x.id === b.metric_id);
-                      const unit = b.unit || m?.unit || '';
-                      const bt = attainmentTone(b.attainmentPct);
-                      return (
-                        <tr key={b.metric_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                          <td style={{ padding: '7px 10px', fontWeight: 600, color: '#111827' }}>
-                            {b.metric_name}
-                            {m?.scope === 'team' && <span style={{ marginLeft: 6, fontSize: 10, color: '#7c3aed', fontWeight: 700 }}>TEAM</span>}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#374151', whiteSpace: 'nowrap' }}>{fmt(b.actual, unit)}</td>
-                          <td style={{ padding: '7px 10px', color: '#374151', whiteSpace: 'nowrap' }}>{fmt(b.target, unit)}</td>
-                          <td style={{ padding: '7px 10px', color: '#6b7280', whiteSpace: 'nowrap' }}>{b.floor === null || b.floor === undefined ? '—' : fmt(b.floor, unit)}</td>
-                          <td style={{ padding: '7px 10px', color: '#6b7280', whiteSpace: 'nowrap' }}>{Math.round(Number(b.weight || 0) * 100)}%</td>
-                          <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontWeight: 800, color: bt.fg, minWidth: 44 }}>{b.attainmentPct || 0}%</span>
-                              <div style={{ width: 60, height: 6, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
-                                <div style={{ width: `${Math.min(Math.max(b.attainmentPct || 0, 0), 100)}%`, height: '100%', background: bt.bar }} />
+                {/* Per-metric table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-rule bg-page/50">
+                        {['Metric', 'Actual', 'Target', 'Floor', 'Weight', 'Attainment', 'Payout'].map(h => (
+                          <th key={h} className="table-head">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-rule-soft">
+                      {r.breakdown.map(b => {
+                        const m = (schemes.find(s => s.name === r.schemeName)?.metrics || []).find(x => x.id === b.metric_id);
+                        const unit = b.unit || m?.unit || '';
+                        const bt = attainmentTone(b.attainmentPct);
+                        return (
+                          <tr key={b.metric_id} className="hover:bg-page/40 transition-colors">
+                            <td className="table-cell font-medium text-ink">
+                              {b.metric_name}
+                              {m?.scope === 'team' && (
+                                <span className="ml-2 text-2xs uppercase tracking-wide text-accent font-semibold">[Team]</span>
+                              )}
+                            </td>
+                            <td className="table-cell whitespace-nowrap text-ink">{fmt(b.actual, unit)}</td>
+                            <td className="table-cell whitespace-nowrap text-ink-muted">{fmt(b.target, unit)}</td>
+                            <td className="table-cell whitespace-nowrap text-ink-muted">{b.floor === null || b.floor === undefined ? '—' : fmt(b.floor, unit)}</td>
+                            <td className="table-cell whitespace-nowrap text-ink-muted">{Math.round(Number(b.weight || 0) * 100)}%</td>
+                            <td className="table-cell whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-semibold min-w-[3rem] ${bt.text}`}>{b.attainmentPct || 0}%</span>
+                                <div className="w-16 h-1.5 bg-rule-soft rounded-full overflow-hidden">
+                                  <div
+                                    style={{ width: `${Math.min(Math.max(b.attainmentPct || 0, 0), 100)}%` }}
+                                    className={`h-full rounded-full ${bt.bar}`}
+                                  />
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '7px 10px', fontWeight: 700, color: (b.payoutAmount || 0) > 0 ? '#059669' : '#9ca3af', whiteSpace: 'nowrap' }}>
-                            ₹{Number(b.payoutAmount || 0).toLocaleString('en-IN')}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className={`table-cell whitespace-nowrap font-medium ${(b.payoutAmount || 0) > 0 ? 'text-good' : 'text-ink-muted'}`}>
+                              ₹{Number(b.payoutAmount || 0).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </div>
   );
