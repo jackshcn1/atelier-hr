@@ -15,121 +15,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`node scripts/setup-petpooja.mjs`** - One-time setup for Petpooja credentials
 
 ### Common Operations
-- **Preview deployment** - Use Vercel or GitHub deployments via their respective tools
-- **Supabase operations** - Direct SQL in Supabase dashboard, or use `supabase-schema.sql` for new projects
+- **Preview deployment** - Vercel automatic builds on push to `main` branch
+- **Supabase operations** - Direct SQL in Supabase dashboard, or migrations in `supabase/migrations/`
 
 ## High-Level Architecture
 
 **Atelier HR** is a comprehensive Internal HR administration & Employee Self-Service tool with complex domain logic.
 
-### Core Components
+### Navigation Architecture & Route Hierarchy
 
-#### Application Structure
-- **Framework**: Next.js 14 (app router) with React 18
-- **Styling**: Tailwind CSS 3.x + shadcn/ui components  
-- **Database**: Supabase Postgres with extensive HR schema
-- **Authentication**: Supabase auth with role-based access control
-- **Deployment**: Vercel hosting with environment variables
+Navigation is grouped into 4 functional dropdown families + standalone links:
 
-#### Key Domains
-1. **Employee Management** - CRUD operations, soft delete, onboarding/offboarding workflow
-2. **Payroll System** - Complex variable pay engine, Petpooja integration, Google Sheets sync
-3. **Variable Pay Engine** - Multi-metric incentive schemes with qualification floors/ceilings
-4. **Document Management** - Storage bucket for resignation letters, certificates, assets
-5. **Workflow Automation** - Exit clearance process, bulk import, document templates
+1. **Employees**
+   - Employees (`/employees`) — Employee directory, profile view/edit, onboarding
+   - Org Chart (`/orgchart`) — Hierarchical team structure
 
-#### Integration Points
-- **Petpooja**: Attends billing and inventory systems via browser automation (scripted in `scripts/petpooja-sync.mjs`)
-- **Google Sheets**: Customer feedback integration via API (in `lib/googleSheetsService.js`)
-- **Email**: Failure notifications via Nodemailer
+2. **Operations**
+   - Checklists (`/checklists`) — Daily opening/closing and hygiene checklists
+   - Tasks (`/tasks`) — Delegated accountability tasks and assignments
 
-### Security Patterns
-- **RLS**: Extensive Row Level Security in Supabase covering all employee/sensitive data
-- **Role-Based Access**: Department heads see only their department's data
-- **Environment Variables**: Sensitive credentials (Petpooja, Supabase service_role) in `.env.local`
-- **Middleware**: Page-level login protection in `middleware.js`
+3. **Payroll**
+   - Payroll (`/payroll`) — Attendance processing & monthly calculation
+   - Salary Processing (`/payroll/processing`) — Bank payment processing, narration & UTR logging
+   - My Variable Pay (`/my-variable-pay`) — Individual employee scorecard, live progress & target attainment (with manager switcher for admins)
+   - Attainment (`/payroll/variable-pay/attainment`) — Admin-only company-wide attainment overview table & snapshot regeneration
+   - Payslips (`/payslips` / `/my-payslips`) — Payslip directory & individual slip view
+
+4. **Documents**
+   - SOPs & Workflows (`/documents?category=sop`)
+   - Training Material (`/documents?category=training`)
+   - Variable Pay Targets (`/documents?category=targets`)
+   - Company Policies (`/documents?category=policy`)
+
+5. **Standalone Links**
+   - Export (`/export`) — CSV data download
+   - Settings (`/settings`) — System configuration, departments, and user management (`/settings/users`)
+
+### Design System (Atelier Theme)
+- **Typography**: Newsreader (Editorial Serif) for titles/figures, Inter for UI text
+- **CSS Utility Classes** (in `app/globals.css`):
+  - `.page-head`, `.page-title`, `.page-purpose`
+  - `.panel`, `.panel-body`, `.panel-title`, `.hairline-list`
+  - `.btn-primary`, `.btn-secondary`, `.btn-quiet`, `.btn-danger`
+  - `.field`, `.field-label`
+  - `.table-head`, `.table-cell`
+  - `.pill-good`, `.pill-warn`, `.pill-bad`, `.pill-quiet`
+  - `.figure`, `.figure-label`, `.note`
+
+### User Management & Authentication Architecture
+- **API Endpoint**: `POST /api/admin/create-user` handles creating users in Supabase Auth via `auth.admin.createUser` and creates their `profiles` row with the chosen preset (Employee, Department Head, HR Manager, Super Admin), department scope, and custom permissions in 1 step.
+- **Access Status**: Users can be marked `active` or `revoked`/`inactive` from the UI.
+- **Super Admin Protection**: Only super admins can create or promote accounts to `super_admin`.
 
 ### Key Files & Responsibilities
+- `app/components/Navbar.js` - Dropdown navigation (desktop) + collapsible drawer (mobile)
+- `app/my-variable-pay/page.js` - Individual variable pay scorecard and manager employee selector
+- `app/payroll/variable-pay/attainment/page.js` - Company-wide variable pay attainment table
+- `app/settings/users/page.js` - User management, permission configurator, role presets, and add user drawer
+- `app/api/admin/create-user/route.js` - Backend admin user creation API
+- `app/documents/page.js` - Documents hub with query param tab selection
 
-#### Project Root
-- `app/layout.js` - Root layout, metadata, font loading
-- `app/page.js` - Home page redirects based on user role
-- `middleware.js` - Login protection for all routes
-- `README.md` - Complete setup and migration documentation
-
-#### Core Routes
-- `app/employees/` - Employee management (create, edit, view, bulk import)
-- `app/payroll/` - Payroll processing interface
-- `app/settings/` - Configuration (departments, users, variable pay, document templates)
-- `app/documents/` - File uploads for employee documentation
-- `app/export/` - CSV exports of all HR data (department-scoped)
-
-#### Supporting Libs
-- `lib/supabaseClient.js` - Supabase client setup
-- `lib/variablePayParsers.js` - Petpooja report parsing (captains, pax sales, inventory)
-- `lib/feedbackParsers.js` - Google Sheets feedback processing
-- `scripts/petpooja-sync.mjs` - Main integration engine
-
-## Important Setup & Migration Notes
-
-### Initial Setup (README.md)
-1. **Supabase** - Import `supabase-schema.sql` for complete HR database
-2. **GitHub** - Upload all files preserving folder structure
-3. **Vercel** - Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. **Google Sheets** - Set up feedback spreadsheet for integration
-
-### Key Migrations That May Be Needed
-- **Payroll split** - `basic_da`, `hra`, `other_allowances` columns added
-- **Document storage** - `documents` bucket created for file uploads
-- **Department FKs** - ON UPDATE CASCADE and ON DELETE SET NULL constraints
-- **Personal details** - Sensitive info separated into `employee_sensitive_info` table
-- **Petpooja integration** - Employee ID unified with Petpooja codes
-
-### File Permissions & Special Notes
-- **`.claude/worktrees/`** - Isolated development environments for Claude sessions
-- **`.env.local`** - Environment variables (never commit to git)
-- **`scripts/petpooja-config.json`** - Petpooja credentials (git-ignored)
-- **`.claude/base-menu-cache/`** - Cached Petpooja menu data (updated every 15 days)
-
-## Development Workflow
-
-### Branching
-- **Worktrees** - Each Claude session gets its own worktree for isolation
-- **Merge conflicts** - Use `ccd_host sync_with_base_branch` tool when conflicts occur
-- **Protected files** - `.claude/hooks`, `.claude/skills`, `.mcp.json` require special handling
-
-### Testing
-- **Playwright** - End-to-end testing (included in devDependencies)
-- **Component testing** - Client-side React components
-- **Integration** - Petpooja sync automation in scripts directory
-
-### Common Pitfalls
-1. **Petpooja credentials** - Never commit to git, use `.env.local` or local config
-2. **Supabase keys** - Service role vs anon key distinction for different operations
-3. **Date handling** - Petpooja sync uses complex date calculations for payroll periods
-4. **Cache management** - Base menu cache updates every 15 days
-5. **RLS policies** - Must be checked after any schema changes involving employee data
-
-## Current Working State
-
-**Active Focus Area**: Petpooja Integration Sync Engine
-- **Files being worked on**: `scripts/petpooja-sync.mjs` (main integration engine)
-- **Key components**: Variable pay parsers, Google Sheets feedback integration, browser automation
-- **Current status**: Review and enhance the Petpooja sync automation for complex report handling
-- **Dependencies**: Playwright for browser automation, XLSX for Excel parsing, Supabase for data storage
-
-**Recent Changes**:
-- Added robust date handling for payroll cycle calculations
-- Enhanced browser automation for Petpooja report downloads
-- Implemented caching system for Base Menu data
-- Added comprehensive error handling and failure notifications
-
-**Critical Notes**:
-- Petpooja sync runs LOCAL on office computer (Petpooja blocks cloud/datacenter IPs)
-- Configuration in `scripts/petpooja-config.json` (git-ignored)
-- Environment variables take precedence for CI/CD deployments
-- Requires both Petpooja Billing and Inventory credentials
-
-This codebase combines modern web development with complex HR domain logic and external system integration. Focus on understanding the security implications and data flow between components.
+## Security & Environment Variables
+- `NEXT_PUBLIC_SUPABASE_URL` — Public Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Public anon key (JWT starting with `eyJ...`)
+- `SUPABASE_SERVICE_ROLE_KEY` — Protected server-side secret key (used strictly in backend routes and local sync scripts)
 
 **Last Updated**: 2026-10-01
