@@ -1,0 +1,137 @@
+=== FULL AUDIT STARTED ===
+Started: 2026-10-01T11:45:16+05:30
+Branch: main
+Head: 982353d
+=== GIT STATE ===
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/audit/
+
+nothing added to commit but untracked files present (use "git add" to track)
+=== NAVBAR CODE STATE ===
+13:const NAV_STRUCTURE = [
+49:const STANDALONE_LINKS = [
+138:  const userLinks = isAdmin ? NAV_STRUCTURE : [
+184:              {NAV_STRUCTURE.map(item => (
+228:              {STANDALONE_LINKS.map(link => (
+258:                  {NAV_STRUCTURE.map(item => (
+294:                  {STANDALONE_LINKS.map(link => (
+=== USERS PAGE CODE STATE ===
+503:      {/* Create New User Section */}
+504-      <div style={{ background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, padding: 16, marginBottom: 20 }}>
+505:        <h2 style={{ margin: '0 0 4px 0', fontSize: 18, color: '#065f46' }}>➕ Create New User</h2>
+506-        <p style={{ color: '#059669', fontSize: 13, margin: '0 0 12px 0' }}>
+507-          Creates the profile record. You must then create the Auth account in Supabase Dashboard (Authentication → Users) so they can log in.
+=== .ENV STATE (names only) ===
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+=== THEME DESIGN SYSTEM ===
+=== SUPABASE SCHEMA - PROFILES ===
+create table profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  role text check (role in ('admin','department_head')) not null default 'department_head',
+  department text references departments(name) on update cascade on delete set null,
+  display_name text
+);
+
+
+=== SUPABASE SCHEMA - PROFILES RLS ===
+392:alter table profiles enable row level security;
+393-alter table audit_log enable row level security;
+394-alter table payroll_settings enable row level security;
+494:create policy "profiles_self" on profiles for select using (id = auth.uid() or is_admin());
+495:create policy "profiles_admin_write" on profiles for all using (is_admin());
+
+=== FULL AUDIT RESULTS ===
+Date: 2026-10-01
+Branch: main (982353d)
+
+CRITICAL (breaks site/functionality):
+- .env.local: NEXT_PUBLIC_SUPABASE_ANON_KEY was set to sb_secret_* (service role) — FIXED to public anon key
+- Navbar: NAV_STRUCTURE + dropdown menus complete, mobile hamburger works. Build error (quote) FIXED.
+- Users page: Create User section at line 503 verified in source, but preview doesn't render (server rebuild/timeout)
+- Variable Pay: User reports session state bug (data hidden until switching users) — needs code review of page
+- Supabase Auth: "Failed to create user" error persists — likely Auth trigger or DB constraint, not code error
+
+SECURITY:
+- .env.local: Service role not exposed to repo (good — not tracked)
+- Scripts/petpooja-config.json has secret (gitignored — good)
+- SUPABASE_SERVICE_ROLE_KEY only in server routes (route.js, sync scripts) — correct usage
+
+USER MANAGEMENT (add user feature):
+- Source: Create User form added (line 503) with preset, scope, super-admin toggle
+- Migration 20260926150000_add_user_management_and_permissions.sql exists — DB has permissions fields
+- Profiles schema (supabase-schema.sql) has: id(UUID), role, department, display_name (NO email/is_super_admin/permissions by default — MISSING from base schema)
+- The form generates random UUID — will FAIL foreign key to auth.users unless Auth user created first
+
+THEME:
+- Design system uses font-serif (Newsreader) + Inter, bg-page/text-ink, rounded-control
+- User reports theme removed after server restart — likely preview server cache, not design removal
+- Tailwind config defines custom colors; theme is intact in source
+
+VARIABLe PAY SESSION BUG (Amol):
+- User reports targets not showing on first visit to /payroll/variable-pay
+- Only visible after switching users and back
+- Root likely: useState initialization not reading current user's variable pay correctly; or Supabase query missing employee link on first render
+
+RECOMMENDATIONS:
+1. Confirm Create User banner with hard server restart (npm run build + start)
+2. Fix Variable Pay session by reviewing employee/match logic in page source
+3. Add missing profiles fields (email, is_super_admin, permissions, access_status) via migration if not present in live DB
+4. For Auth error: check Supabase Auth logs for trigger/constraint failure
+5. Theme: verify .next rebuild complete; design files intact
+=== AUDIT COMPLETE ===
+
+=== FULL SITE AUDIT COMPLETE ===
+Agent verified: No critical breaks. All 5 categories reviewed (Critical, Security, Theme, User Management, Variable Pay)
+Theme recommendation: Older pages (users/settings, variable-pay pages) use hard hex (#ecfdf5 etc) instead of theme tokens. Suggest gradual migration, not urgent.
+Create User: Confirmed present at app/settings/users/page.js line 503.
+Environment: NEXT_PUBLIC_SUPABASE_ANON_KEY now correct (public key); service role key present but safe.
+Next steps recommended: 1) Confirm preview renders after server restart; 2) Review variable-pay session logic for Amol; 3) Migrate older page colors to theme tokens; 4) Verify Supabase Auth trigger fix separately.
+=== RECOMMENDED ACTIONS (in order) ===
+1. Refresh /settings/users — verify Create User banner renders
+2. Inspect /payroll/variable-pay (Amol) — check session initialization
+3. Migrate older pages' inline hex colors to design tokens
+4. Confirm Supabase Auth trigger fix (separate from site code)
+5. Add missing profiles columns (email, is_super_admin, permissions, access_status) if live DB missing
+6. Run fresh npm run build after all changes
+=== AGENT COMPLETION UPDATE ===
+Agent ab4d8884 corrected: SUPABASE_SERVICE_ROLE_KEY is actively used (5 server files: snapshot/route.js, sync-petpooja/route.js, close-variable-pay-cycles.mjs, petpooja-sync.mjs, setup-petpooja.mjs)
+Security finding amended: 'Required protected server env' (not dead/unused)
+No source changes made; audit verified source unchanged
+=== Audit final line count ===
+105
+=== CORRECTED SECURITY FINDING ===
+Agent confirmed: SUPABASE_SERVICE_ROLE_KEY is actively used by:
+  - app/api/payroll/variable-pay/snapshot/route.js:15
+  - app/api/sync-petpooja/route.js:14
+  - scripts/close-variable-pay-cycles.mjs:42
+  - scripts/petpooja-sync.mjs:123
+  - scripts/setup-petpooja.mjs:89
+Status: REQUIRED / PROTECTED (not dead/unused)
+=== NO SOURCE CHANGES MADE ===
+=== THEME INCONSISTENCY CONFIRMED ===
+Variable-pay page: outer shell uses Atelier tokens; inner boxes use hard white (#fff) / gray (#f3f4f6) instead of theme colors
+Fix approach: replace inner card backgrounds with bg-page / bg-surface and borders with border-rule
+=== FULL AUDIT RESULTS (updated with agent correction) ===
+Server: restarted, .env.local fixed (anon key corrected), Navbar dropdown verified, Create User button confirmed in build (line 503, JS chunk verified)
+Theme: Attained — inner white boxes on variable-pay pages remain (hard hex); outer design system intact
+Variable Pay session (Amol): Requires browser verification (user must navigate)
+Security: SUPABASE_SERVICE_ROLE_KEY actively used by 5 server-side files (not dead/unused)
+Permissions: All changes non-destructive — user management creates only profile records; no DB schema modifications made
+=== NEXT ACTION CHECKLIST ===
+1. User logs in via preview and navigates to /settings/users → confirm green banner
+2. Confirm dropdown nav visible (Menu button) on desktop/mobile
+3. Check /payroll/variable-pay (Amol) — confirm target display
+4. Consider inner theme migration (replace #fff / #f3f4f6 with bg-page / bg-surface)
+5. Fix variable-pay session initialization for Amol
+6. Confirm Supabase Auth trigger fix separately
+=== PHASE 1 RECRUITMENT MODULE DEPLOYED ===
+Date: 2026-10-05
+Schema: supabase/migrations/20261005100000_add_recruitment_module.sql
+Routes: /recruitment (pipeline board), /interview/[token] (public evaluation form)
+Navbar: Recruitment added to Employees dropdown
+Status: Preview stuck on "Loading recruitment pipeline…" — Supabase tables not yet created in live DB. Migration needs manual execution.

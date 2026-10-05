@@ -38,6 +38,9 @@ export default function EmployeeDetail() {
   const [managerAndStatusSaved, setManagerAndStatusSaved] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [exitDate, setExitDate] = useState('');
+  const [profileRole, setProfileRole] = useState('');
+  const [trainingPending, setTrainingPending] = useState(false);
+  const [showStageAdvance, setShowStageAdvance] = useState(false);
   const [exitReason, setExitReason] = useState('');
   const [resignationLetter, setResignationLetter] = useState(null);
   const [uploadingLetter, setUploadingLetter] = useState(false);
@@ -144,8 +147,10 @@ export default function EmployeeDetail() {
       const { data: templates } = await supabase.from('doc_templates').select('*').eq('department', emp.department);
       setDocTemplates(templates || []);
     }
-    const { data: training } = await supabase.from('training_records').select('*').eq('employee_id', id);
-    setTrainingRecords(training || []);
+    const { data: et } = await supabase.from('employee_training').select('status').eq('employee_id', id);
+    const hasPendingTraining = et && et.some(t => t.status !== 'completed');
+    if (hasPendingTraining) setTrainingPending(true);
+    setTrainingRecords(et || []);
     const { data: vSchemes } = await supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true);
     setVariableSchemes(vSchemes || []);
     const { data: deptData } = await supabase.from('departments').select('name').order('name');
@@ -158,8 +163,20 @@ export default function EmployeeDetail() {
       .eq('employee_id', id)
       .not('payslip_number', 'is', null)
       .order('id', { ascending: false });
+    const { data: viewer } = await supabase.auth.getUser();
+    if (viewer?.user?.id) {
+      const { data: vp } = await supabase.from('profiles').select('role,is_super_admin,permissions').eq('id', viewer.user.id).single();
+      setViewerProfile(vp || null);
+    }
     setEmployeePayslips(slips || []);
   }
+
+  // Phase 2: Access control — salary edit only for super_admin, role='owner', or permissions.edit_salary
+  const canEditSalary = viewerProfile ? (
+    viewerProfile.is_super_admin === true ||
+    viewerProfile.role === 'owner' ||
+    (viewerProfile.permissions && typeof viewerProfile.permissions === 'object' && viewerProfile.permissions.edit_salary === true)
+  ) : false;
 
   useEffect(() => { load(); }, [id]);
 
@@ -561,6 +578,43 @@ export default function EmployeeDetail() {
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#111827' }}>
               {employee.name}
             </h1>
+            {/* Phase 2: Onboarding stage pill — top right of name block */}
+            {employee?.onboarding_status && (
+              <span
+                onClick={() => { if (canEditSalary) setShowStageAdvance(s => !s); }}
+                style={{
+                  padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
+                  background: employee.onboarding_status === 'Draft' ? '#fee2e2' :
+                              employee.onboarding_status === 'Documents Pending' ? '#fef3c7' :
+                              employee.onboarding_status === 'Compensation Set' ? '#e0e7ff' :
+                              employee.onboarding_status === 'Assets Issued' ? '#dcfce7' :
+                              '#f0fdf4',
+                  color: employee.onboarding_status === 'Draft' ? '#991b1b' :
+                         employee.onboarding_status === 'Documents Pending' ? '#b45309' :
+                         employee.onboarding_status === 'Compensation Set' ? '#3730a3' :
+                         employee.onboarding_status === 'Assets Issued' ? '#166534' :
+                         '#166534',
+                  border: `1px solid ${employee.onboarding_status === 'Draft' ? '#fca5a5' :
+                             employee.onboarding_status === 'Documents Pending' ? '#fde68a' :
+                             employee.onboarding_status === 'Compensation Set' ? '#c7d2fe' :
+                             employee.onboarding_status === 'Assets Issued' ? '#bbf7d0' :
+                             '#bbf7d0'}`,
+                  cursor: canEditSalary ? 'pointer' : 'default',
+                  marginLeft: 8, whiteSpace: 'nowrap'
+                }}
+                onClick={() => { if (canEditSalary) setShowStageAdvance(s => !s); }}
+              >
+                {employee.onboarding_status === 'Active' ? '✓ Active' : employee.onboarding_status}
+                {showStageAdvance && canEditSalary && (
+                  <div style={{ position: 'absolute', top: 28, right: 0, background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, minWidth: 220, zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Move to:</div>
+                    {['Draft','Documents Pending','Compensation Set','Assets Issued','Active'].map(s => (
+                      <button key={s} onClick={() => { supabase.from('employees').update({ onboarding_status: s }).eq('employee_id', id); setShowStageAdvance(false); load(); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', borderRadius: 4, border: 'none', fontSize: 12, cursor: 'pointer', background: s === employee.onboarding_status ? '#dbeafe' : 'transparent', color: '#111827', marginBottom: 2 }}>{s}</button>
+                    ))}
+                  </div>
+                )}
+              </span>
+            )}
             <span style={{
               padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
               background: employee.status === 'active' ? '#dcfce7' : employee.status === 'on-notice' ? '#fef3c7' : '#fee2e2',
@@ -570,6 +624,13 @@ export default function EmployeeDetail() {
               {employee.status === 'active' ? '✓ Active' : employee.status === 'on-notice' ? '⏳ On Notice' : '🚪 Exited'}
             </span>
           </div>
+
+          {/* Phase 2: Non-blocking Training Pending banner */}
+          {trainingPending && (
+            <div style={{ background: '#fff3cd', border: '1px solid #ffe08a', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#92400e', marginLeft: 10, fontWeight: 600 }}>
+              Training Pending — report manager must complete modules.
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontSize: 13, color: '#4b5563', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, color: '#1f2937' }}>{employee.designation || 'Staff'}</span>
@@ -1136,6 +1197,30 @@ export default function EmployeeDetail() {
         </form>
       </section>
 
+      <section style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 16, marginTop: 20 }}>
+        <h2 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 700, color: '#1e40af' }}>Compensation</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Fixed Salary</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#111827' }}>₹{Number(employee?.current_fixed_salary || 0).toLocaleString('en-IN')}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Variable Pay Scheme</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{employee?.variable_pay_scheme || '—'}</div>
+            <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>Rule structure shown (not live earnings)</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>PF Applicable</div>
+            <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 700, background: employee?.pf_applicable ? '#dcfce7' : '#fee2e2', color: employee?.pf_applicable ? '#166534' : '#991b1b', border: `1px solid ${employee?.pf_applicable ? '#bbf7d0' : '#fca5a5'}` }}>{employee?.pf_applicable ? 'Yes' : 'No'}</span>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>ESI Applicable</div>
+            <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 700, background: employee?.esi_applicable ? '#dcfce7' : '#fee2e2', color: employee?.esi_applicable ? '#166534' : '#991b1b', border: `1px solid ${employee?.esi_applicable ? '#bbf7d0' : '#fca5a5'}` }}>{employee?.esi_applicable ? 'Yes' : 'No'}</span>
+          </div>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>Edit restricted to owner / payroll-admin (see salary history section above).</div>
+      </section>
+
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
         <h2>Salary history</h2>
         <p style={{ color: '#777', fontSize: 14 }}>Payroll split shown below is the breakdown used for gratuity/statutory purposes at the time each entry was recorded.</p>
@@ -1150,17 +1235,23 @@ export default function EmployeeDetail() {
             </li>
           ))}
         </ul>
-        <form onSubmit={addSalaryChange} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input type="number" placeholder="Fixed" required value={newSalary.fixed}
-            onChange={e => setNewSalary({ ...newSalary, fixed: e.target.value })} />
-          <input type="number" placeholder="Variable" value={newSalary.variable}
-            onChange={e => setNewSalary({ ...newSalary, variable: e.target.value })} />
-          <input type="date" required value={newSalary.effective_from}
-            onChange={e => setNewSalary({ ...newSalary, effective_from: e.target.value })} />
-          <input placeholder="Reason (e.g. annual review)" value={newSalary.reason}
-            onChange={e => setNewSalary({ ...newSalary, reason: e.target.value })} />
-          <button type="submit">Record change</button>
-        </form>
+        {canEditSalary ? (
+          <form onSubmit={addSalaryChange} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input type="number" placeholder="Fixed" required value={newSalary.fixed}
+              onChange={e => setNewSalary({ ...newSalary, fixed: e.target.value })} />
+            <input type="number" placeholder="Variable" value={newSalary.variable}
+              onChange={e => setNewSalary({ ...newSalary, variable: e.target.value })} />
+            <input type="date" required value={newSalary.effective_from}
+              onChange={e => setNewSalary({ ...newSalary, effective_from: e.target.value })} />
+            <input placeholder="Reason (e.g. annual review)" value={newSalary.reason}
+              onChange={e => setNewSalary({ ...newSalary, reason: e.target.value })} />
+            <button type="submit">Record change</button>
+          </form>
+        ) : (
+          <p style={{ color: '#777', fontSize: 13, fontStyle: 'italic', marginTop: 4 }}>
+            Salary edits restricted to owner / payroll-admin.
+          </p>
+        )}
       </section>
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>

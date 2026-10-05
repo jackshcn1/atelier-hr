@@ -80,4 +80,4 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Public anon key (JWT starting with `eyJ...`)
 - `SUPABASE_SERVICE_ROLE_KEY` — Protected server-side secret key (used strictly in backend routes and local sync scripts)
 
-**Last Updated**: 2026-10-01
+**Last Updated**: 2026-10-05 — Phase audit complete (1-4 done, 2 deferred open items: Exit page design, Recruitment layout). See `.claude/audit/atelier-phase-audit-20261005.md` for full context. Theme universal applied using existing card design (white card + blue header + rounded border).
