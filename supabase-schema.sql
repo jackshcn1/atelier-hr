@@ -535,3 +535,112 @@ create policy "employee_deposits_all" on employee_deposits for all
     select 1 from employees e where e.employee_id = employee_deposits.employee_id
     and e.department = my_department()
   ));
+
+-- =====================================================================
+-- 18. Recruitment Module
+-- =====================================================================
+
+create table if not exists job_listings (
+  id bigint generated always as identity primary key,
+  serial text not null unique,
+  department text references departments(name) on update cascade on delete set null,
+  designation text,
+  job_description_title text,
+  job_description_text text,
+  offered_fixed_salary numeric not null default 0,
+  offered_variable_salary numeric not null default 0,
+  max_fixed_salary numeric not null default 0,
+  max_variable_salary numeric not null default 0,
+  platforms_tagged jsonb not null default '[]'::jsonb,
+  listing_date date not null default current_date,
+  status text not null default 'open' check (status in ('open', 'filled', 'inactive')),
+  hired_date date,
+  inactive_date date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists candidates (
+  id bigint generated always as identity primary key,
+  serial text not null unique,
+  first_name text not null,
+  last_name text,
+  phone text,
+  email text,
+  source text not null default 'Indeed' check (source in ('Indeed', 'OLX', 'Referral', 'Walk-in', 'LinkedIn', 'Other')),
+  source_details text,
+  interview_date date,
+  cv_url text,
+  expected_fixed_salary numeric,
+  expected_variable_salary numeric,
+  current_salary numeric,
+  status text not null default 'active' check (status in ('active', 'talent_pool', 'rejected', 'hired')),
+  hard_reject_reason text check (hard_reject_reason in ('Language', 'No-show', 'Not Competent', 'Salary Mismatch', 'Other')),
+  hard_reject_notes text,
+  public_token uuid not null default gen_random_uuid() unique,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists candidate_job_mapping (
+  id bigint generated always as identity primary key,
+  candidate_id bigint not null references candidates(id) on delete cascade,
+  job_listing_id bigint not null references job_listings(id) on delete cascade,
+  stage text not null default 'applied' check (stage in ('applied', 'interview_scheduled', 'interview_completed', 'offered', 'accepted', 'talent_pool', 'rejected')),
+  stage_notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (candidate_id, job_listing_id)
+);
+
+create table if not exists interview_evaluations (
+  id bigint generated always as identity primary key,
+  candidate_id bigint not null references candidates(id) on delete cascade,
+  interviewer_name text not null,
+  ratings jsonb not null default '{}'::jsonb,
+  overall_score numeric not null default 0,
+  expected_salary numeric,
+  current_salary numeric,
+  recommendation text check (recommendation in ('strongly_hire', 'hire', 'talent_pool', 'reject')),
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists offers (
+  id bigint generated always as identity primary key,
+  candidate_id bigint not null references candidates(id) on delete cascade,
+  job_listing_id bigint not null references job_listings(id) on delete cascade,
+  offered_fixed_salary numeric not null default 0,
+  offered_variable_salary numeric not null default 0,
+  revision_history jsonb not null default '[]'::jsonb,
+  status text not null default 'draft' check (status in ('draft', 'sent', 'negotiating', 'accepted', 'declined')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table job_listings enable row level security;
+alter table candidates enable row level security;
+alter table candidate_job_mapping enable row level security;
+alter table interview_evaluations enable row level security;
+alter table offers enable row level security;
+
+create policy "job_listings_read" on job_listings for select to authenticated using (true);
+create policy "job_listings_write" on job_listings for all to authenticated using (is_admin());
+
+create policy "candidates_read" on candidates for select to authenticated using (true);
+create policy "candidates_write" on candidates for all to authenticated using (is_admin());
+
+create policy "candidate_job_mapping_read" on candidate_job_mapping for select to authenticated using (true);
+create policy "candidate_job_mapping_write" on candidate_job_mapping for all to authenticated using (is_admin());
+
+create policy "interview_evaluations_read" on interview_evaluations for select to authenticated using (true);
+create policy "interview_evaluations_write" on interview_evaluations for all to authenticated using (is_admin());
+
+create policy "offers_read" on offers for select to authenticated using (true);
+create policy "offers_write" on offers for all to authenticated using (is_admin());
+
+create policy "candidates_anon_read_token" on candidates for select to anon using (true);
+create policy "interview_evaluations_anon_insert" on interview_evaluations for insert to anon with check (
+  candidate_id is not null and interviewer_name is not null and interviewer_name != ''
+);
+

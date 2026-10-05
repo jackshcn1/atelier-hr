@@ -48,3 +48,6 @@ next-env.d.ts
 
 # local preview env
 .env.local
+
+# supabase CLI local state (link metadata, cached version checks)
+supabase/.temp/
