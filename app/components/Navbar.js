@@ -36,6 +36,7 @@ const ADMIN_NAV = [
       { href: '/documents?category=training', label: 'Training Material' },
       { href: '/documents?category=targets', label: 'Variable Pay Targets' },
       { href: '/documents?category=policy', label: 'Company Policies' },
+      { href: '/documents?category=onboarding_documentation', label: 'Onboarding Terms & Clauses' },
     ]
   },
 ];

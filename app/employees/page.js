@@ -1520,8 +1520,18 @@ export default function EmployeesPage() {
 
             {/* Checklist of Auto-ticked Clauses */}
             <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
-                Select Policies & Clauses to Include in Agreement:
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>
+                  Select Policies & Clauses to Include in Agreement:
+                </div>
+                <a
+                  href="/documents?category=onboarding_documentation"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 11, color: '#2563eb', textDecoration: 'none', fontWeight: 700, background: '#eff6ff', padding: '3px 8px', borderRadius: 4, border: '1px solid #bfdbfe' }}
+                >
+                  ⚙️ View & Edit Master Clauses →
+                </a>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
                 {clauseTemplates.map(c => {
