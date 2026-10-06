@@ -1825,14 +1825,16 @@ export default function EmployeesPage() {
             </tr>
           </thead>
           <tbody>
-            {employees.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
-                  No active or on-notice staff found.
-                </td>
-              </tr>
-            ) : (
-              employees.map(emp => (
+            {(() => {
+              const visibleData = employees.filter(emp => {
+                const deptMatch = filterDept === 'All' || emp.department === filterDept;
+                const statusMatch = filterStatus.includes(emp.status);
+                return deptMatch && statusMatch;
+              });
+              if (visibleData.length === 0) return (
+                <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>No staff match the selected filters.</td></tr>
+              );
+              return visibleData.map(emp => (
                 <tr key={emp.employee_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1845,47 +1847,27 @@ export default function EmployeesPage() {
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151', fontWeight: 500 }}>
-                    {emp.designation || 'Staff'}
-                  </td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151' }}>
-                    {emp.department || 'Unassigned'}
-                  </td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#4b5563' }}>
-                    {emp.phone || '—'}
-                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151', fontWeight: 500 }}>{emp.designation || 'Staff'}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151' }}>{emp.department || 'Unassigned'}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#4b5563' }}>{emp.phone || '—'}</td>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{
-                        padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700,
-                        background: emp.status === 'active' ? '#dcfce7' : emp.status === 'on-notice' ? '#fef3c7' : '#fee2e2',
-                        color: emp.status === 'active' ? '#15803d' : emp.status === 'on-notice' ? '#b45309' : '#991b1b'
-                      }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: emp.status === 'active' ? '#dcfce7' : emp.status === 'on-notice' ? '#fef3c7' : '#fee2e2', color: emp.status === 'active' ? '#15803d' : emp.status === 'on-notice' ? '#b45309' : '#991b1b' }}>
                         {emp.status === 'active' ? '✓ Active' : emp.status === 'on-notice' ? '⏳ On Notice' : '🚪 Exited'}
                       </span>
                       {emp.onboarding_status && (
-                        <span style={{
-                          padding: '1px 6px', borderRadius: 10, fontSize: 10, fontWeight: 600,
-                          background: emp.onboarding_status === 'Active' ? '#f0fdf4' : '#eff6ff',
-                          color: emp.onboarding_status === 'Active' ? '#166534' : '#1e40af',
-                          border: `1px solid ${emp.onboarding_status === 'Active' ? '#bbf7d0' : '#bfdbfe'}`
-                        }}>
+                        <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: 10, fontWeight: 600, background: emp.onboarding_status === 'Active' ? '#f0fdf4' : '#eff6ff', color: emp.onboarding_status === 'Active' ? '#166534' : '#1e40af', border: `1px solid ${emp.onboarding_status === 'Active' ? '#bbf7d0' : '#bfdbfe'}` }}>
                           {emp.onboarding_status}
                         </span>
                       )}
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px' }}>
-                    <a
-                      href={`/employees/${emp.employee_id}`}
-                      style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}
-                    >
-                      View / Edit →
-                    </a>
+                    <a href={`/employees/${emp.employee_id}`} style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>View / Edit →</a>
                   </td>
                 </tr>
-              ))
-            )}
+              ));
+            })()}
           </tbody>
         </table>
       </div>

@@ -26,18 +26,18 @@ function download(filename, content) {
 }
 
 const EXPORTS = [
-  { table: 'employees', label: 'Employees (all fields, all statuses)' },
+  { table: 'employees', label: 'Employees' },
   { table: 'salary_history', label: 'Salary history' },
-  { table: 'track_record', label: 'Track record (notes/warnings/merits)' },
+  { table: 'track_record', label: 'Track record' },
   { table: 'training_records', label: 'Training records' },
-  { table: 'documents', label: 'Documents (metadata only, not the files themselves)' },
+  { table: 'documents', label: 'Documents metadata' },
   { table: 'employee_deposits', label: 'Employee deposits' },
-  { table: 'employee_sensitive_info', label: 'Employee sensitive info (ID/bank details — admin only)' },
-  { table: 'exit_records', label: 'Exit records & clearance' },
+  { table: 'employee_sensitive_info', label: 'Employee sensitive info' },
+  { table: 'exit_records', label: 'Exit records' },
   { table: 'departments', label: 'Departments' },
 ];
 
-export default function ExportPage() {
+export default function ExportImportPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState('');
   const [error, setError] = useState('');
@@ -54,20 +54,32 @@ export default function ExportPage() {
   }
 
   return (
-    <div>
-      <h1>Export data</h1>
-      <p style={{ color: '#777' }}>
-        Downloads a CSV of everything you have access to in that table (department heads only get their own department's rows,
-        same as everywhere else in the app).
-      </p>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <div style={{ background: 'white', padding: 16, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 500 }}>
-        {EXPORTS.map(exp => (
-          <button key={exp.table} onClick={() => exportTable(exp.table)} disabled={loading === exp.table}
-            style={{ padding: 10, textAlign: 'left' }}>
-            {loading === exp.table ? 'Exporting…' : `Export: ${exp.label}`}
-          </button>
-        ))}
+    <div className="pb-20 max-w-4xl mx-auto px-4 sm:px-6">
+      <div className="mb-6 pt-2">
+        <h1 className="font-serif text-2.5xl sm:text-3xl font-bold text-ink">Export/Import</h1>
+        <p className="text-sm text-ink-muted mt-2">Manage data exports and bulk imports.</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-8">
+        <div className="panel p-6">
+          <h2 className="panel-title mb-4">Export Data</h2>
+          <div className="flex flex-col gap-2">
+            {EXPORTS.map(exp => (
+              <button key={exp.table} onClick={() => exportTable(exp.table)} disabled={loading === exp.table}
+                className="btn-quiet text-left text-xs justify-start">
+                {loading === exp.table ? 'Exporting…' : `Export: ${exp.label}`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel p-6">
+          <h2 className="panel-title mb-4">Bulk Import</h2>
+          <p className="text-xs text-ink-muted mb-4">Use CSV templates to batch upload employee data.</p>
+          <a href="/employees/bulk-import" className="btn-primary text-xs inline-block">
+            Go to Bulk Import Tool →
+          </a>
+        </div>
       </div>
     </div>
   );
