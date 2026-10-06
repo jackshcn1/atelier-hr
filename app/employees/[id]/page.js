@@ -38,6 +38,7 @@ export default function EmployeeDetail() {
   const [managerAndStatusSaved, setManagerAndStatusSaved] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [exitDate, setExitDate] = useState('');
+  const [viewerProfile, setViewerProfile] = useState(null);
   const [profileRole, setProfileRole] = useState('');
   const [trainingPending, setTrainingPending] = useState(false);
   const [showStageAdvance, setShowStageAdvance] = useState(false);
@@ -48,7 +49,7 @@ export default function EmployeeDetail() {
   const [assets, setAssets] = useState([]);
   const [showAssetForm, setShowAssetForm] = useState(false);
   const [savingAsset, setSavingAsset] = useState(false);
-  const [assetForm, setAssetForm] = useState({ name: '', asset_number: '', date_handed_over: '' });
+  const [assetForm, setAssetForm] = useState({ name: '', asset_number: '', units: 1, deposit_amount: 0, date_issued: '', status: 'Issued' });
   const [documents, setDocuments] = useState([]);
   const [employeePayslips, setEmployeePayslips] = useState([]);
   const [docTemplates, setDocTemplates] = useState([]);
@@ -419,20 +420,46 @@ export default function EmployeeDetail() {
     setSavingAsset(true);
     setError('');
     try {
+      const issueDate = assetForm.date_issued || new Date().toISOString().slice(0, 10);
       const { error: insErr } = await supabase.from('employee_assets').insert({
         employee_id: id,
         name: assetForm.name.trim(),
         asset_number: assetForm.asset_number.trim() || null,
-        date_handed_over: assetForm.date_handed_over || null,
-        returned: false,
+        units: Number(assetForm.units) || 1,
+        deposit_amount: Number(assetForm.deposit_amount) || 0,
+        date_issued: issueDate,
+        date_handed_over: issueDate,
+        status: assetForm.status || 'Issued',
+        returned: assetForm.status === 'Returned',
       });
       if (insErr) { setError(insErr.message); return; }
-      setAssetForm({ name: '', asset_number: '', date_handed_over: '' });
+
+      // If deposit amount > 0, snapshot to employee_deposits
+      if (Number(assetForm.deposit_amount) > 0) {
+        await supabase.from('employee_deposits').insert([{
+          employee_id: id,
+          deposit_type: assetForm.name.toLowerCase().includes('accommodation') ? 'accommodation' : 'uniform',
+          amount: Number(assetForm.deposit_amount)
+        }]);
+      }
+
+      setAssetForm({ name: '', asset_number: '', units: 1, deposit_amount: 0, date_issued: '', status: 'Issued' });
       setShowAssetForm(false);
       load();
     } finally {
       setSavingAsset(false);
     }
+  }
+
+  async function updateAssetStatus(assetId, newStatus) {
+    setError('');
+    const { error: upErr } = await supabase.from('employee_assets').update({
+      status: newStatus,
+      returned: newStatus === 'Returned',
+      date_returned: newStatus === 'Returned' ? new Date().toISOString().slice(0, 10) : null
+    }).eq('id', assetId);
+    if (upErr) { setError(upErr.message); return; }
+    load();
   }
 
   async function removeAsset(assetId) {
@@ -800,7 +827,19 @@ export default function EmployeeDetail() {
           </label>
           <label>Emergency contact name<input value={personal.emergency_contact_name} onChange={e => setPersonal({ ...personal, emergency_contact_name: e.target.value })} /></label>
           <label>Emergency contact phone<input value={personal.emergency_contact_phone} onChange={e => setPersonal({ ...personal, emergency_contact_phone: e.target.value })} /></label>
-          <label>ID proof type (e.g. Aadhaar, PAN)<input value={personal.id_proof_type} onChange={e => setPersonal({ ...personal, id_proof_type: e.target.value })} /></label>
+          <label>ID proof document type
+            <select
+              value={personal.id_proof_type || 'Aadhaar'}
+              onChange={e => setPersonal({ ...personal, id_proof_type: e.target.value })}
+              style={{ display: 'block', width: '100%', padding: '6px 8px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', background: 'white' }}
+            >
+              <option value="Aadhaar">Aadhaar Card</option>
+              <option value="PAN">PAN Card</option>
+              <option value="Passport">Passport</option>
+              <option value="Driving License">Driving License</option>
+              <option value="Voter ID">Voter ID</option>
+            </select>
+          </label>
           <label style={{ gridColumn: 'span 2' }}>Previous work history
             <textarea value={personal.previous_work_history} onChange={e => setPersonal({ ...personal, previous_work_history: e.target.value })} rows={3} style={{ display: 'block', width: '100%' }} />
           </label>
@@ -1035,7 +1074,12 @@ export default function EmployeeDetail() {
 
       <section style={{ background: 'white', padding: 16, borderRadius: 8, marginTop: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 6 }}>
-          <h2 style={{ margin: 0 }}>Assets</h2>
+          <div>
+            <h2 style={{ margin: 0 }}>Assets & Equipment</h2>
+            <p style={{ color: '#777', fontSize: 13, margin: '2px 0 0 0' }}>
+              Uniforms, accommodation keys, and tools tagged to this employee. Carries over to exit handover and deposit clearance.
+            </p>
+          </div>
           <button
             onClick={() => setShowAssetForm(s => !s)}
             style={{ background: '#334155', color: 'white', border: 'none', padding: '6px 14px', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
@@ -1043,29 +1087,48 @@ export default function EmployeeDetail() {
             {showAssetForm ? 'Cancel' : '+ Add asset'}
           </button>
         </div>
-        <p style={{ color: '#777', fontSize: 14 }}>
-          Items currently tagged to this employee. These carry over to their exit handover.
-        </p>
 
         {showAssetForm && (
-          <form onSubmit={saveAsset} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, marginBottom: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <form onSubmit={saveAsset} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 14, marginTop: 12, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
-                Asset name
+                Asset Name *
                 <input required value={assetForm.name} onChange={e => setAssetForm({ ...assetForm, name: e.target.value })}
-                  placeholder="e.g. Apron, Torch, ID card"
-                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
+                  placeholder="e.g. Uniform, POS Tab, Knife Set"
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }} />
               </label>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
-                Asset number
+                Tag / Serial / Size
                 <input value={assetForm.asset_number} onChange={e => setAssetForm({ ...assetForm, asset_number: e.target.value })}
-                  placeholder="Optional — not yet in use"
-                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
+                  placeholder="e.g. Size L, Tab #04, Room 2B"
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }} />
               </label>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
-                Date handed over
-                <input type="date" value={assetForm.date_handed_over} onChange={e => setAssetForm({ ...assetForm, date_handed_over: e.target.value })}
-                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
+                Units / Qty
+                <input type="number" min="1" value={assetForm.units} onChange={e => setAssetForm({ ...assetForm, units: e.target.value })}
+                  placeholder="1"
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }} />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                Deposit Amount (₹)
+                <input type="number" value={assetForm.deposit_amount} onChange={e => setAssetForm({ ...assetForm, deposit_amount: e.target.value })}
+                  placeholder="0"
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }} />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                Date Issued
+                <input type="date" value={assetForm.date_issued} onChange={e => setAssetForm({ ...assetForm, date_issued: e.target.value })}
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }} />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                Status
+                <select value={assetForm.status} onChange={e => setAssetForm({ ...assetForm, status: e.target.value })}
+                  style={{ display: 'block', width: '100%', marginTop: 4, padding: '6px 9px', borderRadius: 5, border: '1.5px solid #cbd5e1', fontSize: 13, background: 'white', boxSizing: 'border-box' }}>
+                  <option value="Issued">Issued</option>
+                  <option value="Returned">Returned</option>
+                  <option value="Lost">Lost</option>
+                  <option value="Damaged">Damaged</option>
+                </select>
               </label>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -1086,34 +1149,54 @@ export default function EmployeeDetail() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  {['Asset', 'Number', 'Handed over', 'Status', ''].map((h, i) => (
-                    <th key={i} style={{ textAlign: 'left', padding: '7px 10px', borderBottom: '1px solid #e5e7eb', fontWeight: 700, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>{h}</th>
+                  {['Asset Name', 'Tag / Serial / Spec', 'Units', 'Deposit', 'Date Issued', 'Status', ''].map((h, i) => (
+                    <th key={i} style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid #e5e7eb', fontWeight: 700, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {assets.map(a => (
-                  <tr key={a.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '7px 10px', fontWeight: 600, color: '#111827' }}>{a.name}</td>
-                    <td style={{ padding: '7px 10px', color: '#6b7280' }}>{a.asset_number || '—'}</td>
-                    <td style={{ padding: '7px 10px', color: '#374151' }}>{a.date_handed_over || '—'}</td>
-                    <td style={{ padding: '7px 10px' }}>
-                      {employee.status === 'exited' ? (
-                        <span style={{ color: a.returned ? '#059669' : '#b91c1c', fontWeight: 700 }}>
-                          {a.returned ? 'Returned' : 'Not returned'}
-                        </span>
-                      ) : (
-                        <span style={{ color: '#6b7280' }}>With employee</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '7px 10px', textAlign: 'right' }}>
-                      {employee.status !== 'exited' && (
-                        <button onClick={() => removeAsset(a.id)}
-                          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 16 }}>×</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {assets.map(a => {
+                  const st = a.status || (a.returned ? 'Returned' : 'Issued');
+                  return (
+                    <tr key={a.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 600, color: '#111827' }}>{a.name}</td>
+                      <td style={{ padding: '8px 10px', color: '#6b7280' }}>{a.asset_number || '—'}</td>
+                      <td style={{ padding: '8px 10px', color: '#374151', fontWeight: 600 }}>{a.units ?? 1}</td>
+                      <td style={{ padding: '8px 10px', color: '#059669', fontWeight: 600 }}>
+                        {Number(a.deposit_amount) > 0 ? `₹${Number(a.deposit_amount).toLocaleString('en-IN')}` : '—'}
+                      </td>
+                      <td style={{ padding: '8px 10px', color: '#374151' }}>{a.date_issued || a.date_handed_over || '—'}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <select
+                          value={st}
+                          onChange={e => updateAssetStatus(a.id, e.target.value)}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 12,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            border: '1px solid transparent',
+                            cursor: 'pointer',
+                            background: st === 'Issued' ? '#dcfce7' : st === 'Returned' ? '#eff6ff' : st === 'Lost' ? '#fee2e2' : '#fef3c7',
+                            color: st === 'Issued' ? '#166534' : st === 'Returned' ? '#1e40af' : st === 'Lost' ? '#991b1b' : '#92400e',
+                            borderColor: st === 'Issued' ? '#bbf7d0' : st === 'Returned' ? '#bfdbfe' : st === 'Lost' ? '#fca5a5' : '#fde68a'
+                          }}
+                        >
+                          <option value="Issued">✓ Issued</option>
+                          <option value="Returned">↩ Returned</option>
+                          <option value="Lost">⚠ Lost</option>
+                          <option value="Damaged">⚡ Damaged</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                        {employee.status !== 'exited' && (
+                          <button onClick={() => removeAsset(a.id)}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, fontWeight: 700 }} title="Remove asset">×</button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -41,13 +41,34 @@ const initialEmptyForm = {
   esi_applicable: false,
   esi_number: '',
   accommodation_provided: false,
-  uniform_deposit_applicable: true,
 
   // 5. Bank Details (Admin-Only Sensitive)
   bank_account_holder_name: '',
   bank_name: '',
   bank_ifsc_code: '',
   bank_account_number: ''
+};
+
+const initialAssetsForm = {
+  uniform: {
+    enabled: true,
+    name: 'Uniform',
+    asset_number: '',
+    units: 2,
+    deposit_amount: 500,
+    date_issued: '',
+    status: 'Issued'
+  },
+  accommodation: {
+    enabled: false,
+    name: 'Company Accommodation',
+    asset_number: '',
+    units: 1,
+    deposit_amount: 2000,
+    date_issued: '',
+    status: 'Issued'
+  },
+  custom: []
 };
 
 export default function EmployeesPage() {
@@ -57,7 +78,9 @@ export default function EmployeesPage() {
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [schemes, setSchemes] = useState([]);
+  const [depositSettings, setDepositSettings] = useState({ uniform_deposit_amount: 500, accommodation_deposit_amount: 2000 });
   const [form, setForm] = useState(initialEmptyForm);
+  const [assetsForm, setAssetsForm] = useState(initialAssetsForm);
   const [showForm, setShowForm] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -67,12 +90,13 @@ export default function EmployeesPage() {
   const [error, setError] = useState('');
 
   async function load() {
-    const [visible, all, depts, desigs, schemeData] = await Promise.all([
+    const [visible, all, depts, desigs, schemeData, depSetData] = await Promise.all([
       supabase.from('employees').select('*').in('status', ['active', 'on-notice']).is('deleted_at', null).order('name'),
       supabase.from('employees').select('*').is('deleted_at', null),
       supabase.from('departments').select('name').order('name'),
       supabase.from('designations').select('*').order('name'),
-      supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true)
+      supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true),
+      supabase.from('deposit_settings').select('*').eq('id', 1).maybeSingle()
     ]);
 
     if (visible.error) setError(visible.error.message);
@@ -81,6 +105,20 @@ export default function EmployeesPage() {
     setDepartments((depts.data || []).map(d => d.name));
     setDesignations(desigs.data || []);
     setSchemes(schemeData.data || []);
+    if (depSetData?.data) {
+      setDepositSettings(depSetData.data);
+      setAssetsForm(prev => ({
+        ...prev,
+        uniform: {
+          ...prev.uniform,
+          deposit_amount: depSetData.data.uniform_deposit_amount ?? 500
+        },
+        accommodation: {
+          ...prev.accommodation,
+          deposit_amount: depSetData.data.accommodation_deposit_amount ?? 2000
+        }
+      }));
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -126,6 +164,23 @@ export default function EmployeesPage() {
       }
 
       // 3. Insert into employees table
+      const isAccommodationActive = !!assetsForm.accommodation.enabled || !!form.accommodation_provided;
+
+      // Calculate Onboarding Stage Gate (Tier 1 vs Tier 2)
+      const hasId = !!(form.id_proof_number.trim() || idFrontUrl);
+      const hasBank = !!(form.bank_account_number.trim() && form.bank_ifsc_code.trim());
+      const hasComp = Number(form.current_fixed_salary) > 0;
+      const hasContact = !!(form.emergency_contact_name.trim() && form.emergency_contact_phone.trim());
+
+      let calcOnboardingStatus = 'Draft';
+      if (hasComp && hasBank && hasId && hasContact) {
+        calcOnboardingStatus = 'Active';
+      } else if (hasComp) {
+        calcOnboardingStatus = 'Compensation Set';
+      } else if (hasId || hasBank) {
+        calcOnboardingStatus = 'Documents Pending';
+      }
+
       const empPayload = {
         employee_id: cleanId,
         name: form.name.trim(),
@@ -151,11 +206,12 @@ export default function EmployeesPage() {
         notes: form.notes.trim() || null,
         pf_applicable: !!form.pf_applicable,
         esi_applicable: !!form.esi_applicable,
-        accommodation_provided: !!form.accommodation_provided,
-        uniform_deposit_applicable: form.uniform_deposit_applicable ? 'true' : 'false',
+        accommodation_provided: isAccommodationActive,
+        uniform_deposit_applicable: assetsForm.uniform.enabled ? 'true' : 'false',
         current_fixed_salary: Number(form.current_fixed_salary) || 0,
         current_variable_salary: Number(form.current_variable_salary) || 0,
         variable_pay_scheme: form.variable_pay_scheme || null,
+        onboarding_status: calcOnboardingStatus,
         status: 'active'
       };
 
@@ -183,20 +239,74 @@ export default function EmployeesPage() {
         }]);
       }
 
-      // 5. Snapshot deposits
-      const { data: rates } = await supabase.from('deposit_settings').select('*').eq('id', 1).single();
-      const depositRows = [];
-      if (form.uniform_deposit_applicable && rates?.uniform_deposit_amount) {
-        depositRows.push({ employee_id: cleanId, deposit_type: 'uniform', amount: rates.uniform_deposit_amount });
+      // 5. Insert Assets into employee_assets
+      const assetsToInsert = [];
+      const defaultDate = form.date_of_joining || new Date().toISOString().slice(0, 10);
+
+      if (assetsForm.uniform.enabled) {
+        assetsToInsert.push({
+          employee_id: cleanId,
+          name: assetsForm.uniform.name.trim() || 'Uniform',
+          asset_number: assetsForm.uniform.asset_number.trim() || null,
+          units: Number(assetsForm.uniform.units) || 1,
+          deposit_amount: Number(assetsForm.uniform.deposit_amount) || 0,
+          date_issued: assetsForm.uniform.date_issued || defaultDate,
+          date_handed_over: assetsForm.uniform.date_issued || defaultDate,
+          status: 'Issued',
+          returned: false
+        });
       }
-      if (form.accommodation_provided && rates?.accommodation_deposit_amount) {
-        depositRows.push({ employee_id: cleanId, deposit_type: 'accommodation', amount: rates.accommodation_deposit_amount });
+
+      if (isAccommodationActive) {
+        assetsToInsert.push({
+          employee_id: cleanId,
+          name: assetsForm.accommodation.name.trim() || 'Company Accommodation',
+          asset_number: assetsForm.accommodation.asset_number.trim() || null,
+          units: Number(assetsForm.accommodation.units) || 1,
+          deposit_amount: Number(assetsForm.accommodation.deposit_amount) || 0,
+          date_issued: assetsForm.accommodation.date_issued || defaultDate,
+          date_handed_over: assetsForm.accommodation.date_issued || defaultDate,
+          status: 'Issued',
+          returned: false
+        });
       }
+
+      assetsForm.custom.forEach(item => {
+        if (item.name && item.name.trim()) {
+          assetsToInsert.push({
+            employee_id: cleanId,
+            name: item.name.trim(),
+            asset_number: item.asset_number?.trim() || null,
+            units: Number(item.units) || 1,
+            deposit_amount: Number(item.deposit_amount) || 0,
+            date_issued: item.date_issued || defaultDate,
+            date_handed_over: item.date_issued || defaultDate,
+            status: item.status || 'Issued',
+            returned: item.status === 'Returned'
+          });
+        }
+      });
+
+      if (assetsToInsert.length > 0) {
+        const { error: assetErr } = await supabase.from('employee_assets').insert(assetsToInsert);
+        if (assetErr) {
+          console.error('Error saving assets:', assetErr);
+        }
+      }
+
+      // 6. Snapshot deposits into employee_deposits
+      const depositRows = assetsToInsert
+        .filter(a => Number(a.deposit_amount) > 0)
+        .map(a => ({
+          employee_id: cleanId,
+          deposit_type: a.name.toLowerCase().includes('accommodation') ? 'accommodation' : 'uniform',
+          amount: Number(a.deposit_amount)
+        }));
       if (depositRows.length > 0) {
         await supabase.from('employee_deposits').insert(depositRows);
       }
 
-      // 6. Snapshot initial salary into salary_history
+      // 7. Snapshot initial salary into salary_history
       if (form.current_fixed_salary || form.current_variable_salary) {
         const { data: settings } = await supabase.from('payroll_settings').select('*').eq('id', 1).single();
         const split = computeSalarySplit(form.current_fixed_salary, settings);
@@ -212,6 +322,11 @@ export default function EmployeesPage() {
 
       // Reset form & state
       setForm(initialEmptyForm);
+      setAssetsForm({
+        ...initialAssetsForm,
+        uniform: { ...initialAssetsForm.uniform, deposit_amount: depositSettings.uniform_deposit_amount ?? 500 },
+        accommodation: { ...initialAssetsForm.accommodation, deposit_amount: depositSettings.accommodation_deposit_amount ?? 2000 }
+      });
       setPhotoFile(null);
       setPhotoPreview(null);
       setIdFrontFile(null);
@@ -631,10 +746,10 @@ export default function EmployeesPage() {
             </div>
           </div>
 
-          {/* SECTION 4: Salary, Variable Pay & Company Facilities */}
+          {/* SECTION 4: Salary & Variable Pay Schemes */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '6px 12px', borderRadius: 6, marginBottom: 14 }}>
-              4. Compensation, Variable Pay Schemes & Deposits
+              4. Compensation & Variable Pay Schemes
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
@@ -674,7 +789,7 @@ export default function EmployeesPage() {
               </label>
             </div>
 
-            {/* Checkboxes for statutory & accommodation */}
+            {/* Statutory applicability */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
                 <input
@@ -697,27 +812,361 @@ export default function EmployeesPage() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
                 <input
                   type="checkbox"
-                  checked={form.accommodation_provided}
-                  onChange={e => setForm({ ...form, accommodation_provided: e.target.checked })}
+                  checked={form.accommodation_provided || assetsForm.accommodation.enabled}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setForm({ ...form, accommodation_provided: checked });
+                    setAssetsForm(prev => ({
+                      ...prev,
+                      accommodation: { ...prev.accommodation, enabled: checked }
+                    }));
+                  }}
                 />
                 Company Accommodation Provided
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
-                <input
-                  type="checkbox"
-                  checked={form.uniform_deposit_applicable}
-                  onChange={e => setForm({ ...form, uniform_deposit_applicable: e.target.checked })}
-                />
-                Uniform Deposit Applicable
               </label>
             </div>
           </div>
 
-          {/* SECTION 5: Bank & Payment Account Details */}
+          {/* SECTION 5: Assets Issued & Allocation */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e0f2fe', padding: '6px 12px', borderRadius: 6, marginBottom: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0369a1' }}>
+                5. Assets Issued & Deposit Tracking
+              </div>
+              <span style={{ fontSize: 11, color: '#0284c7', fontWeight: 600 }}>
+                Uniforms, accommodation keys & equipment
+              </span>
+            </div>
+
+            {/* Default Asset 1: Uniform */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: assetsForm.uniform.enabled ? 12 : 0 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={assetsForm.uniform.enabled}
+                    onChange={e => setAssetsForm(prev => ({
+                      ...prev,
+                      uniform: { ...prev.uniform, enabled: e.target.checked }
+                    }))}
+                  />
+                  👕 Uniform Issued
+                </label>
+                {assetsForm.uniform.enabled && (
+                  <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
+                    Status: Issued
+                  </span>
+                )}
+              </div>
+
+              {assetsForm.uniform.enabled && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, paddingTop: 4 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Units / Sets
+                    <input
+                      type="number"
+                      min="1"
+                      value={assetsForm.uniform.units}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        uniform: { ...prev.uniform, units: e.target.value }
+                      }))}
+                      placeholder="e.g. 2"
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Size / Spec / Tag #
+                    <input
+                      type="text"
+                      value={assetsForm.uniform.asset_number}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        uniform: { ...prev.uniform, asset_number: e.target.value }
+                      }))}
+                      placeholder="e.g. Size L (2 Shirts, 2 Aprons)"
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Deposit Amount (₹)
+                    <input
+                      type="number"
+                      value={assetsForm.uniform.deposit_amount}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        uniform: { ...prev.uniform, deposit_amount: e.target.value }
+                      }))}
+                      placeholder="e.g. 500"
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Date Issued
+                    <input
+                      type="date"
+                      value={assetsForm.uniform.date_issued || form.date_of_joining || ''}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        uniform: { ...prev.uniform, date_issued: e.target.value }
+                      }))}
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Default Asset 2: Accommodation */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: assetsForm.accommodation.enabled ? 12 : 0 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={assetsForm.accommodation.enabled}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setAssetsForm(prev => ({
+                        ...prev,
+                        accommodation: { ...prev.accommodation, enabled: checked }
+                      }));
+                      setForm(prev => ({ ...prev, accommodation_provided: checked }));
+                    }}
+                  />
+                  🏠 Company Accommodation & Facility Keys
+                </label>
+                {assetsForm.accommodation.enabled && (
+                  <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
+                    Status: Issued
+                  </span>
+                )}
+              </div>
+
+              {assetsForm.accommodation.enabled && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, paddingTop: 4 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Room / Key / Bed #
+                    <input
+                      type="text"
+                      value={assetsForm.accommodation.asset_number}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        accommodation: { ...prev.accommodation, asset_number: e.target.value }
+                      }))}
+                      placeholder="e.g. Room 3B - Bed 2 (Key #08)"
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Units
+                    <input
+                      type="number"
+                      min="1"
+                      value={assetsForm.accommodation.units}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        accommodation: { ...prev.accommodation, units: e.target.value }
+                      }))}
+                      placeholder="1"
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Deposit Amount (₹)
+                    <input
+                      type="number"
+                      value={assetsForm.accommodation.deposit_amount}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        accommodation: { ...prev.accommodation, deposit_amount: e.target.value }
+                      }))}
+                      placeholder="e.g. 2000"
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                    Date Issued
+                    <input
+                      type="date"
+                      value={assetsForm.accommodation.date_issued || form.date_of_joining || ''}
+                      onChange={e => setAssetsForm(prev => ({
+                        ...prev,
+                        accommodation: { ...prev.accommodation, date_issued: e.target.value }
+                      }))}
+                      style={{ width: '100%', padding: '6px 9px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Custom Assets List */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                  📦 Additional Custom Assets (Tools, Knives, POS Tablets, Locker Keys)
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAssetsForm(prev => ({
+                    ...prev,
+                    custom: [
+                      ...prev.custom,
+                      {
+                        id: Date.now(),
+                        name: '',
+                        asset_number: '',
+                        units: 1,
+                        deposit_amount: 0,
+                        date_issued: form.date_of_joining || new Date().toISOString().slice(0, 10),
+                        status: 'Issued'
+                      }
+                    ]
+                  }))}
+                  style={{
+                    background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe',
+                    padding: '4px 10px', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: 'pointer'
+                  }}
+                >
+                  + Add Custom Asset
+                </button>
+              </div>
+
+              {assetsForm.custom.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
+                  No extra custom assets added yet. Click "+ Add Custom Asset" above to issue knives, POS tabs, or tools.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {assetsForm.custom.map((item, idx) => (
+                    <div key={item.id || idx} style={{ background: 'white', border: '1px solid #cbd5e1', borderRadius: 6, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr)) auto', gap: 8, alignItems: 'center' }}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        Asset Name *
+                        <input
+                          type="text"
+                          placeholder="e.g. Chef Knife Kit"
+                          value={item.name}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setAssetsForm(prev => ({
+                              ...prev,
+                              custom: prev.custom.map((c, i) => i === idx ? { ...c, name: val } : c)
+                            }));
+                          }}
+                          style={{ width: '100%', padding: '5px 8px', marginTop: 2, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        Tag / Serial #
+                        <input
+                          type="text"
+                          placeholder="e.g. TAB-04"
+                          value={item.asset_number}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setAssetsForm(prev => ({
+                              ...prev,
+                              custom: prev.custom.map((c, i) => i === idx ? { ...c, asset_number: val } : c)
+                            }));
+                          }}
+                          style={{ width: '100%', padding: '5px 8px', marginTop: 2, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        Qty / Units
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={item.units}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setAssetsForm(prev => ({
+                              ...prev,
+                              custom: prev.custom.map((c, i) => i === idx ? { ...c, units: val } : c)
+                            }));
+                          }}
+                          style={{ width: '100%', padding: '5px 8px', marginTop: 2, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        Deposit (₹)
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={item.deposit_amount}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setAssetsForm(prev => ({
+                              ...prev,
+                              custom: prev.custom.map((c, i) => i === idx ? { ...c, deposit_amount: val } : c)
+                            }));
+                          }}
+                          style={{ width: '100%', padding: '5px 8px', marginTop: 2, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        Date Issued
+                        <input
+                          type="date"
+                          value={item.date_issued}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setAssetsForm(prev => ({
+                              ...prev,
+                              custom: prev.custom.map((c, i) => i === idx ? { ...c, date_issued: val } : c)
+                            }));
+                          }}
+                          style={{ width: '100%', padding: '5px 8px', marginTop: 2, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                        Status
+                        <select
+                          value={item.status}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setAssetsForm(prev => ({
+                              ...prev,
+                              custom: prev.custom.map((c, i) => i === idx ? { ...c, status: val } : c)
+                            }));
+                          }}
+                          style={{ width: '100%', padding: '5px 8px', marginTop: 2, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, background: 'white', boxSizing: 'border-box' }}
+                        >
+                          <option value="Issued">Issued</option>
+                          <option value="Returned">Returned</option>
+                          <option value="Lost">Lost</option>
+                          <option value="Damaged">Damaged</option>
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setAssetsForm(prev => ({
+                          ...prev,
+                          custom: prev.custom.filter((_, i) => i !== idx)
+                        }))}
+                        style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', fontWeight: 800, cursor: 'pointer', fontSize: 14, padding: '6px 10px', borderRadius: 4, marginTop: 14 }}
+                        title="Remove custom asset"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION 6: Bank & Payment Account Details */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#374151', background: '#f3f4f6', padding: '6px 12px', borderRadius: 6, marginBottom: 14 }}>
-              5. Bank Details & Statutory Registration (Admin Confidential)
+              6. Bank Details & Statutory Registration (Admin Confidential)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
