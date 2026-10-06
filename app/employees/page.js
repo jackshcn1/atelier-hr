@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '../../lib/supabaseClient';
 import { computeSalarySplit } from '../../lib/salarySplit';
 
@@ -71,6 +71,58 @@ const initialAssetsForm = {
   custom: []
 };
 
+const DEFAULT_ONBOARDING_CLAUSES = [
+  {
+    id: 1,
+    name: '1. Offer Letter & Appointment Terms',
+    default_applicable: 'employment_type',
+    default_condition: 'all',
+    clause_text: 'We are pleased to confirm your appointment at Atelier as {{designation}} in the {{department}} department, commencing on {{doj}}. Your employment is on a {{employment_type}} basis with standard daily operational hours of 10 hours per shift. You agree to perform the duties assigned to your role diligently and adhere to all operational guidelines.'
+  },
+  {
+    id: 2,
+    name: '2. Compensation Structure & Statutory Payment Plan',
+    default_applicable: 'employment_type',
+    default_condition: 'all',
+    clause_text: 'Your monthly compensation is set at a Fixed Gross CTC of {{fixed_salary}} per month. In addition, you are eligible for the Variable Incentive Scheme ({{variable_scheme}}). Statutory Kerala payroll allocations apply as follows: {{salary_split}}. Statutory coverage: {{pf_esi_status}}. Salaries are disbursed monthly following attendance verification.'
+  },
+  {
+    id: 3,
+    name: '3. Code of Conduct, Punctuality & Attendance Policy',
+    default_applicable: 'department',
+    default_condition: 'all',
+    clause_text: 'Atelier maintains high standards of guest hospitality and hygiene. Punctual attendance for scheduled shifts is mandatory. Any planned leave must be requested at least 7 days in advance. Unexcused absence or absconding without notice will result in disciplinary action and forfeiting of accrued variable incentives.'
+  },
+  {
+    id: 4,
+    name: '4. Prevention of Sexual Harassment (POSH) Policy',
+    default_applicable: 'department',
+    default_condition: 'all',
+    clause_text: 'Atelier is committed to providing a safe, respectful, and dignified work environment for all employees. Harassment of any nature—verbal, physical, or psychological—will not be tolerated and is subject to immediate disciplinary termination and legal reporting under the POSH Act, 2013.'
+  },
+  {
+    id: 5,
+    name: '5. Asset Allocation, Uniforms & Security Deposits',
+    default_applicable: 'assets_assigned',
+    default_condition: 'assets_assigned',
+    clause_text: 'The company has issued the following assets and equipment for your operational duties: {{assets_list}}. You are required to maintain all items in clean, undamaged condition. In the event of loss or willful damage, repair/replacement charges will be deducted from your deposit or final salary clearance.'
+  },
+  {
+    id: 6,
+    name: '6. Company Accommodation & Facility Guidelines',
+    default_applicable: 'assets_assigned',
+    default_condition: 'accommodation',
+    clause_text: 'Staff utilizing company accommodation agree to maintain cleanliness, adhere to quiet hours, respect fellow residents, and safeguard all room keys and furnishings. The accommodation deposit of {{assets_list}} is refundable upon exit handover in good order.'
+  },
+  {
+    id: 7,
+    name: '7. Confidentiality, Food Safety & Non-Disclosure',
+    default_applicable: 'department',
+    default_condition: 'all',
+    clause_text: 'All recipes, culinary preparation methods, vendor pricing, guest details, and financial metrics of Atelier are strictly proprietary. You agree not to disclose, replicate, or share any trade secrets or proprietary workflows with external third parties during or after your tenure.'
+  }
+];
+
 export default function EmployeesPage() {
   const supabase = createClient();
   const [employees, setEmployees] = useState([]); // active + on-notice only
@@ -79,6 +131,8 @@ export default function EmployeesPage() {
   const [designations, setDesignations] = useState([]);
   const [schemes, setSchemes] = useState([]);
   const [depositSettings, setDepositSettings] = useState({ uniform_deposit_amount: 500, accommodation_deposit_amount: 2000 });
+  const [payrollSettings, setPayrollSettings] = useState({ basic_da_floor: 18000, hra_split_percent: 50 });
+
   const [form, setForm] = useState(initialEmptyForm);
   const [assetsForm, setAssetsForm] = useState(initialAssetsForm);
   const [showForm, setShowForm] = useState(false);
@@ -86,17 +140,31 @@ export default function EmployeesPage() {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [idFrontFile, setIdFrontFile] = useState(null);
   const [idBackFile, setIdBackFile] = useState(null);
+
+  // Onboarding Clause Templates & Signed Tracking inside Drawer
+  const [clauseTemplates, setClauseTemplates] = useState(DEFAULT_ONBOARDING_CLAUSES);
+  const [selectedClauses, setSelectedClauses] = useState({});
+  const [customClauseTexts, setCustomClauseTexts] = useState({});
+  const [editingClauseId, setEditingClauseId] = useState(null);
+
+  const [isSignedCollected, setIsSignedCollected] = useState(false);
+  const [signedDate, setSignedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [signedFile, setSignedFile] = useState(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   async function load() {
-    const [visible, all, depts, desigs, schemeData, depSetData] = await Promise.all([
+    const [visible, all, depts, desigs, schemeData, depSetData, tmplData, pSetData] = await Promise.all([
       supabase.from('employees').select('*').in('status', ['active', 'on-notice']).is('deleted_at', null).order('name'),
       supabase.from('employees').select('*').is('deleted_at', null),
       supabase.from('departments').select('name').order('name'),
       supabase.from('designations').select('*').order('name'),
       supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true),
-      supabase.from('deposit_settings').select('*').eq('id', 1).maybeSingle()
+      supabase.from('deposit_settings').select('*').eq('id', 1).maybeSingle(),
+      supabase.from('onboarding_doc_templates').select('*').eq('is_active', true).order('id'),
+      supabase.from('payroll_settings').select('*').eq('id', 1).maybeSingle()
     ]);
 
     if (visible.error) setError(visible.error.message);
@@ -105,6 +173,8 @@ export default function EmployeesPage() {
     setDepartments((depts.data || []).map(d => d.name));
     setDesignations(desigs.data || []);
     setSchemes(schemeData.data || []);
+    if (pSetData?.data) setPayrollSettings(pSetData.data);
+
     if (depSetData?.data) {
       setDepositSettings(depSetData.data);
       setAssetsForm(prev => ({
@@ -119,9 +189,50 @@ export default function EmployeesPage() {
         }
       }));
     }
+
+    const loadedClauses = (tmplData?.data && tmplData.data.length > 0) ? tmplData.data : DEFAULT_ONBOARDING_CLAUSES;
+    setClauseTemplates(loadedClauses);
+    syncClauseSelection(loadedClauses, form, initialAssetsForm);
+  }
+
+  function syncClauseSelection(clauses, currentForm, currentAssets) {
+    const sel = {};
+    const texts = {};
+    const hasAssets = !!currentAssets.uniform.enabled || currentAssets.custom.length > 0;
+    const hasAccommodation = !!currentAssets.accommodation.enabled || !!currentForm.accommodation_provided;
+    const hasPfEsi = !!currentForm.pf_applicable || !!currentForm.esi_applicable;
+
+    clauses.forEach(c => {
+      texts[c.id] = c.clause_text;
+      let isApplicable = true;
+
+      if (c.default_applicable === 'assets_assigned') {
+        if (c.default_condition === 'accommodation') {
+          isApplicable = hasAccommodation;
+        } else {
+          isApplicable = hasAssets;
+        }
+      } else if (c.default_applicable === 'pf_esi_applicable') {
+        isApplicable = hasPfEsi;
+      } else if (c.default_applicable === 'department' && c.default_condition !== 'all') {
+        isApplicable = c.default_condition === currentForm.department;
+      } else if (c.default_applicable === 'employment_type' && c.default_condition !== 'all') {
+        isApplicable = c.default_condition === currentForm.employment_type;
+      }
+
+      sel[c.id] = isApplicable;
+    });
+
+    setSelectedClauses(sel);
+    setCustomClauseTexts(texts);
   }
 
   useEffect(() => { load(); }, []);
+
+  // Whenever key triggers change in form, refresh auto-checked clauses
+  useEffect(() => {
+    syncClauseSelection(clauseTemplates, form, assetsForm);
+  }, [form.department, form.employment_type, form.pf_applicable, form.esi_applicable, form.accommodation_provided, assetsForm.uniform.enabled, assetsForm.accommodation.enabled, assetsForm.custom.length]);
 
   function handlePhotoChange(e) {
     const file = e.target.files?.[0];
@@ -131,8 +242,67 @@ export default function EmployeesPage() {
     }
   }
 
-  async function handleAdd(e) {
-    e.preventDefault();
+  // Instant Printable Agreement PDF Download / Print from inside Drawer
+  function printOnboardingDocumentPacket() {
+    if (!form.name.trim()) {
+      setError('Please enter the employee name first before downloading or printing the document.');
+      return;
+    }
+
+    const split = computeSalarySplit(form.current_fixed_salary || 0, payrollSettings);
+    const splitText = `Basic+DA: ₹${split.basic_da.toLocaleString('en-IN')}, HRA: ₹${split.hra.toLocaleString('en-IN')}, Other Allowances: ₹${split.other_allowances.toLocaleString('en-IN')}`;
+
+    const assetsList = [];
+    if (assetsForm.uniform.enabled) {
+      assetsList.push(`Uniform (${assetsForm.uniform.units || 2} sets, ${assetsForm.uniform.asset_number || 'Standard'}, Deposit: ₹${assetsForm.uniform.deposit_amount || 0})`);
+    }
+    if (assetsForm.accommodation.enabled || form.accommodation_provided) {
+      assetsList.push(`Company Accommodation (${assetsForm.accommodation.asset_number || 'Room Key'}, Deposit: ₹${assetsForm.accommodation.deposit_amount || 0})`);
+    }
+    assetsForm.custom.forEach(c => {
+      if (c.name) assetsList.push(`${c.name} (${c.units || 1} units, ${c.asset_number || '—'}, Deposit: ₹${c.deposit_amount || 0})`);
+    });
+    const assetsText = assetsList.length > 0 ? assetsList.join('; ') : 'No physical assets issued';
+
+    const pfEsiText = `PF: ${form.pf_applicable ? 'Applicable' : 'Not Applicable'}, ESI: ${form.esi_applicable ? 'Applicable' : 'Not Applicable'}`;
+    const emergencyText = `${form.emergency_contact_name || '—'} (${form.emergency_contact_phone || '—'})`;
+
+    const mergeMap = {
+      '{{name}}': form.name || 'Candidate',
+      '{{designation}}': form.designation || 'Staff Member',
+      '{{department}}': form.department || 'General',
+      '{{doj}}': form.date_of_joining || new Date().toISOString().slice(0, 10),
+      '{{employment_type}}': form.employment_type || 'full-time',
+      '{{fixed_salary}}': `₹${Number(form.current_fixed_salary || 0).toLocaleString('en-IN')}`,
+      '{{variable_scheme}}': `Target: ₹${Number(form.current_variable_salary || 0).toLocaleString('en-IN')}/mo (${form.variable_pay_scheme || 'Standard Scheme'})`,
+      '{{salary_split}}': splitText,
+      '{{assets_list}}': assetsText,
+      '{{pf_esi_status}}': pfEsiText,
+      '{{emergency_contact}}': emergencyText
+    };
+
+    const activeTemplates = clauseTemplates.filter(t => selectedClauses[t.id]);
+    const clausesHtml = activeTemplates.map(t => {
+      let text = customClauseTexts[t.id] || t.clause_text;
+      Object.entries(mergeMap).forEach(([k, v]) => {
+        text = text.split(k).join(v);
+      });
+      return `<div style="margin-bottom: 20px;"><h3 style="font-family: Georgia, serif; font-size: 13px; font-weight: bold; margin: 0 0 4px 0; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px;">${t.name}</h3><p style="margin: 0; line-height: 1.6; color: #374151; font-size: 11px; white-space: pre-wrap;">${text}</p></div>`;
+    }).join('');
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('Please allow popups to open the printable document.');
+      return;
+    }
+    win.document.write(`<!DOCTYPE html><html><head><title>Onboarding Agreement — ${form.name}</title><style>@page{size:A4 portrait;margin:12mm 15mm;}body{font-family:system-ui,-apple-system,sans-serif;font-size:11px;color:#111;margin:20px auto;max-width:750px;line-height:1.5;}h1,h2,h3{font-family:Georgia,serif;}.header{border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-end;}.summary{background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:10px;margin-bottom:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:11px;}.label{font-size:9px;text-transform:uppercase;color:#6b7280;font-weight:bold;display:block;}.declaration{background:#f9fafb;border:1px solid #d1d5db;border-radius:4px;padding:12px;margin:24px 0 32px 0;font-size:11px;}.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #ccc;}.sig-line{border-bottom:1px solid #000;padding-bottom:40px;margin-bottom:4px;}</style></head><body><div class="header"><div><div style="font-size:20px;font-weight:bold;font-family:Georgia,serif;">ATELIER HOSPITALITY</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6b7280;font-weight:600;">Official Appointment & Onboarding Compliance Agreement</div></div><div style="text-align:right;font-size:10px;color:#6b7280;font-family:monospace;"><div>Ref Code: <strong>${form.employee_id || 'PENDING'}</strong></div><div>Date: ${form.date_of_joining || new Date().toISOString().slice(0, 10)}</div></div></div><div class="summary"><div><span class="label">Candidate Name</span><strong>${form.name}</strong></div><div><span class="label">Designation</span><span>${form.designation || 'Staff'}</span></div><div><span class="label">Department</span><span>${form.department || 'General'}</span></div><div><span class="label">Date of Joining</span><span>${form.date_of_joining || '—'}</span></div><div><span class="label">Fixed Salary (CTC)</span><span>₹${Number(form.current_fixed_salary || 0).toLocaleString('en-IN')}/mo</span></div><div><span class="label">Variable Target</span><span>₹${Number(form.current_variable_salary || 0).toLocaleString('en-IN')}/mo</span></div><div><span class="label">Employment Type</span><span style="text-transform:capitalize;">${form.employment_type || 'Full-time'}</span></div><div><span class="label">Contact Phone</span><span>${form.phone || '—'}</span></div></div><div>${clausesHtml}</div><div class="declaration"><div style="font-weight:bold;margin-bottom:4px;">Declaration & Acceptance:</div><div>I, <strong>${form.name}</strong>, acknowledge that I have read, understood, and received a copy of the above terms of employment, compensation breakdown, code of conduct, POSH guidelines, and asset allocation schedule. I unconditionally agree to abide by all the policies and procedures established by Atelier.</div></div><div class="sig-grid"><div><div class="sig-line"></div><strong>${form.name}</strong><div style="font-size:9px;color:#6b7280;text-transform:uppercase;">Employee Signature & Date</div></div><div><div class="sig-line"></div><strong>Atelier Operations / HR</strong><div style="font-size:9px;color:#6b7280;text-transform:uppercase;">Authorized Management Signatory & Date</div></div></div></body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  }
+
+  async function handleAdd(e, saveAsDraft = false) {
+    if (e) e.preventDefault();
     setError('');
     const cleanId = form.employee_id.trim();
     if (!cleanId) { setError('Employee ID (Petpooja code) is required.'); return; }
@@ -163,17 +333,25 @@ export default function EmployeesPage() {
         if (!bErr) idBackUrl = bPath;
       }
 
-      // 3. Insert into employees table
-      const isAccommodationActive = !!assetsForm.accommodation.enabled || !!form.accommodation_provided;
+      // 3. Upload scanned signed onboarding document if attached
+      let signedDocPath = null;
+      if (signedFile) {
+        const sPath = `onboarding-signed/${cleanId}-${Date.now()}-${signedFile.name}`;
+        const { error: sErr } = await supabase.storage.from('documents').upload(sPath, signedFile);
+        if (!sErr) signedDocPath = sPath;
+      }
 
-      // Calculate Onboarding Stage Gate (Tier 1 vs Tier 2)
+      // 4. Determine Gated Onboarding Status
+      const isAccommodationActive = !!assetsForm.accommodation.enabled || !!form.accommodation_provided;
       const hasId = !!(form.id_proof_number.trim() || idFrontUrl);
       const hasBank = !!(form.bank_account_number.trim() && form.bank_ifsc_code.trim());
       const hasComp = Number(form.current_fixed_salary) > 0;
       const hasContact = !!(form.emergency_contact_name.trim() && form.emergency_contact_phone.trim());
 
       let calcOnboardingStatus = 'Draft';
-      if (hasComp && hasBank && hasId && hasContact) {
+      if (saveAsDraft) {
+        calcOnboardingStatus = 'Draft';
+      } else if (isSignedCollected && hasComp && hasBank && hasId && hasContact) {
         calcOnboardingStatus = 'Active';
       } else if (hasComp) {
         calcOnboardingStatus = 'Compensation Set';
@@ -222,7 +400,7 @@ export default function EmployeesPage() {
         return;
       }
 
-      // 4. Insert into employee_sensitive_info table
+      // 5. Insert into employee_sensitive_info table
       const hasSensitive = form.id_proof_number || idFrontUrl || idBackUrl || form.pf_number || form.esi_number || form.bank_account_number || form.bank_account_holder_name || form.bank_name || form.bank_ifsc_code;
       if (hasSensitive) {
         await supabase.from('employee_sensitive_info').upsert([{
@@ -239,7 +417,7 @@ export default function EmployeesPage() {
         }]);
       }
 
-      // 5. Insert Assets into employee_assets
+      // 6. Insert Assets into employee_assets
       const assetsToInsert = [];
       const defaultDate = form.date_of_joining || new Date().toISOString().slice(0, 10);
 
@@ -288,13 +466,10 @@ export default function EmployeesPage() {
       });
 
       if (assetsToInsert.length > 0) {
-        const { error: assetErr } = await supabase.from('employee_assets').insert(assetsToInsert);
-        if (assetErr) {
-          console.error('Error saving assets:', assetErr);
-        }
+        await supabase.from('employee_assets').insert(assetsToInsert);
       }
 
-      // 6. Snapshot deposits into employee_deposits
+      // 7. Snapshot deposits into employee_deposits
       const depositRows = assetsToInsert
         .filter(a => Number(a.deposit_amount) > 0)
         .map(a => ({
@@ -306,7 +481,7 @@ export default function EmployeesPage() {
         await supabase.from('employee_deposits').insert(depositRows);
       }
 
-      // 7. Snapshot initial salary into salary_history
+      // 8. Snapshot initial salary into salary_history
       if (form.current_fixed_salary || form.current_variable_salary) {
         const { data: settings } = await supabase.from('payroll_settings').select('*').eq('id', 1).single();
         const split = computeSalarySplit(form.current_fixed_salary, settings);
@@ -320,6 +495,22 @@ export default function EmployeesPage() {
         }]);
       }
 
+      // 9. Save Onboarding Acknowledgment record
+      const activeClauseNames = clauseTemplates.filter(t => selectedClauses[t.id]).map(t => t.name);
+      const ackPayload = {
+        employee_id: cleanId,
+        clauses_merged: activeClauseNames,
+        pdf_url: signedDocPath,
+        signed_collected: isSignedCollected,
+        signed_collected_date: isSignedCollected ? signedDate : null,
+        signed_by_employee: form.name.trim(),
+        signed_by_hr: (await supabase.auth.getUser()).data.user?.email || 'HR Operations'
+      };
+      const { data: ackData } = await supabase.from('onboarding_acknowledgments').insert([ackPayload]).select().maybeSingle();
+      if (ackData?.id) {
+        await supabase.from('employees').update({ acknowledgment_id: ackData.id }).eq('employee_id', cleanId);
+      }
+
       // Reset form & state
       setForm(initialEmptyForm);
       setAssetsForm({
@@ -331,24 +522,17 @@ export default function EmployeesPage() {
       setPhotoPreview(null);
       setIdFrontFile(null);
       setIdBackFile(null);
+      setSignedFile(null);
+      setIsSignedCollected(false);
       setShowForm(false);
       setSubmitting(false);
+      setMessage(`✓ ${form.name.trim()} successfully onboarded with status: ${calcOnboardingStatus}!`);
       load();
     } catch (err) {
       setError(err.message || 'Failed to create employee.');
       setSubmitting(false);
     }
   }
-
-  async function reassign(employeeId, newManagerId) {
-    await supabase.from('employees').update({ reporting_manager_id: newManagerId || null }).eq('employee_id', employeeId);
-    load();
-  }
-
-  const exitedIds = new Set(allEmployees.filter(e => e.status === 'exited').map(e => e.employee_id));
-  const needsReassignment = allEmployees.filter(e =>
-    e.status !== 'exited' && e.reporting_manager_id && exitedIds.has(e.reporting_manager_id)
-  );
 
   return (
     <div style={{ paddingBottom: 40 }}>
@@ -374,7 +558,7 @@ export default function EmployeesPage() {
               padding: '9px 18px',
               borderRadius: 6,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 14,
               cursor: 'pointer'
             }}
           >
@@ -384,78 +568,58 @@ export default function EmployeesPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#fee2e2', border: '1px solid #f87171', color: '#991b1b', padding: 12, borderRadius: 6, margin: '16px 0' }}>
+        <div style={{ background: '#fee2e2', border: '1px solid #f87171', color: '#991b1b', padding: '10px 16px', borderRadius: 6, marginTop: 14, fontWeight: 500 }}>
           {error}
         </div>
       )}
-
-      {/* Needs Reassignment Alert */}
-      {needsReassignment.length > 0 && (
-        <div style={{ background: '#fff3cd', border: '1px solid #ffe08a', borderRadius: 8, padding: 16, margin: '16px 0' }}>
-          <strong>⚠ Needs reassignment — {needsReassignment.length} employee(s) report to someone who has exited</strong>
-          <ul style={{ marginTop: 10, paddingLeft: 20 }}>
-            {needsReassignment.map(e => (
-              <li key={e.employee_id} style={{ marginBottom: 6 }}>
-                {e.name} — new manager:{' '}
-                <select defaultValue="" onChange={ev => reassign(e.employee_id, ev.target.value)}>
-                  <option value="">Choose manager…</option>
-                  {employees.filter(m => m.employee_id !== e.employee_id).map(m => (
-                    <option key={m.employee_id} value={m.employee_id}>{m.name}</option>
-                  ))}
-                </select>
-              </li>
-            ))}
-          </ul>
+      {message && (
+        <div style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#065f46', padding: '10px 16px', borderRadius: 6, marginTop: 14, fontWeight: 600 }}>
+          {message}
         </div>
       )}
 
-      {/* Comprehensive New Employee Onboarding Sheet */}
+      {/* =========================================================================
+          ADD NEW EMPLOYEE ONBOARDING FORM DRAWER
+          ========================================================================= */}
       {showForm && (
-        <form onSubmit={handleAdd} style={{
-          background: 'white',
-          border: '1px solid #cbd5e1',
-          borderRadius: 10,
-          padding: 24,
-          margin: '20px 0',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-        }}>
-          <div style={{ borderBottom: '2px solid #111827', paddingBottom: 10, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <form onSubmit={handleAdd} style={{ background: 'white', padding: 24, borderRadius: 10, marginTop: 16, border: '1.5px solid #2563eb', boxShadow: '0 4px 12px rgba(37,99,235,0.1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1.5px solid #e5e7eb', paddingBottom: 12 }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111827' }}>
+              <h2 style={{ margin: 0, fontSize: 20, color: '#1e3a8a', fontWeight: 800 }}>
                 📋 New Employee Onboarding Sheet
               </h2>
-              <p style={{ margin: '3px 0 0 0', fontSize: 13, color: '#6b7280' }}>
+              <p style={{ color: '#4b5563', margin: '4px 0 0 0', fontSize: 13 }}>
                 Complete all job details, personal history, photo, statutory, and salary numbers for onboarding records.
               </p>
             </div>
             <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>* Required fields</span>
           </div>
 
-          {/* SECTION 1: Core Job & Role Details */}
+          {/* SECTION 1: Role, Identification & Dates */}
           <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e40af', background: '#eff6ff', padding: '6px 12px', borderRadius: 6, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', padding: '6px 12px', borderRadius: 6, marginBottom: 14 }}>
               1. Job & Organizational Details
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 Employee ID (Petpooja Code) <span style={{ color: '#dc2626' }}>*</span>
                 <input
-                  placeholder="e.g. ATL0023"
                   required
+                  placeholder="e.g. 101, 102"
                   value={form.employee_id}
                   onChange={e => setForm({ ...form, employee_id: e.target.value })}
-                  style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, boxSizing: 'border-box' }}
                 />
               </label>
 
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 Full Legal Name <span style={{ color: '#dc2626' }}>*</span>
                 <input
-                  placeholder="e.g. Ravi Kumar"
                   required
+                  placeholder="Full name as per Aadhaar/Bank"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, fontWeight: 600, boxSizing: 'border-box' }}
                 />
               </label>
 
@@ -466,31 +630,22 @@ export default function EmployeesPage() {
                   onChange={e => setForm({ ...form, department: e.target.value })}
                   style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, background: 'white', boxSizing: 'border-box' }}
                 >
-                  {departments.length > 0 ? (
-                    departments.map(d => <option key={d} value={d}>{d}</option>)
-                  ) : (
-                    <>
-                      <option value="Service">Service</option>
-                      <option value="Kitchen">Kitchen</option>
-                      <option value="Housekeeping">Housekeeping</option>
-                      <option value="Cash/ Counter/ Customer Care">Cash/ Counter/ Customer Care</option>
-                      <option value="Admin">Admin</option>
-                      <option value="Security">Security</option>
-                    </>
-                  )}
+                  {departments.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
                 </select>
               </label>
 
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 Designation (Role)
                 <input
-                  list="add-employee-desig-options"
+                  list="desig-options"
                   placeholder="Select or type designation"
                   value={form.designation}
                   onChange={e => setForm({ ...form, designation: e.target.value })}
                   style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
                 />
-                <datalist id="add-employee-desig-options">
+                <datalist id="desig-options">
                   {designations.map(d => (
                     <option key={d.id} value={d.name}>{d.department ? `(${d.department})` : ''}</option>
                   ))}
@@ -539,8 +694,10 @@ export default function EmployeesPage() {
                   style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, background: 'white', boxSizing: 'border-box' }}
                 >
                   <option value="">None (Top of hierarchy / Direct Admin)</option>
-                  {employees.map(m => (
-                    <option key={m.employee_id} value={m.employee_id}>{m.name} ({m.designation || 'Staff'})</option>
+                  {allEmployees.filter(m => m.status !== 'exited').map(m => (
+                    <option key={m.employee_id} value={m.employee_id}>
+                      {m.name} ({m.designation || 'Staff'}{m.department ? ` • ${m.department}` : ''})
+                    </option>
                   ))}
                 </select>
               </label>
@@ -562,12 +719,12 @@ export default function EmployeesPage() {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '6px 12px', borderRadius: 6, marginBottom: 14 }}>
               2. Personal Details, Contact & Passport Photo
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 Phone Number
                 <input
-                  placeholder="10-digit mobile"
+                  type="tel"
+                  placeholder="Primary phone number"
                   value={form.phone}
                   onChange={e => setForm({ ...form, phone: e.target.value })}
                   style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
@@ -578,7 +735,7 @@ export default function EmployeesPage() {
                 Email Address
                 <input
                   type="email"
-                  placeholder="employee@atelier.com"
+                  placeholder="Personal email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   style={{ width: '100%', padding: '7px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #94a3b8', fontSize: 13, boxSizing: 'border-box' }}
@@ -1235,7 +1392,115 @@ export default function EmployeesPage() {
             </div>
           </div>
 
-          {/* Onboarding Notes */}
+          {/* =========================================================================
+              SECTION 7: ONBOARDING COMPLIANCE CLAUSES & COMPILED PDF DOWNLOAD
+              ========================================================================= */}
+          <div style={{ marginBottom: 24, border: '1px solid #bfdbfe', borderRadius: 8, padding: 16, background: '#f8fafc' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#1e40af' }}>
+                  7. Onboarding Terms, Compliance Agreement & Physical Signature Gate
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  Selected terms are compiled with live form values into a single printable appointment & policy contract.
+                </div>
+              </div>
+
+              {/* Instant Download / Print Button */}
+              <button
+                type="button"
+                onClick={printOnboardingDocumentPacket}
+                style={{
+                  background: '#1e40af', color: 'white', border: 'none',
+                  padding: '9px 18px', borderRadius: 6, fontWeight: 700, fontSize: 13,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  boxShadow: '0 2px 5px rgba(30,64,175,0.2)'
+                }}
+              >
+                🖨️ Download / Print Compiled Agreement (PDF)
+              </button>
+            </div>
+
+            {/* Checklist of Auto-ticked Clauses */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10, marginBottom: 16 }}>
+              {clauseTemplates.map(c => {
+                const isSelected = !!selectedClauses[c.id];
+                return (
+                  <label
+                    key={c.id}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 8,
+                      background: isSelected ? 'white' : '#f1f5f9',
+                      padding: '8px 12px', borderRadius: 6,
+                      border: isSelected ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                      cursor: 'pointer', fontSize: 12
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={e => setSelectedClauses(prev => ({ ...prev, [c.id]: e.target.checked }))}
+                      style={{ marginTop: 2 }}
+                    />
+                    <div>
+                      <strong style={{ color: isSelected ? '#1e293b' : '#64748b' }}>{c.name}</strong>
+                      {c.default_applicable === 'assets_assigned' && (
+                        <span style={{ fontSize: 10, color: '#0369a1', marginLeft: 6, fontWeight: 600 }}>[Auto for Assets]</span>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* Physical Signature Gate Verification */}
+            <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
+                ✍️ Physical Signature & Collection Status
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#15803d', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={isSignedCollected}
+                    onChange={e => setIsSignedCollected(e.target.checked)}
+                  />
+                  Document Physically Signed & Collected on Day 1
+                </label>
+
+                {isSignedCollected && (
+                  <>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                      Date Signed:
+                      <input
+                        type="date"
+                        value={signedDate}
+                        onChange={e => setSignedDate(e.target.value)}
+                        style={{ marginLeft: 6, padding: '4px 8px', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 12 }}
+                      />
+                    </label>
+
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                      Upload Signed Scanned Copy:
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={e => setSignedFile(e.target.files?.[0] || null)}
+                        style={{ marginLeft: 6, fontSize: 11 }}
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
+                {isSignedCollected
+                  ? '✓ Gate verified: Saving will register employee directly as Active!'
+                  : 'ℹ️ If unsigned now, employee will save as Draft / Documents Pending until signed document is verified.'}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 8: HR Notes */}
           <div style={{ marginBottom: 24 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
               Onboarding / HR Notes
@@ -1249,24 +1514,36 @@ export default function EmployeesPage() {
             </label>
           </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          {/* Actions Footer with Draft vs Complete Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              style={{ background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '10px 20px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+              style={{ background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '10px 18px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
             >
               Cancel
+            </button>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => handleAdd(null, true)}
+              style={{
+                background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1',
+                padding: '10px 18px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer'
+              }}
+            >
+              💾 Save as Onboarding Draft
             </button>
             <button
               type="submit"
               disabled={submitting}
               style={{
-                background: '#059669', color: 'white', border: 'none',
-                padding: '10px 28px', borderRadius: 6, fontWeight: 700, fontSize: 14, cursor: 'pointer'
+                background: isSignedCollected ? '#15803d' : '#2563eb',
+                color: 'white', border: 'none',
+                padding: '10px 24px', borderRadius: 6, fontWeight: 700, fontSize: 14, cursor: 'pointer'
               }}
             >
-              {submitting ? 'Saving Employee & Uploading Scans...' : '💾 Complete Onboarding & Save Employee'}
+              {submitting ? 'Saving Employee & Uploading Scans...' : (isSignedCollected ? '✓ Complete & Activate Employee' : '💾 Save Employee Onboarding')}
             </button>
           </div>
         </form>
@@ -1277,63 +1554,66 @@ export default function EmployeesPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb', background: '#f9fafb', fontSize: 12, textTransform: 'uppercase', color: '#6b7280' }}>
-              <th style={{ padding: '12px 16px' }}>Employee</th>
-              <th>Designation</th>
-              <th>Department</th>
-              <th>Contact</th>
-              <th>Status</th>
-              <th style={{ textAlign: 'right', paddingRight: 16 }}>Actions</th>
+              <th style={{ padding: '10px 14px' }}>Employee</th>
+              <th style={{ padding: '10px 14px' }}>Designation</th>
+              <th style={{ padding: '10px 14px' }}>Department</th>
+              <th style={{ padding: '10px 14px' }}>Contact</th>
+              <th style={{ padding: '10px 14px' }}>Status</th>
+              <th style={{ padding: '10px 14px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {employees.map(emp => {
-              const initials = String(emp.name || 'E').split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase();
-
-              return (
-                <tr key={emp.employee_id} style={{ borderBottom: '1px solid #f3f4f6', fontSize: 13 }}>
-                  <td style={{ padding: '10px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      {emp.passport_photo_url ? (
-                        <img
-                          src={`https://wzxswmopfxnucmeygqeg.supabase.co/storage/v1/object/public/documents/${emp.passport_photo_url}`}
-                          alt=""
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                          style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '1px solid #cbd5e1' }}
-                        />
-                      ) : (
-                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0f2fe', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12 }}>
-                          {initials}
-                        </div>
-                      )}
+            {employees.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
+                  No active or on-notice staff found.
+                </td>
+              </tr>
+            ) : (
+              employees.map(emp => (
+                <tr key={emp.employee_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#eff6ff', color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 12 }}>
+                        {emp.name.slice(0, 2).toUpperCase()}
+                      </div>
                       <div>
-                        <a href={`/employees/${emp.employee_id}`} style={{ fontWeight: 700, color: '#111827', textDecoration: 'none' }}>
-                          {emp.name}
-                        </a>
-                        <span style={{ display: 'block', fontSize: 11, fontFamily: 'monospace', color: '#6b7280' }}>
-                          ID: {emp.employee_id}
-                        </span>
+                        <div style={{ fontWeight: 700, color: '#111827' }}>{emp.name}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', fontFamily: 'monospace' }}>ID: {emp.employee_id}</div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ fontWeight: 500, color: '#374151' }}>{emp.designation || '—'}</td>
-                  <td>
-                    <span style={{ background: '#f1f5f9', color: '#334155', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-                      {emp.department || '—'}
-                    </span>
+                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151', fontWeight: 500 }}>
+                    {emp.designation || 'Staff'}
                   </td>
-                  <td style={{ color: '#6b7280', fontSize: 12 }}>
-                    {emp.phone || emp.email || '—'}
+                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151' }}>
+                    {emp.department || 'Unassigned'}
                   </td>
-                  <td>
-                    <span style={{
-                      padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700,
-                      background: emp.status === 'active' ? '#dcfce7' : '#fef3c7',
-                      color: emp.status === 'active' ? '#15803d' : '#b45309'
-                    }}>
-                      {emp.status === 'active' ? '✓ Active' : '⏳ On Notice'}
-                    </span>
+                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#4b5563' }}>
+                    {emp.phone || '—'}
                   </td>
-                  <td style={{ textAlign: 'right', paddingRight: 16 }}>
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                        background: emp.status === 'active' ? '#dcfce7' : emp.status === 'on-notice' ? '#fef3c7' : '#fee2e2',
+                        color: emp.status === 'active' ? '#15803d' : emp.status === 'on-notice' ? '#b45309' : '#991b1b'
+                      }}>
+                        {emp.status === 'active' ? '✓ Active' : emp.status === 'on-notice' ? '⏳ On Notice' : '🚪 Exited'}
+                      </span>
+                      {emp.onboarding_status && (
+                        <span style={{
+                          padding: '1px 6px', borderRadius: 10, fontSize: 10, fontWeight: 600,
+                          background: emp.onboarding_status === 'Active' ? '#f0fdf4' : '#eff6ff',
+                          color: emp.onboarding_status === 'Active' ? '#166534' : '#1e40af',
+                          border: `1px solid ${emp.onboarding_status === 'Active' ? '#bbf7d0' : '#bfdbfe'}`
+                        }}>
+                          {emp.onboarding_status}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
                     <a
                       href={`/employees/${emp.employee_id}`}
                       style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}
@@ -1342,15 +1622,10 @@ export default function EmployeesPage() {
                     </a>
                   </td>
                 </tr>
-              );
-            })}
+              ))
+            )}
           </tbody>
         </table>
-        {employees.length === 0 && (
-          <div style={{ padding: 30, textAlign: 'center', color: '#6b7280' }}>
-            No active employees found. Click "+ Add New Employee" above to add your first staff member.
-          </div>
-        )}
       </div>
     </div>
   );
