@@ -426,23 +426,49 @@ function VariableTargetPolicyContent() {
           </div>
         </div>
 
-        {/* 4. Terms & Operational Governance */}
+        {/* 4. Terms & Operational Governance (Rendered from Scheme Template) */}
         <div className="mb-8 bg-page/40 p-4 border border-rule-soft rounded-control text-3xs text-ink-muted space-y-2">
-          <div className="font-bold text-xs text-ink uppercase tracking-wider mb-1">
-            4. Governance & Operational Guidelines
+          <div className="flex justify-between items-center mb-1">
+            <div className="font-bold text-xs text-ink uppercase tracking-wider">
+              4. Governance & Operational Guidelines
+            </div>
+            {isManager && (
+              <a
+                href="/settings/variable-pay"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-3xs text-accent font-semibold hover:underline no-print"
+              >
+                ⚙️ Edit Guidelines in Settings →
+              </a>
+            )}
           </div>
-          <p>
-            • <strong>Measurement Period</strong>: Variable performance cycles run monthly from the 20th of the previous month to the 19th of the current month.
-          </p>
-          <p>
-            • <strong>Data Verification & Disbursal</strong>: Metrics are synced directly from Petpooja POS and management audits. Monthly payouts are disbursed alongside the monthly salary following attendance review.
-          </p>
-          <p>
-            • <strong>Attendance Floor</strong>: Payout eligibility requires satisfactory attendance during the designated cycle. Unexcused absences or disciplinary actions may result in forfeiture.
-          </p>
+          {docModel.scheme?.policy_guidelines ? (
+            <div className="whitespace-pre-line leading-relaxed text-ink-muted">
+              {docModel.scheme.policy_guidelines}
+            </div>
+          ) : (
+            <>
+              <p>
+                • <strong>Measurement Period</strong>: Variable performance cycles run monthly from the 20th of the previous month to the 19th of the current month.
+              </p>
+              <p>
+                • <strong>Data Verification & Disbursal</strong>: Metrics are synced directly from Petpooja POS and management audits. Monthly payouts are disbursed alongside the monthly salary following attendance review.
+              </p>
+              <p>
+                • <strong>Attendance Floor</strong>: Payout eligibility requires satisfactory attendance during the designated cycle. Unexcused absences or disciplinary actions may result in forfeiture.
+              </p>
+            </>
+          )}
         </div>
 
         {/* 5. Acknowledgment & Signatures */}
+        {docModel.scheme?.terms_and_conditions && (
+          <div className="mb-6 p-3 bg-page/60 border border-rule-soft rounded-control text-3xs text-ink italic leading-normal">
+            <strong>Declaration:</strong> &ldquo;{docModel.scheme.terms_and_conditions}&rdquo;
+          </div>
+        )}
+
         <div className="pt-6 border-t border-rule-soft grid grid-cols-2 gap-10 text-center text-xs">
           <div>
             <div className="border-b border-ink/40 pb-10 mb-2"></div>

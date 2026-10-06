@@ -114,6 +114,8 @@ function VariablePayConfigContent() {
         display_name: editingScheme.display_name,
         department: editingScheme.department || null,
         metrics: editingScheme.metrics,
+        policy_guidelines: editingScheme.policy_guidelines || null,
+        terms_and_conditions: editingScheme.terms_and_conditions || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', editingScheme.id);
@@ -381,6 +383,44 @@ function VariablePayConfigContent() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Policy Document Guidelines & Signature Terms (Editable by Admin) */}
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: 14, marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a8a', marginBottom: 6 }}>
+                  📜 Variable Pay Policy Document Wording & Governance Terms
+                </div>
+                <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 10px 0' }}>
+                  These terms are rendered on each employee's personalized target agreement document.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      Governance & Operational Guidelines (Bullet points)
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={editingScheme.policy_guidelines || ''}
+                      onChange={e => setEditingScheme(prev => ({ ...prev, policy_guidelines: e.target.value }))}
+                      placeholder="• Measurement Period: 20th to 19th of each month...\n• Verification & Disbursal: Synced directly from Petpooja POS...\n• Attendance Floor: Minimum attendance threshold applies..."
+                      style={{ width: '100%', padding: '7px 9px', borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      Employee Acknowledgment Text
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editingScheme.terms_and_conditions || ''}
+                      onChange={e => setEditingScheme(prev => ({ ...prev, terms_and_conditions: e.target.value }))}
+                      placeholder="I acknowledge and understand the performance criteria, weighted allocation, and target metrics specified in this policy document."
+                      style={{ width: '100%', padding: '7px 9px', borderRadius: 4, border: '1px solid #94a3b8', fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Add Metric & Save Actions */}
