@@ -7,7 +7,6 @@ const ADMIN_NAV = [
   {
     label: 'Employees',
     links: [
-      { href: '/recruitment', label: 'Recruitment' },
       { href: '/employees', label: 'Employees' },
     ]
   },
