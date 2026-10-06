@@ -20,6 +20,7 @@ function DocumentsHubContent() {
   const [departments, setDepartments] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [employeeRecord, setEmployeeRecord] = useState(null);
   const [canManageDocs, setCanManageDocs] = useState(false);
 
   const searchParams = useSearchParams();
@@ -83,6 +84,16 @@ function DocumentsHubContent() {
       setCurrentUserProfile(profile);
       isPrivileged = !!(profile?.is_super_admin || profile?.role === 'admin' || profile?.role === 'hr_manager' || profile?.permissions?.manage_documents);
       setCanManageDocs(isPrivileged);
+
+      // Fetch linked employee record
+      if (user.email || profile?.employee_id) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('employee_id, name, designation, department, variable_pay_scheme, current_fixed_salary, current_variable_salary')
+          .or(`email.ilike.${user.email || ''},employee_id.eq.${profile?.employee_id || '0'}`)
+          .maybeSingle();
+        setEmployeeRecord(emp || null);
+      }
     }
 
     // 2. Fetch departments
@@ -516,6 +527,50 @@ function DocumentsHubContent() {
           </div>
 
           {/* Documents Grid */}
+          {/* Personalized Variable Pay Target Policy Card (Featured for Targets or All category) */}
+          {(selectedCategory === 'targets' || selectedCategory === 'all') && (
+            <div className="mb-6 p-5 sm:p-6 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-surface border-2 border-accent/40 rounded-card shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-3xs font-bold uppercase tracking-wider bg-accent/15 text-accent px-2 py-0.5 rounded-full">
+                      ⭐ Personalized Employee Policy
+                    </span>
+                    <span className="text-3xs font-medium text-ink-muted">
+                      Real-time Compensation & Scheme Sync
+                    </span>
+                  </div>
+                  <h3 className="font-serif text-lg sm:text-xl font-bold text-ink">
+                    My Variable Pay Target & Incentive Breakdown Document
+                  </h3>
+                  <p className="text-xs text-ink-muted mt-1 max-w-2xl">
+                    {employeeRecord ? (
+                      <>
+                        Tailored for <strong className="text-ink">{employeeRecord.name}</strong> ({employeeRecord.designation || 'Staff'} · {employeeRecord.department || 'General'}). Includes live Fixed vs Variable split ratio, assigned scheme metrics (<strong>{employeeRecord.variable_pay_scheme || 'Standard Scheme'}</strong>), target pool of <strong>₹{Number(employeeRecord.current_variable_salary || 0).toLocaleString('en-IN')}/mo</strong>, and benchmark rules.
+                      </>
+                    ) : (
+                      'View and print your customized variable incentive policy document showing exact percentage weights, maximum rupee earnings per metric, benchmark targets, and governance guidelines.'
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0 w-full sm:w-auto">
+                  <a
+                    href={employeeRecord ? `/documents/my-variable-pay-target?employee_id=${employeeRecord.employee_id}` : '/documents/my-variable-pay-target'}
+                    className="btn-primary text-xs w-full sm:w-auto justify-center shadow-xs"
+                  >
+                    📄 Open Policy Document →
+                  </a>
+                  {canManageDocs && (
+                    <span className="text-3xs text-ink-muted hidden sm:inline">
+                      Managers can switch staff inside viewer
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="panel panel-body bg-surface text-center p-12 text-ink-muted">
               Loading training materials and SOPs...

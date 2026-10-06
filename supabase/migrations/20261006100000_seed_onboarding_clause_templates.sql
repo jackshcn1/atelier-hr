@@ -2,6 +2,12 @@
 -- Migration: Seed Standard Onboarding Clause Templates & Policies
 -- =====================================================================
 
+-- Clear any existing onboarding templates to start fresh
+delete from public.onboarding_doc_templates;
+
+-- Insert all 7 standard onboarding clause templates
+-- These templates automatically merge with new hire data during onboarding
+
 insert into public.onboarding_doc_templates (name, clause_text, default_applicable, default_condition, is_active)
 values
   (
@@ -52,7 +58,6 @@ values
     'department',
     'all',
     true
-  )
-on conflict do nothing;
+  );
 
 notify pgrst, 'reload schema';

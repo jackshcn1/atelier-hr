@@ -14,7 +14,7 @@ create table if not exists public.onboarding_doc_templates (
 );
 
 alter table public.onboarding_doc_templates enable row level security;
-create policy "odt_read" on onboarding_doc_templates for select using (is_admin() or has_permission('manage_documents'));
+create policy "odt_read" on onboarding_doc_templates for select using (auth.role() = 'authenticated');
 create policy "odt_write" on onboarding_doc_templates for all using (is_admin() or has_permission('manage_documents'));
 
 -- 2. Acknowledgment tracking: one combined signed document per employee

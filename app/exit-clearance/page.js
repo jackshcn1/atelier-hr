@@ -196,54 +196,43 @@ function ExitClearanceInner() {
   const isExited = employee.status === 'exited';
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', paddingBottom: 60 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+    <div className="max-w-4xl mx-auto p-6 pb-20">
+      <div className="flex items-start justify-between gap-6 mb-8">
         <div>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: 22, fontWeight: 800, color: '#111827' }}>Exit Clearance</h1>
-          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
-            {employee.name} · {employee.designation || 'Staff'} · {employee.department || 'All'}
+          <h1 className="font-serif text-3xl font-bold text-ink">Exit Clearance</h1>
+          <p className="text-sm text-ink-muted mt-2">
+            Clearance workflow for {employee.name} · {employee.designation || 'Staff'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowPrint(v => !v)}
-            style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155', padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+        <div className="flex gap-2">
+          <button onClick={() => setShowPrint(v => !v)} className="btn-secondary text-xs">
             {showPrint ? 'Hide' : 'Preview'} printable form
           </button>
-          <a href={`/employees/${id}`}
-            style={{ background: '#6b7280', color: 'white', padding: '7px 14px', borderRadius: 6, textDecoration: 'none', fontWeight: 700, fontSize: 12 }}>
-            ← Back
-          </a>
+          <a href={`/employees/${id}`} className="btn-quiet text-xs">← Back to Profile</a>
         </div>
       </div>
 
-      {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: 12, marginBottom: 14, color: '#991b1b', fontSize: 13 }}>{error}</div>}
-      {message && <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 6, padding: 12, marginBottom: 14, color: '#065f46', fontSize: 13 }}>{message}</div>}
+      {error && <div className="p-4 mb-4 bg-bad-wash text-bad rounded-control text-sm border border-bad/20">{error}</div>}
+      {message && <div className="p-4 mb-4 bg-good-wash text-good rounded-control text-sm border border-good/20">{message}</div>}
 
       {/* Outstanding items */}
-      <div style={{
-        background: summary.isCleared ? '#ecfdf5' : summary.hasBlockingIssues ? '#fef2f2' : '#fffbeb',
-        border: `1px solid ${summary.isCleared ? '#a7f3d0' : summary.hasBlockingIssues ? '#fecaca' : '#fde68a'}`,
-        borderRadius: 10, padding: 16, marginBottom: 20,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: summary.openCount > 0 ? 10 : 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: summary.isCleared ? '#065f46' : summary.hasBlockingIssues ? '#991b1b' : '#92400e' }}>
+      <div className={`p-6 rounded-card border shadow-sm mb-6 ${summary.isCleared ? 'bg-good-wash border-good/30' : summary.hasBlockingIssues ? 'bg-bad-wash border-bad/30' : 'bg-warn-wash border-warn/30'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div className={`text-base font-bold ${summary.isCleared ? 'text-good' : summary.hasBlockingIssues ? 'text-bad' : 'text-warn'}`}>
             {summary.isCleared ? '✅ Clearance complete' : `${summary.openCount} outstanding item(s)`}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="flex gap-2">
             {!isExited && (
-              <button onClick={markExited} disabled={saving}
-                style={{ background: '#dc2626', color: 'white', border: 'none', padding: '7px 16px', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+              <button onClick={markExited} disabled={saving} className="btn-danger text-xs">
                 Mark as exited
               </button>
             )}
             {summary.isCleared ? (
-              <button onClick={reopenClearance} disabled={saving}
-                style={{ background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '7px 14px', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+              <button onClick={reopenClearance} disabled={saving} className="btn-secondary text-xs">
                 Reopen clearance
               </button>
             ) : (
-              <button onClick={markCleared} disabled={saving}
-                style={{ background: '#059669', color: 'white', border: 'none', padding: '7px 16px', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+              <button onClick={markCleared} disabled={saving} className="btn-primary text-xs">
                 Mark clearance complete
               </button>
             )}
@@ -251,13 +240,10 @@ function ExitClearanceInner() {
         </div>
 
         {summary.openCount > 0 && (
-          <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#374151' }}>
+          <ul className="space-y-1.5 text-sm text-ink-muted list-none pl-0">
             {summary.openItems.map(item => (
-              <li key={item.key} style={{ marginBottom: 3 }}>
-                <span style={{
-                  display: 'inline-block', width: 8, height: 8, borderRadius: '50%', marginRight: 6,
-                  background: item.severity === 'high' ? '#dc2626' : item.severity === 'medium' ? '#f59e0b' : '#9ca3af',
-                }} />
+              <li key={item.key} className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${item.severity === 'high' ? 'bg-bad' : item.severity === 'medium' ? 'bg-warn' : 'bg-ink-muted'}`} />
                 {item.label}
               </li>
             ))}
@@ -265,56 +251,54 @@ function ExitClearanceInner() {
         )}
 
         {summary.isCleared && summary.settledOn && (
-          <div style={{ fontSize: 12, color: '#047857', marginTop: 8 }}>
+          <div className="text-xs text-good font-medium mt-2">
             Settled {summary.settledOn} by {summary.settledBy}
           </div>
         )}
       </div>
 
       {/* Exit facts */}
-      <form onSubmit={saveExitFacts} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 10, padding: 18, marginBottom: 18 }}>
-        <h2 style={{ margin: '0 0 14px 0', fontSize: 16, fontWeight: 800, color: '#111827' }}>Exit details</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+      <form onSubmit={saveExitFacts} className="panel panel-body bg-surface mb-8">
+        <h2 className="panel-title mb-5">Exit details</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <label className="field-label">
             Last working day
             <input type="date" name="last_working_day" defaultValue={record?.last_working_day || employee.date_of_leaving || ''}
-              style={{ display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 6, border: '1.5px solid #cbd5e1' }} />
+              className="field" />
           </label>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+          <label className="field-label">
             Exit type
-            <select name="exit_type" defaultValue={record?.exit_type || ''}
-              style={{ display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 6, border: '1.5px solid #cbd5e1' }}>
+            <select name="exit_type" defaultValue={record?.exit_type || ''} className="field">
               <option value="">Not recorded</option>
               {EXIT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </label>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+          <label className="field-label">
             Notice period (days)
             <input type="number" name="notice_period_days" defaultValue={record?.notice_period_days ?? ''}
-              style={{ display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 6, border: '1.5px solid #cbd5e1' }} />
+              className="field" />
           </label>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+          <label className="field-label">
             Gratuity payable (₹)
             <input type="number" name="gratuity_payable" defaultValue={record?.gratuity_payable ?? 0}
-              style={{ display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 6, border: '1.5px solid #cbd5e1' }} />
+              className="field" />
           </label>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+          <label className="field-label">
             Last salary paid on
             <input type="date" name="last_salary_paid_date" defaultValue={record?.last_salary_paid_date || ''}
-              style={{ display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 6, border: '1.5px solid #cbd5e1' }} />
+              className="field" />
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#374151', marginTop: 18 }}>
-            <input type="checkbox" name="notice_served" defaultChecked={record?.notice_served || false} />
+          <label className="flex items-center gap-2 pt-6 font-medium text-sm text-ink">
+            <input type="checkbox" name="notice_served" defaultChecked={record?.notice_served || false} className="rounded border-rule" />
             Notice served
           </label>
         </div>
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 14 }}>
+        <label className="field-label">
           Remarks
           <textarea name="open_remarks" rows={2} defaultValue={record?.open_remarks || ''}
-            style={{ display: 'block', width: '100%', marginTop: 4, padding: '7px 10px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontFamily: 'inherit' }} />
+            className="field font-sans" />
         </label>
-        <button type="submit" disabled={saving}
-          style={{ background: saving ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', padding: '9px 20px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <button type="submit" disabled={saving} className="btn-primary mt-4">
           {saving ? 'Saving…' : 'Save exit details'}
         </button>
       </form>

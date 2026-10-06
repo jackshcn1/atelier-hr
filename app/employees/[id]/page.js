@@ -273,6 +273,12 @@ export default function EmployeeDetail() {
       exit_reason: statusEdit === 'exited' ? (exitReason || null) : null
     };
 
+    if (statusEdit === 'on-notice' && !resignationLetter) {
+        setError('Please upload the resignation letter before moving to "Serving Notice Period" status.');
+        setSavingStatus(false);
+        return;
+    }
+
     const { error: upErr } = await supabase.from('employees').update(update).eq('employee_id', id);
     setSavingStatus(false);
 
@@ -823,14 +829,12 @@ export default function EmployeeDetail() {
             >
               ⭐ Appraisals →
             </a>
-            {['on-notice', 'exited'].includes(employee.status) && (
-              <a
-                href={`/exit-clearance?id=${id}`}
-                className="btn-secondary text-xs text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100"
-              >
-                🚪 Exit Clearance →
-              </a>
-            )}
+            <a
+              href={`/exit-clearance?id=${id}`}
+              className="btn-secondary text-xs text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100"
+            >
+              🚪 Exit Clearance →
+            </a>
             <button
               type="button"
               onClick={() => window.print()}
@@ -1034,31 +1038,35 @@ export default function EmployeeDetail() {
                   </select>
                 </div>
 
-                {statusEdit === 'exited' && (
+                {['on-notice', 'exited'].includes(statusEdit) && (
                   <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-control space-y-3">
-                    <div>
-                      <label className="field-label text-amber-900">Official Date of Leaving</label>
-                      <input
-                        type="date"
-                        value={exitDate}
-                        onChange={e => setExitDate(e.target.value)}
-                        className="field bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label text-amber-900">Exit Reason Code</label>
-                      <select
-                        value={exitReason}
-                        onChange={e => setExitReason(e.target.value)}
-                        className="field bg-white"
-                      >
-                        <option value="">Select reason code…</option>
-                        <option value="resigned">Voluntary Resignation</option>
-                        <option value="absconding">Absconding</option>
-                        <option value="terminated_disciplinary">Terminated (Disciplinary)</option>
-                        <option value="terminated_admin">Terminated (Administrative)</option>
-                      </select>
-                    </div>
+                    {statusEdit === 'exited' && (
+                      <>
+                        <div>
+                          <label className="field-label text-amber-900">Official Date of Leaving</label>
+                          <input
+                            type="date"
+                            value={exitDate}
+                            onChange={e => setExitDate(e.target.value)}
+                            className="field bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="field-label text-amber-900">Exit Reason Code</label>
+                          <select
+                            value={exitReason}
+                            onChange={e => setExitReason(e.target.value)}
+                            className="field bg-white"
+                          >
+                            <option value="">Select reason code…</option>
+                            <option value="resigned">Voluntary Resignation</option>
+                            <option value="absconding">Absconding</option>
+                            <option value="terminated_disciplinary">Terminated (Disciplinary)</option>
+                            <option value="terminated_admin">Terminated (Administrative)</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
 
                     <div className="pt-2 border-t border-amber-200/80">
                       <label className="field-label text-amber-900">Resignation Letter Upload</label>

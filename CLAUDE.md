@@ -80,4 +80,9 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Public anon key (JWT starting with `eyJ...`)
 - `SUPABASE_SERVICE_ROLE_KEY` — Protected server-side secret key (used strictly in backend routes and local sync scripts)
 
-**Last Updated**: 2026-10-06 — Onboarding workflow, compiled agreement documentation generator, physical signature gate, and executive employee master profile dossier complete. Embeds 1:1 square photo cropper, asset tracking with deposits/statuses, and seamless PDF agreement compilation in the Add New Employee drawer and Employee Profile.
+**Last Updated**: 2026-10-06 — Completed:
+- **Onboarding Workflow**: 5-stage gating (`Draft` → `Documents Pending` → `Compensation Set` → `Assets Issued` → `Active`), standing legal/compliance terms auto-compiler with merge fields, instant A4 PDF agreement generator, and mandatory Day 1 physical signature verification gate.
+- **Executive Employee Dossier**: Segmented tabbed profile layout (`Job & Hierarchy`, `Personal & ID`, `Compensation & Slips`, `Assets & Facilities`, `Compliance & Training`, `Notes & Record`), interactive 1:1 square photo cropper with zoom/pan, unified asset inventory with deposit status, and full multi-section master record print dossier.
+- **Recruitment Pipeline**: Atelier design system layout with headcount positions, active pipeline tracking, candidate evaluation scoring, and stage transitions.
+- **Exit Clearance & Resignation Gateway**: Mandatory resignation letter upload gate to move employees to "Serving Notice Period" (`on-notice`), early stage-based access to the Exit Clearance workspace during notice, and finalized departure settlement tracking.
+- **Personalized Variable Pay Policy Document**: Real-time customized variable pay target document (`/documents/my-variable-pay-target`) calculating dynamic Fixed vs Variable CTC ratios, weighted metric component rupee distributions, attainment payout tiers, benchmark targets, and print-ready policy agreements for each employee.
