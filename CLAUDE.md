@@ -80,4 +80,4 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Public anon key (JWT starting with `eyJ...`)
 - `SUPABASE_SERVICE_ROLE_KEY` — Protected server-side secret key (used strictly in backend routes and local sync scripts)
 
-**Last Updated**: 2026-10-05 — Phase audit complete (1-4 done, 2 deferred open items: Exit page design, Recruitment layout). See `.claude/audit/atelier-phase-audit-20261005.md` for full context. Theme universal applied using existing card design (white card + blue header + rounded border).
+**Last Updated**: 2026-10-06 — Onboarding workflow, compiled agreement documentation generator, physical signature gate, and executive employee master profile dossier complete. Embeds 1:1 square photo cropper, asset tracking with deposits/statuses, and seamless PDF agreement compilation in the Add New Employee drawer and Employee Profile.
