@@ -145,11 +145,14 @@ export default function EmployeesPage() {
   const [clauseTemplates, setClauseTemplates] = useState(DEFAULT_ONBOARDING_CLAUSES);
   const [selectedClauses, setSelectedClauses] = useState({});
   const [customClauseTexts, setCustomClauseTexts] = useState({});
-  const [editingClauseId, setEditingClauseId] = useState(null);
 
+  // Physical Signed Document Upload & Verification
   const [isSignedCollected, setIsSignedCollected] = useState(false);
   const [signedDate, setSignedDate] = useState(new Date().toISOString().slice(0, 10));
   const [signedFile, setSignedFile] = useState(null);
+
+  // Modal Preview for Document Printing / Download
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -242,13 +245,8 @@ export default function EmployeesPage() {
     }
   }
 
-  // Instant Printable Agreement PDF Download / Print from inside Drawer
-  function printOnboardingDocumentPacket() {
-    if (!form.name.trim()) {
-      setError('Please enter the employee name first before downloading or printing the document.');
-      return;
-    }
-
+  // Generate Document HTML and Data for Printing or Modal Preview
+  const compiledDocData = useMemo(() => {
     const split = computeSalarySplit(form.current_fixed_salary || 0, payrollSettings);
     const splitText = `Basic+DA: ₹${split.basic_da.toLocaleString('en-IN')}, HRA: ₹${split.hra.toLocaleString('en-IN')}, Other Allowances: ₹${split.other_allowances.toLocaleString('en-IN')}`;
 
@@ -282,23 +280,122 @@ export default function EmployeesPage() {
     };
 
     const activeTemplates = clauseTemplates.filter(t => selectedClauses[t.id]);
-    const clausesHtml = activeTemplates.map(t => {
+    const clausesWithMerged = activeTemplates.map(t => {
       let text = customClauseTexts[t.id] || t.clause_text;
       Object.entries(mergeMap).forEach(([k, v]) => {
         text = text.split(k).join(v);
       });
-      return `<div style="margin-bottom: 20px;"><h3 style="font-family: Georgia, serif; font-size: 13px; font-weight: bold; margin: 0 0 4px 0; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px;">${t.name}</h3><p style="margin: 0; line-height: 1.6; color: #374151; font-size: 11px; white-space: pre-wrap;">${text}</p></div>`;
-    }).join('');
+      return { id: t.id, name: t.name, text };
+    });
 
-    const win = window.open('', '_blank');
-    if (!win) {
-      alert('Please allow popups to open the printable document.');
+    return {
+      name: form.name || 'Candidate',
+      refCode: form.employee_id || 'PENDING',
+      designation: form.designation || 'Staff',
+      department: form.department || 'General',
+      doj: form.date_of_joining || new Date().toISOString().slice(0, 10),
+      fixedSalary: `₹${Number(form.current_fixed_salary || 0).toLocaleString('en-IN')}/mo`,
+      variableTarget: `₹${Number(form.current_variable_salary || 0).toLocaleString('en-IN')}/mo`,
+      empType: form.employment_type || 'Full-time',
+      phone: form.phone || '—',
+      clauses: clausesWithMerged
+    };
+  }, [form, assetsForm, payrollSettings, clauseTemplates, selectedClauses, customClauseTexts]);
+
+  // Open modal preview or print
+  function handleDownloadPrintClick() {
+    if (!form.name.trim()) {
+      setError('Please enter at least the candidate name before previewing or printing the agreement.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    win.document.write(`<!DOCTYPE html><html><head><title>Onboarding Agreement — ${form.name}</title><style>@page{size:A4 portrait;margin:12mm 15mm;}body{font-family:system-ui,-apple-system,sans-serif;font-size:11px;color:#111;margin:20px auto;max-width:750px;line-height:1.5;}h1,h2,h3{font-family:Georgia,serif;}.header{border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-end;}.summary{background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:10px;margin-bottom:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:11px;}.label{font-size:9px;text-transform:uppercase;color:#6b7280;font-weight:bold;display:block;}.declaration{background:#f9fafb;border:1px solid #d1d5db;border-radius:4px;padding:12px;margin:24px 0 32px 0;font-size:11px;}.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #ccc;}.sig-line{border-bottom:1px solid #000;padding-bottom:40px;margin-bottom:4px;}</style></head><body><div class="header"><div><div style="font-size:20px;font-weight:bold;font-family:Georgia,serif;">ATELIER HOSPITALITY</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6b7280;font-weight:600;">Official Appointment & Onboarding Compliance Agreement</div></div><div style="text-align:right;font-size:10px;color:#6b7280;font-family:monospace;"><div>Ref Code: <strong>${form.employee_id || 'PENDING'}</strong></div><div>Date: ${form.date_of_joining || new Date().toISOString().slice(0, 10)}</div></div></div><div class="summary"><div><span class="label">Candidate Name</span><strong>${form.name}</strong></div><div><span class="label">Designation</span><span>${form.designation || 'Staff'}</span></div><div><span class="label">Department</span><span>${form.department || 'General'}</span></div><div><span class="label">Date of Joining</span><span>${form.date_of_joining || '—'}</span></div><div><span class="label">Fixed Salary (CTC)</span><span>₹${Number(form.current_fixed_salary || 0).toLocaleString('en-IN')}/mo</span></div><div><span class="label">Variable Target</span><span>₹${Number(form.current_variable_salary || 0).toLocaleString('en-IN')}/mo</span></div><div><span class="label">Employment Type</span><span style="text-transform:capitalize;">${form.employment_type || 'Full-time'}</span></div><div><span class="label">Contact Phone</span><span>${form.phone || '—'}</span></div></div><div>${clausesHtml}</div><div class="declaration"><div style="font-weight:bold;margin-bottom:4px;">Declaration & Acceptance:</div><div>I, <strong>${form.name}</strong>, acknowledge that I have read, understood, and received a copy of the above terms of employment, compensation breakdown, code of conduct, POSH guidelines, and asset allocation schedule. I unconditionally agree to abide by all the policies and procedures established by Atelier.</div></div><div class="sig-grid"><div><div class="sig-line"></div><strong>${form.name}</strong><div style="font-size:9px;color:#6b7280;text-transform:uppercase;">Employee Signature & Date</div></div><div><div class="sig-line"></div><strong>Atelier Operations / HR</strong><div style="font-size:9px;color:#6b7280;text-transform:uppercase;">Authorized Management Signatory & Date</div></div></div></body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); }, 400);
+    setPreviewModalOpen(true);
+  }
+
+  function triggerBrowserPrint() {
+    const clausesHtml = compiledDocData.clauses.map(c => (
+      `<div style="margin-bottom: 18px;">
+        <h3 style="font-family: Georgia, serif; font-size: 13px; font-weight: bold; margin: 0 0 4px 0; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px;">${c.name}</h3>
+        <p style="margin: 0; line-height: 1.6; color: #374151; font-size: 11px; white-space: pre-wrap;">${c.text}</p>
+      </div>`
+    )).join('');
+
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Onboarding Agreement — ${compiledDocData.name}</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm 15mm; }
+    body { font-family: system-ui, -apple-system, sans-serif; font-size: 11px; color: #111; margin: 20px auto; max-width: 750px; line-height: 1.5; }
+    h1, h2, h3 { font-family: Georgia, serif; }
+    .header { border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .summary { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px; margin-bottom: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 11px; }
+    .label { font-size: 9px; text-transform: uppercase; color: #6b7280; font-weight: bold; display: block; }
+    .declaration { background: #f9fafb; border: 1px solid #d1d5db; border-radius: 4px; padding: 12px; margin: 24px 0 32px 0; font-size: 11px; }
+    .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; }
+    .sig-line { border-bottom: 1px solid #000; padding-bottom: 40px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div style="font-size: 20px; font-weight: bold; font-family: Georgia, serif;">ATELIER HOSPITALITY</div>
+      <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; font-weight: 600;">Official Appointment & Onboarding Compliance Agreement</div>
+    </div>
+    <div style="text-align: right; font-size: 10px; color: #6b7280; font-family: monospace;">
+      <div>Ref Code: <strong>${compiledDocData.refCode}</strong></div>
+      <div>Date: ${compiledDocData.doj}</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div><span class="label">Candidate Name</span><strong>${compiledDocData.name}</strong></div>
+    <div><span class="label">Designation</span><span>${compiledDocData.designation}</span></div>
+    <div><span class="label">Department</span><span>${compiledDocData.department}</span></div>
+    <div><span class="label">Date of Joining</span><span>${compiledDocData.doj}</span></div>
+    <div><span class="label">Fixed Salary (CTC)</span><span>${compiledDocData.fixedSalary}</span></div>
+    <div><span class="label">Variable Target</span><span>${compiledDocData.variableTarget}</span></div>
+    <div><span class="label">Employment Type</span><span style="text-transform: capitalize;">${compiledDocData.empType}</span></div>
+    <div><span class="label">Contact Phone</span><span>${compiledDocData.phone}</span></div>
+  </div>
+
+  <div>${clausesHtml}</div>
+
+  <div class="declaration">
+    <div style="font-weight: bold; margin-bottom: 4px;">Declaration & Acceptance:</div>
+    <div>I, <strong>${compiledDocData.name}</strong>, acknowledge that I have read, understood, and received a copy of the above terms of employment, compensation breakdown, code of conduct, POSH guidelines, and asset allocation schedule. I unconditionally agree to abide by all the policies and procedures established by Atelier.</div>
+  </div>
+
+  <div class="sig-grid">
+    <div>
+      <div class="sig-line"></div>
+      <strong>${compiledDocData.name}</strong>
+      <div style="font-size: 9px; color: #6b7280; text-transform: uppercase;">Employee Signature & Date</div>
+    </div>
+    <div>
+      <div class="sig-line"></div>
+      <strong>Atelier Operations / HR</strong>
+      <div style="font-size: 9px; color: #6b7280; text-transform: uppercase;">Authorized Management Signatory & Date</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const printWindow = window.open(blobUrl, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+    } else {
+      // Fallback: download HTML directly if popup is blocked
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `Onboarding_Agreement_${compiledDocData.name.replace(/\s+/g, '_')}.html`;
+      a.click();
+    }
   }
 
   async function handleAdd(e, saveAsDraft = false) {
@@ -1395,107 +1492,142 @@ export default function EmployeesPage() {
           {/* =========================================================================
               SECTION 7: ONBOARDING COMPLIANCE CLAUSES & COMPILED PDF DOWNLOAD
               ========================================================================= */}
-          <div style={{ marginBottom: 24, border: '1px solid #bfdbfe', borderRadius: 8, padding: 16, background: '#f8fafc' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+          <div style={{ marginBottom: 24, border: '1.5px solid #3b82f6', borderRadius: 8, padding: 18, background: '#f8fafc' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#1e40af' }}>
-                  7. Onboarding Terms, Compliance Agreement & Physical Signature Gate
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>📜</span> 7. Onboarding Terms, Compliance Contract & Physical Signature Gate
                 </div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                  Selected terms are compiled with live form values into a single printable appointment & policy contract.
+                <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>
+                  Clauses are dynamically merged with live employee details, salary split, assets & policies.
                 </div>
               </div>
 
               {/* Instant Download / Print Button */}
               <button
                 type="button"
-                onClick={printOnboardingDocumentPacket}
+                onClick={handleDownloadPrintClick}
                 style={{
                   background: '#1e40af', color: 'white', border: 'none',
-                  padding: '9px 18px', borderRadius: 6, fontWeight: 700, fontSize: 13,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  boxShadow: '0 2px 5px rgba(30,64,175,0.2)'
+                  padding: '10px 20px', borderRadius: 6, fontWeight: 700, fontSize: 13,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                  boxShadow: '0 2px 6px rgba(30,64,175,0.25)'
                 }}
               >
-                🖨️ Download / Print Compiled Agreement (PDF)
+                <span>🖨️</span> Download / Print Compiled Agreement (PDF)
               </button>
             </div>
 
             {/* Checklist of Auto-ticked Clauses */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10, marginBottom: 16 }}>
-              {clauseTemplates.map(c => {
-                const isSelected = !!selectedClauses[c.id];
-                return (
-                  <label
-                    key={c.id}
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 8,
-                      background: isSelected ? 'white' : '#f1f5f9',
-                      padding: '8px 12px', borderRadius: 6,
-                      border: isSelected ? '1px solid #93c5fd' : '1px solid #cbd5e1',
-                      cursor: 'pointer', fontSize: 12
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={e => setSelectedClauses(prev => ({ ...prev, [c.id]: e.target.checked }))}
-                      style={{ marginTop: 2 }}
-                    />
-                    <div>
-                      <strong style={{ color: isSelected ? '#1e293b' : '#64748b' }}>{c.name}</strong>
-                      {c.default_applicable === 'assets_assigned' && (
-                        <span style={{ fontSize: 10, color: '#0369a1', marginLeft: 6, fontWeight: 600 }}>[Auto for Assets]</span>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
+                Select Policies & Clauses to Include in Agreement:
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+                {clauseTemplates.map(c => {
+                  const isSelected = !!selectedClauses[c.id];
+                  return (
+                    <label
+                      key={c.id}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 8,
+                        background: isSelected ? 'white' : '#f1f5f9',
+                        padding: '8px 12px', borderRadius: 6,
+                        border: isSelected ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                        cursor: 'pointer', fontSize: 12
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={e => setSelectedClauses(prev => ({ ...prev, [c.id]: e.target.checked }))}
+                        style={{ marginTop: 2 }}
+                      />
+                      <div>
+                        <strong style={{ color: isSelected ? '#1e293b' : '#64748b' }}>{c.name}</strong>
+                        {c.default_applicable === 'assets_assigned' && (
+                          <span style={{ fontSize: 10, color: '#0369a1', marginLeft: 6, fontWeight: 600 }}>[Auto for Assets]</span>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Physical Signature Gate Verification */}
-            <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, padding: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
-                ✍️ Physical Signature & Collection Status
+            {/* =========================================================================
+                PERMANENT, ALWAYS-VISIBLE SIGNED DOCUMENT UPLOAD & VERIFICATION CARD
+                ========================================================================= */}
+            <div style={{ background: '#ffffff', border: '1.5px solid #10b981', borderRadius: 8, padding: 16, boxShadow: '0 1px 4px rgba(16,185,129,0.08)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12, borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#065f46', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>✍️</span> Physical Signed Document Collection & Upload
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 12,
+                  background: isSignedCollected ? '#dcfce7' : '#fef3c7',
+                  color: isSignedCollected ? '#15803d' : '#b45309'
+                }}>
+                  {isSignedCollected ? '🟢 Signed Document Verified (Active)' : '🟡 Pending Physical Signature (Draft / Docs Pending)'}
+                </span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#15803d', cursor: 'pointer' }}>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, alignItems: 'start' }}>
+                {/* 1. File Upload Box */}
+                <div style={{ border: '2px dashed #93c5fd', borderRadius: 8, padding: 14, background: '#f8fafc', textAlign: 'center' }}>
+                  <div style={{ fontSize: 24, marginBottom: 4 }}>📄</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a8a', marginBottom: 4 }}>
+                    Upload Scanned Signed Agreement
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
+                    Accepted: PDF, Scanned Photo (.jpg, .png)
+                  </div>
                   <input
-                    type="checkbox"
-                    checked={isSignedCollected}
-                    onChange={e => setIsSignedCollected(e.target.checked)}
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      setSignedFile(file);
+                      if (file) {
+                        setIsSignedCollected(true);
+                      }
+                    }}
+                    style={{ fontSize: 12, maxWidth: '100%' }}
                   />
-                  Document Physically Signed & Collected on Day 1
-                </label>
+                  {signedFile && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#15803d', fontWeight: 700 }}>
+                      ✓ Selected: {signedFile.name} ({(signedFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+                </div>
 
-                {isSignedCollected && (
-                  <>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
-                      Date Signed:
-                      <input
-                        type="date"
-                        value={signedDate}
-                        onChange={e => setSignedDate(e.target.value)}
-                        style={{ marginLeft: 6, padding: '4px 8px', borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 12 }}
-                      />
-                    </label>
+                {/* 2. Verification Checkbox & Date */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, fontWeight: 700, color: '#15803d', cursor: 'pointer', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: 10, borderRadius: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={isSignedCollected}
+                      onChange={e => setIsSignedCollected(e.target.checked)}
+                      style={{ marginTop: 3 }}
+                    />
+                    <div>
+                      <span>Physical signature collected & verified on Day 1</span>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: '#166534', marginTop: 2 }}>
+                        Tick this when candidate has physically signed and returned the agreement.
+                      </div>
+                    </div>
+                  </label>
 
-                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
-                      Upload Signed Scanned Copy:
-                      <input
-                        type="file"
-                        accept=".pdf,image/*"
-                        onChange={e => setSignedFile(e.target.files?.[0] || null)}
-                        style={{ marginLeft: 6, fontSize: 11 }}
-                      />
-                    </label>
-                  </>
-                )}
-              </div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
-                {isSignedCollected
-                  ? '✓ Gate verified: Saving will register employee directly as Active!'
-                  : 'ℹ️ If unsigned now, employee will save as Draft / Documents Pending until signed document is verified.'}
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                    Date Signed & Collected:
+                    <input
+                      type="date"
+                      value={signedDate}
+                      onChange={e => setSignedDate(e.target.value)}
+                      style={{ width: '100%', padding: '6px 10px', marginTop: 4, borderRadius: 4, border: '1px solid #cbd5e1', fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -1547,6 +1679,112 @@ export default function EmployeesPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* =========================================================================
+          IN-PAGE MODAL PREVIEW FOR ONBOARDING AGREEMENT
+          ========================================================================= */}
+      {previewModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.65)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div style={{
+            background: 'white', width: '100%', maxWidth: 840, maxHeight: '90vh',
+            borderRadius: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)'
+          }}>
+            {/* Modal Top Bar */}
+            <div style={{ background: '#1e3a8a', color: 'white', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>📋 Onboarding Compliance Agreement Preview</div>
+                <div style={{ fontSize: 12, opacity: 0.85 }}>{compiledDocData.name} ({compiledDocData.designation}) • Ready for Print / Physical Sign-off</div>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={triggerBrowserPrint}
+                  style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  🖨️ Print Agreement / Save PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewModalOpen(false)}
+                  style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Document Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 32, background: '#f8fafc' }}>
+              <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 6, padding: 32, boxShadow: '0 2px 4px rgba(0,0,0,0.05)', maxWidth: 720, margin: '0 auto' }}>
+                {/* Header */}
+                <div style={{ borderBottom: '2px solid #111', paddingBottom: 12, marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 'bold', fontFamily: 'Georgia, serif', color: '#111827' }}>ATELIER HOSPITALITY</div>
+                    <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#6b7280', fontWeight: 600 }}>Official Appointment & Onboarding Compliance Agreement</div>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 11, color: '#6b7280', fontFamily: 'monospace' }}>
+                    <div>Ref Code: <strong>{compiledDocData.refCode}</strong></div>
+                    <div>Date: {compiledDocData.doj}</div>
+                  </div>
+                </div>
+
+                {/* Summary Box */}
+                <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, fontSize: 12 }}>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Candidate Name</span><strong>{compiledDocData.name}</strong></div>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Designation</span><span>{compiledDocData.designation}</span></div>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Department</span><span>{compiledDocData.department}</span></div>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Date of Joining</span><span>{compiledDocData.doj}</span></div>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Fixed Salary (CTC)</span><span>{compiledDocData.fixedSalary}</span></div>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Variable Target</span><span>{compiledDocData.variableTarget}</span></div>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Employment Type</span><span style={{ textTransform: 'capitalize' }}>{compiledDocData.empType}</span></div>
+                  <div><span style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b7280', fontWeight: 'bold', display: 'block' }}>Contact Phone</span><span>{compiledDocData.phone}</span></div>
+                </div>
+
+                {/* Clauses */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {compiledDocData.clauses.map(c => (
+                    <div key={c.id}>
+                      <h4 style={{ fontFamily: 'Georgia, serif', fontSize: 13, fontWeight: 'bold', margin: '0 0 4px 0', color: '#111827', borderBottom: '1px solid #e5e7eb', paddingBottom: 2 }}>
+                        {c.name}
+                      </h4>
+                      <p style={{ margin: 0, lineHeight: 1.6, color: '#374151', fontSize: 11, whiteSpace: 'pre-wrap' }}>
+                        {c.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Declaration */}
+                <div style={{ background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: 6, padding: 12, margin: '24px 0 32px 0', fontSize: 11 }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Declaration & Acceptance:</div>
+                  <div style={{ color: '#374151', lineHeight: 1.5 }}>
+                    I, <strong>{compiledDocData.name}</strong>, acknowledge that I have read, understood, and received a copy of the above terms of employment, compensation breakdown, code of conduct, POSH guidelines, and asset allocation schedule. I unconditionally agree to abide by all the policies and procedures established by Atelier.
+                  </div>
+                </div>
+
+                {/* Signatures */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, textAlign: 'center', marginTop: 30, paddingTop: 20, borderTop: '1px solid #ccc' }}>
+                  <div>
+                    <div style={{ borderBottom: '1px solid #000', paddingBottom: 40, marginBottom: 4 }}></div>
+                    <strong>{compiledDocData.name}</strong>
+                    <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase' }}>Employee Signature & Date</div>
+                  </div>
+                  <div>
+                    <div style={{ borderBottom: '1px solid #000', paddingBottom: 40, marginBottom: 4 }}></div>
+                    <strong>Atelier Operations / HR</strong>
+                    <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase' }}>Authorized Management Signatory & Date</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Employees Table List */}
