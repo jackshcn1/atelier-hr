@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/supabaseClient';
 
-const CATEGORIES = [
+const BASE_CATEGORIES = [
   { id: 'all', label: 'All Resources', icon: '📚' },
   { id: 'sop', label: 'SOPs & Workflows', icon: '🧑‍🍳' },
   { id: 'policy', label: 'Company Policies', icon: '📋' },
@@ -16,6 +16,7 @@ function DocumentsHubContent() {
   const supabase = createClient();
 
   const [documents, setDocuments] = useState([]);
+  const [clauseTemplates, setClauseTemplates] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
@@ -32,13 +33,7 @@ function DocumentsHubContent() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    if (catQuery && (CATEGORIES.some(c => c.id === catQuery) || catQuery === 'all')) {
-      setSelectedCategory(catQuery);
-    }
-  }, [catQuery]);
-
-  // Upload/Create Modal state
+  // Upload/Create Document Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingDocId, setEditingDocId] = useState(null);
   const [formTitle, setFormTitle] = useState('');
@@ -49,6 +44,21 @@ function DocumentsHubContent() {
   const [formContent, setFormContent] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  // Clause Template Modal state
+  const [showClauseModal, setShowClauseModal] = useState(false);
+  const [editingClauseId, setEditingClauseId] = useState(null);
+  const [clauseName, setClauseName] = useState('');
+  const [clauseText, setClauseText] = useState('');
+  const [clauseApplicable, setClauseApplicable] = useState('department');
+  const [clauseCondition, setClauseCondition] = useState('all');
+  const [savingClause, setSavingClause] = useState(false);
+
+  useEffect(() => {
+    if (catQuery && (BASE_CATEGORIES.some(c => c.id === catQuery) || catQuery === 'all' || catQuery === 'onboarding_documentation')) {
+      setSelectedCategory(catQuery);
+    }
+  }, [catQuery]);
 
   useEffect(() => {
     loadUserAndDocs();
@@ -62,6 +72,7 @@ function DocumentsHubContent() {
     const { data: { user } } = await supabase.auth.getUser();
     setCurrentUser(user);
 
+    let isPrivileged = false;
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
@@ -70,15 +81,15 @@ function DocumentsHubContent() {
         .maybeSingle();
 
       setCurrentUserProfile(profile);
-      const isPrivileged = profile?.is_super_admin || profile?.role === 'admin' || profile?.permissions?.manage_documents;
-      setCanManageDocs(!!isPrivileged);
+      isPrivileged = !!(profile?.is_super_admin || profile?.role === 'admin' || profile?.role === 'hr_manager' || profile?.permissions?.manage_documents);
+      setCanManageDocs(isPrivileged);
     }
 
     // 2. Fetch departments
     const { data: depts } = await supabase.from('departments').select('name').order('name');
     setDepartments((depts || []).map(d => d.name));
 
-    // 3. Fetch documents
+    // 3. Fetch company documents
     const { data: docs, error: docsErr } = await supabase
       .from('company_documents')
       .select('*')
@@ -87,8 +98,27 @@ function DocumentsHubContent() {
     if (docsErr) setError(docsErr.message);
     else setDocuments(docs || []);
 
+    // 4. If admin/HR, fetch onboarding clause templates
+    if (isPrivileged) {
+      const { data: clauses } = await supabase
+        .from('onboarding_doc_templates')
+        .select('*')
+        .order('id');
+      setClauseTemplates(clauses || []);
+    }
+
     setLoading(false);
   }
+
+  const categories = useMemo(() => {
+    if (canManageDocs) {
+      return [
+        ...BASE_CATEGORIES,
+        { id: 'onboarding_documentation', label: 'Onboarding Terms & Clauses', icon: '📝' }
+      ];
+    }
+    return BASE_CATEGORIES;
+  }, [canManageDocs]);
 
   function handleOpenCreateModal(doc = null) {
     if (doc) {
@@ -128,7 +158,6 @@ function DocumentsHubContent() {
     let fileUrl = null;
     let fileName = null;
 
-    // Handle PDF upload if chosen
     if (formType === 'pdf' && selectedFile) {
       const ext = selectedFile.name.split('.').pop();
       const path = `company_docs/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
@@ -165,7 +194,6 @@ function DocumentsHubContent() {
     }
 
     if (editingDocId) {
-      // Update existing
       const { error: updateErr } = await supabase
         .from('company_documents')
         .update(payload)
@@ -178,7 +206,6 @@ function DocumentsHubContent() {
         loadUserAndDocs();
       }
     } else {
-      // Create new
       payload.created_by = currentUser?.email || 'admin';
       const { error: insertErr } = await supabase
         .from('company_documents')
@@ -209,19 +236,84 @@ function DocumentsHubContent() {
     }
   }
 
+  // Clause Template CRUD
+  function handleOpenClauseModal(clause = null) {
+    if (clause) {
+      setEditingClauseId(clause.id);
+      setClauseName(clause.name);
+      setClauseText(clause.clause_text);
+      setClauseApplicable(clause.default_applicable || 'department');
+      setClauseCondition(clause.default_condition || 'all');
+    } else {
+      setEditingClauseId(null);
+      setClauseName('');
+      setClauseText('');
+      setClauseApplicable('department');
+      setClauseCondition('all');
+    }
+    setShowClauseModal(true);
+  }
+
+  async function handleSaveClause(e) {
+    e.preventDefault();
+    if (!clauseName.trim() || !clauseText.trim()) return;
+    setSavingClause(true);
+    setError('');
+
+    const payload = {
+      name: clauseName.trim(),
+      clause_text: clauseText.trim(),
+      default_applicable: clauseApplicable,
+      default_condition: clauseCondition.trim() || 'all',
+      is_active: true,
+      updated_at: new Date().toISOString()
+    };
+
+    if (editingClauseId) {
+      const { error: upErr } = await supabase
+        .from('onboarding_doc_templates')
+        .update(payload)
+        .eq('id', editingClauseId);
+      if (upErr) setError(upErr.message);
+      else {
+        setMessage('✓ Onboarding clause template updated.');
+        setShowClauseModal(false);
+        loadUserAndDocs();
+      }
+    } else {
+      const { error: insErr } = await supabase
+        .from('onboarding_doc_templates')
+        .insert([payload]);
+      if (insErr) setError(insErr.message);
+      else {
+        setMessage('✓ Onboarding clause template created.');
+        setShowClauseModal(false);
+        loadUserAndDocs();
+      }
+    }
+    setSavingClause(false);
+  }
+
+  async function handleDeleteClause(id) {
+    if (!window.confirm('Delete this standing onboarding clause template?')) return;
+    const { error: delErr } = await supabase.from('onboarding_doc_templates').delete().eq('id', id);
+    if (delErr) setError(delErr.message);
+    else {
+      setMessage('✓ Clause template removed.');
+      loadUserAndDocs();
+    }
+  }
+
   // Filtered documents list
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
-      // Category filter
       if (selectedCategory !== 'all' && doc.category !== selectedCategory) return false;
 
-      // Department filter
       if (selectedDept !== 'all') {
         if (selectedDept === 'company_wide' && doc.department !== null) return false;
         if (selectedDept !== 'company_wide' && doc.department !== selectedDept && doc.department !== null) return false;
       }
 
-      // Search query
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return (
@@ -234,335 +326,482 @@ function DocumentsHubContent() {
   }, [documents, selectedCategory, selectedDept, searchQuery]);
 
   return (
-    <div>
+    <div className="pb-16 max-w-7xl mx-auto">
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <div>
-          <h1 style={{ margin: '0 0 4px 0' }}>Training Materials & SOPs</h1>
-          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
-            Official restaurant workflows, standard operating procedures, hygiene protocols, and company policies.
+          <h1 className="font-serif text-3xl font-bold text-ink mb-1">
+            {selectedCategory === 'onboarding_documentation' ? 'Onboarding Terms & Clause Templates' : 'Training Materials & SOPs'}
+          </h1>
+          <p className="text-xs text-ink-muted">
+            {selectedCategory === 'onboarding_documentation'
+              ? 'Manage standing clauses, statutory terms, POSH policies, and merge-field rules that compile into the new hire onboarding packet.'
+              : 'Official restaurant workflows, standard operating procedures, hygiene protocols, and company policies.'}
           </p>
         </div>
 
         {canManageDocs && (
-          <button
-            onClick={() => handleOpenCreateModal()}
-            style={{
-              background: '#059669', color: 'white', border: 'none', padding: '10px 18px',
-              borderRadius: 6, fontWeight: 'bold', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6
-            }}
-          >
-            ➕ Upload / Create Document
-          </button>
+          <div>
+            {selectedCategory === 'onboarding_documentation' ? (
+              <button
+                type="button"
+                onClick={() => handleOpenClauseModal()}
+                className="btn-primary text-xs"
+              >
+                + Add Clause Template
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleOpenCreateModal()}
+                className="btn-primary text-xs"
+              >
+                ➕ Upload / Create Document
+              </button>
+            )}
+          </div>
         )}
       </div>
 
       {/* Notifications */}
       {message && (
-        <div style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#065f46', padding: '10px 16px', borderRadius: 6, marginBottom: 16, fontWeight: 500 }}>
-          {message}
+        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-control text-xs flex items-center justify-between">
+          <span>{message}</span>
+          <button onClick={() => setMessage('')} className="text-emerald-600 font-bold ml-2">✕</button>
         </div>
       )}
       {error && (
-        <div style={{ background: '#fee2e2', border: '1px solid #f87171', color: '#991b1b', padding: '10px 16px', borderRadius: 6, marginBottom: 16, fontWeight: 500 }}>
-          {error}
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-control text-xs flex items-center justify-between">
+          <span>⚠️ {error}</span>
+          <button onClick={() => setError('')} className="text-red-600 font-bold ml-2">✕</button>
         </div>
       )}
 
-      {/* Category Tabs (Mobile Scrollable) */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, marginBottom: 16, scrollbarWidth: 'none' }}>
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.id)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 20,
-              border: selectedCategory === cat.id ? 'none' : '1px solid #d1d5db',
-              background: selectedCategory === cat.id ? '#111827' : 'white',
-              color: selectedCategory === cat.id ? 'white' : '#374151',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <span>{cat.icon}</span>
-            <span>{cat.label}</span>
-          </button>
-        ))}
+      {/* Category Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-6 scrollbar-none">
+        {categories.map(cat => {
+          const isSelected = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-full border transition-all whitespace-nowrap ${
+                isSelected
+                  ? 'bg-ink text-white border-ink shadow-xs'
+                  : 'bg-surface text-ink border-rule hover:bg-page'
+              }`}
+            >
+              <span>{cat.icon}</span>
+              <span>{cat.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Department Filter & Search Bar */}
-      <div style={{ background: 'white', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb', marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-        <input
-          type="text"
-          placeholder="🔍 Search SOPs, guidelines, policies..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          style={{ flex: 1, minWidth: 240, padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
-        />
+      {/* =========================================================================
+          VIEW A: ONBOARDING CLAUSE TEMPLATES MANAGER (ADMIN ONLY)
+          ========================================================================= */}
+      {selectedCategory === 'onboarding_documentation' && canManageDocs ? (
+        <div className="space-y-6">
+          <div className="panel panel-body bg-surface">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-rule-soft">
+              <div>
+                <h2 className="panel-title text-base font-bold text-ink">Standing Onboarding Clause Templates</h2>
+                <p className="text-xs text-ink-muted">
+                  These clause templates automatically merge with new hire data on the employee onboarding page.
+                </p>
+              </div>
+              <span className="text-2xs font-bold bg-page px-2.5 py-1 rounded border border-rule-soft">
+                {clauseTemplates.length} Templates Active
+              </span>
+            </div>
 
-        <select
-          value={selectedDept}
-          onChange={e => setSelectedDept(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: 'white' }}
-        >
-          <option value="all">All Departments Scope</option>
-          <option value="company_wide">Company-Wide (All Staff)</option>
-          {departments.map(d => (
-            <option key={d} value={d}>{d} Department Only</option>
-          ))}
-        </select>
-      </div>
+            {/* Merge Fields Cheat-sheet */}
+            <div className="mb-6 p-4 bg-amber-50/70 border border-amber-200 rounded-control text-xs text-amber-950">
+              <div className="font-bold text-xs mb-1.5 flex items-center gap-1.5">
+                <span>⚡ Available Merge Field Placeholders:</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-3xs font-mono">
+                <div><strong className="text-ink">{'{{name}}'}</strong>: Candidate Name</div>
+                <div><strong className="text-ink">{'{{designation}}'}</strong>: Role / Title</div>
+                <div><strong className="text-ink">{'{{department}}'}</strong>: Department</div>
+                <div><strong className="text-ink">{'{{doj}}'}</strong>: Date of Joining</div>
+                <div><strong className="text-ink">{'{{fixed_salary}}'}</strong>: Monthly Fixed CTC</div>
+                <div><strong className="text-ink">{'{{variable_scheme}}'}</strong>: Incentive Scheme</div>
+                <div><strong className="text-ink">{'{{salary_split}}'}</strong>: Statutory Split</div>
+                <div><strong className="text-ink">{'{{assets_list}}'}</strong>: Issued Assets & Keys</div>
+                <div><strong className="text-ink">{'{{pf_esi_status}}'}</strong>: PF/ESI Coverage</div>
+                <div><strong className="text-ink">{'{{emergency_contact}}'}</strong>: Emergency Contact</div>
+              </div>
+            </div>
 
-      {/* Documents Grid */}
-      {loading ? (
-        <div style={{ background: 'white', padding: 40, textAlign: 'center', borderRadius: 8, color: '#6b7280' }}>
-          Loading training materials and SOPs...
-        </div>
-      ) : filteredDocs.length === 0 ? (
-        <div style={{ background: 'white', padding: 48, textAlign: 'center', borderRadius: 8, border: '1px solid #e5e7eb', color: '#6b7280' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
-          <div style={{ fontWeight: 600, color: '#374151', fontSize: 16 }}>No documents found</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>
-            Try selecting another category or clear your search query.
+            {/* Clause Templates List */}
+            {clauseTemplates.length === 0 ? (
+              <div className="p-8 text-center text-ink-muted bg-page rounded-control border border-rule-soft">
+                <p className="text-sm font-semibold text-ink">No custom clause templates found.</p>
+                <p className="text-xs text-ink-muted mt-1">Default standard appointment terms will be used.</p>
+                <button
+                  type="button"
+                  onClick={() => handleOpenClauseModal()}
+                  className="btn-primary text-xs mt-3 inline-block"
+                >
+                  + Add First Clause Template
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {clauseTemplates.map(clause => (
+                  <div key={clause.id} className="p-4 border border-rule rounded-control bg-surface shadow-2xs">
+                    <div className="flex justify-between items-start gap-4 mb-2">
+                      <div>
+                        <h3 className="font-serif text-sm font-bold text-ink">{clause.name}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-3xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-page border border-rule-soft text-ink-muted">
+                            Rule: {clause.default_applicable} ({clause.default_condition})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenClauseModal(clause)}
+                          className="btn-secondary text-2xs py-1"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClause(clause.id)}
+                          className="btn-quiet text-2xs py-1 text-red-600 hover:text-red-800"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-ink-muted bg-page/40 p-3 rounded border border-rule-soft font-mono leading-relaxed whitespace-pre-wrap">
+                      {clause.clause_text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-          {filteredDocs.map(doc => {
-            const catInfo = CATEGORIES.find(c => c.id === doc.category) || { label: doc.category, icon: '📄' };
-            const isPdf = doc.doc_type === 'pdf';
+        /* =========================================================================
+            VIEW B: STANDARD COMPANY DOCUMENTS & SOPS GRID
+            ========================================================================= */
+        <div>
+          {/* Department Filter & Search Bar */}
+          <div className="panel panel-body bg-surface mb-6 flex gap-3 flex-wrap items-center justify-between p-3.5">
+            <input
+              type="text"
+              placeholder="🔍 Search SOPs, guidelines, policies..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="field flex-1 min-w-[240px] text-xs"
+            />
 
-            return (
-              <div
-                key={doc.id}
-                style={{
-                  background: 'white',
-                  borderRadius: 10,
-                  border: '1px solid #e5e7eb',
-                  padding: '16px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-                }}
-              >
-                <div>
-                  {/* Category Pill & Dept Scope */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, background: '#f3f4f6', color: '#374151', padding: '3px 8px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {catInfo.icon} {catInfo.label}
-                    </span>
+            <select
+              value={selectedDept}
+              onChange={e => setSelectedDept(e.target.value)}
+              className="field w-auto text-xs bg-surface"
+            >
+              <option value="all">All Departments Scope</option>
+              <option value="company_wide">Company-Wide (All Staff)</option>
+              {departments.map(d => (
+                <option key={d} value={d}>{d} Department Only</option>
+              ))}
+            </select>
+          </div>
 
-                    <span style={{ fontSize: 11, fontWeight: 600, color: doc.department ? '#7c3aed' : '#047857', background: doc.department ? '#f5f3ff' : '#ecfdf5', padding: '2px 8px', borderRadius: 4 }}>
-                      {doc.department ? `${doc.department}` : '🌐 All Staff'}
-                    </span>
-                  </div>
-
-                  {/* Title */}
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 700, color: '#111827', lineHeight: 1.3 }}>
-                    {doc.title}
-                  </h3>
-
-                  {/* Description */}
-                  {doc.description && (
-                    <p style={{ margin: '0 0 14px 0', fontSize: 13, color: '#6b7280', lineHeight: 1.4 }}>
-                      {doc.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Footer & Action Buttons */}
-                <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: '#9ca3af', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    {isPdf ? '📎 PDF Document' : '📝 Standard SOP'}
-                  </span>
-
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {canManageDocs && (
-                      <button
-                        onClick={() => handleOpenCreateModal(doc)}
-                        style={{ background: 'none', border: 'none', color: '#4f46e5', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
-                      >
-                        ✏️ Edit
-                      </button>
-                    )}
-
-                    <a
-                      href={`/documents/${doc.id}`}
-                      style={{
-                        background: '#111827',
-                        color: 'white',
-                        padding: '6px 14px',
-                        borderRadius: 6,
-                        textDecoration: 'none',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}
-                    >
-                      📖 Open →
-                    </a>
-                  </div>
-                </div>
+          {/* Documents Grid */}
+          {loading ? (
+            <div className="panel panel-body bg-surface text-center p-12 text-ink-muted">
+              Loading training materials and SOPs...
+            </div>
+          ) : filteredDocs.length === 0 ? (
+            <div className="panel panel-body bg-surface text-center p-12 border border-rule">
+              <div className="text-3xl mb-2">📚</div>
+              <div className="font-bold text-ink text-base">No documents found</div>
+              <div className="text-xs text-ink-muted mt-1">
+                Try selecting another category or clear your search query.
               </div>
-            );
-          })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredDocs.map(doc => {
+                const catInfo = BASE_CATEGORIES.find(c => c.id === doc.category) || { label: doc.category, icon: '📄' };
+                const isPdf = doc.doc_type === 'pdf';
+
+                return (
+                  <div
+                    key={doc.id}
+                    className="panel panel-body bg-surface flex flex-col justify-between hover:shadow-md transition-shadow"
+                  >
+                    <div>
+                      <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+                        <span className="text-3xs font-bold bg-page text-ink px-2.5 py-1 rounded-full border border-rule-soft flex items-center gap-1.5">
+                          {catInfo.icon} {catInfo.label}
+                        </span>
+                        <span className="text-3xs font-semibold px-2 py-0.5 rounded bg-page text-ink-muted border border-rule-soft">
+                          {doc.department ? `${doc.department}` : '🌐 All Staff'}
+                        </span>
+                      </div>
+
+                      <h3 className="font-serif text-base font-bold text-ink mb-1.5 leading-snug">
+                        {doc.title}
+                      </h3>
+
+                      {doc.description && (
+                        <p className="text-xs text-ink-muted mb-4 line-clamp-2">
+                          {doc.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-rule-soft flex justify-between items-center">
+                      <span className="text-3xs text-ink-muted font-medium">
+                        {isPdf ? '📎 PDF Document' : '📝 Standard SOP'}
+                      </span>
+                      <div className="flex gap-2 items-center">
+                        {canManageDocs && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCreateModal(doc)}
+                            className="text-xs text-accent font-semibold hover:underline"
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                        <a
+                          href={`/documents/${doc.id}`}
+                          className="btn-secondary text-2xs py-1"
+                        >
+                          View Document →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Upload & Create Document Modal */}
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: 'white', borderRadius: 12, maxWidth: 640, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 24, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111827' }}>
-                {editingDocId ? 'Edit Document' : 'Upload / Create Company Document'}
-              </h2>
+      {/* =========================================================================
+          MODAL: CREATE / EDIT ONBOARDING CLAUSE TEMPLATE
+          ========================================================================= */}
+      {showClauseModal && (
+        <div className="fixed inset-0 bg-ink/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-settle">
+          <div className="panel panel-body max-w-xl w-full bg-surface shadow-2xl">
+            <div className="flex justify-between items-center pb-3 mb-4 border-b border-rule-soft">
+              <h3 className="font-serif text-lg font-bold text-ink">
+                {editingClauseId ? 'Edit Onboarding Clause Template' : 'Add Onboarding Clause Template'}
+              </h3>
               <button
-                onClick={() => setShowModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6b7280' }}
+                type="button"
+                onClick={() => setShowClauseModal(false)}
+                className="text-ink-muted hover:text-ink text-sm p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveDocument} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleSaveClause} className="space-y-4">
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                  Document Title *
-                </label>
+                <label className="field-label">Clause Title *</label>
                 <input
                   type="text"
-                  placeholder="e.g. Kitchen Station Closing SOP"
-                  value={formTitle}
-                  onChange={e => setFormTitle(e.target.value)}
                   required
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }}
+                  placeholder="e.g. Asset Allocation & Key Liability Terms"
+                  value={clauseName}
+                  onChange={e => setClauseName(e.target.value)}
+                  className="field text-xs"
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                    Category
-                  </label>
+                  <label className="field-label">Default Applicability Rule</label>
+                  <select
+                    value={clauseApplicable}
+                    onChange={e => setClauseApplicable(e.target.value)}
+                    className="field text-xs bg-surface"
+                  >
+                    <option value="department">Department Specific</option>
+                    <option value="employment_type">Employment Contract Type</option>
+                    <option value="assets_assigned">Assets or Keys Assigned</option>
+                    <option value="pf_esi_applicable">PF / ESI Statutory Applicable</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">Condition Value</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. all / Kitchen / accommodation"
+                    value={clauseCondition}
+                    onChange={e => setClauseCondition(e.target.value)}
+                    className="field text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label">Clause Content (with merge fields) *</label>
+                <textarea
+                  rows={6}
+                  required
+                  placeholder="The company agrees to employ {{name}} as {{designation}}..."
+                  value={clauseText}
+                  onChange={e => setClauseText(e.target.value)}
+                  className="field text-xs font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-rule-soft">
+                <button
+                  type="button"
+                  onClick={() => setShowClauseModal(false)}
+                  className="btn-secondary text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingClause}
+                  className="btn-primary text-xs"
+                >
+                  {savingClause ? 'Saving…' : 'Save Template'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL: UPLOAD / CREATE STANDARD COMPANY DOCUMENT
+          ========================================================================= */}
+      {showModal && (
+        <div className="fixed inset-0 bg-ink/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-settle">
+          <div className="panel panel-body max-w-2xl w-full bg-surface shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-3 mb-4 border-b border-rule-soft">
+              <h3 className="font-serif text-lg font-bold text-ink">
+                {editingDocId ? 'Edit Document' : 'Upload or Publish New Document'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-ink-muted hover:text-ink text-sm p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDocument} className="space-y-4">
+              <div>
+                <label className="field-label">Document Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Kitchen Opening & Hygiene Protocol"
+                  value={formTitle}
+                  onChange={e => setFormTitle(e.target.value)}
+                  className="field text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="field-label">Resource Category</label>
                   <select
                     value={formCategory}
                     onChange={e => setFormCategory(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: 'white' }}
+                    className="field text-xs bg-surface"
                   >
                     <option value="sop">🧑‍🍳 SOPs & Workflows</option>
                     <option value="policy">📋 Company Policies</option>
                     <option value="food_safety">🛡️ Food Safety & Hygiene</option>
-                    <option value="training">🎓 Training Material</option>
+                    <option value="training">🎓 Training Materials</option>
                     <option value="targets">🎯 Department Targets</option>
-                    <option value="other">📄 Other Resource</option>
                   </select>
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                    Department Scope
-                  </label>
+                  <label className="field-label">Department Scope</label>
                   <select
                     value={formDept}
                     onChange={e => setFormDept(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: 'white' }}
+                    className="field text-xs bg-surface"
                   >
                     <option value="">🌐 All Departments (Company-Wide)</option>
                     {departments.map(d => (
-                      <option key={d} value={d}>{d} Department Only</option>
+                      <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                  Brief Summary / Description
-                </label>
+                <label className="field-label">Short Description</label>
                 <input
                   type="text"
-                  placeholder="One sentence explaining what this SOP or policy covers"
+                  placeholder="Brief 1-sentence summary of this document..."
                   value={formDescription}
                   onChange={e => setFormDescription(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }}
+                  className="field text-xs"
                 />
               </div>
 
-              {/* Format Toggle: In-App Article vs PDF Upload */}
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                  Document Format
-                </label>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <label className="field-label">Document Format</label>
+                <div className="flex gap-4 text-xs text-ink">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
-                      name="format"
-                      value="article"
+                      name="docFormat"
                       checked={formType === 'article'}
                       onChange={() => setFormType('article')}
                     />
-                    <span>📝 <strong>Write in App (HTML / Text SOP)</strong> — Editable anytime</span>
+                    <span>📝 Write In-App Article / SOP</span>
                   </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
-                      name="format"
-                      value="pdf"
+                      name="docFormat"
                       checked={formType === 'pdf'}
                       onChange={() => setFormType('pdf')}
                     />
-                    <span>📎 <strong>Upload PDF File</strong></span>
+                    <span>📎 Upload PDF File</span>
                   </label>
                 </div>
               </div>
 
               {formType === 'pdf' ? (
-                <div style={{ background: '#f9fafb', padding: 16, borderRadius: 6, border: '1px dashed #d1d5db' }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    Select PDF Document from Computer
-                  </label>
+                <div className="p-4 bg-page border border-dashed border-rule rounded-control">
+                  <label className="field-label">Select PDF File from Computer</label>
                   <input
                     type="file"
                     accept=".pdf"
                     onChange={e => setSelectedFile(e.target.files?.[0] || null)}
-                    style={{ fontSize: 13 }}
+                    className="field text-xs py-1 bg-surface"
                   />
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
-                    PDFs are protected with non-downloadable viewer and dynamic forensic watermark.
-                  </div>
                 </div>
               ) : (
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                    SOP / Policy Content (HTML / Text)
-                  </label>
+                  <label className="field-label">SOP / Policy Content (HTML or formatted text)</label>
                   <textarea
-                    rows={10}
-                    placeholder="<h2>1. Overview</h2><p>Describe the standard procedure here...</p><h2>2. Step-by-step Instructions</h2><p>Step 1: ...</p>"
+                    rows={8}
+                    placeholder="Enter full workflow instructions, guidelines, and rules..."
                     value={formContent}
                     onChange={e => setFormContent(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }}
+                    className="field text-xs font-mono"
                   />
-                  <span style={{ fontSize: 11, color: '#6b7280', marginTop: 3, display: 'block' }}>
-                    Supports HTML tags like &lt;h2&gt;, &lt;p&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;strong&gt;.
-                  </span>
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <div className="flex justify-between items-center pt-3 border-t border-rule-soft">
                 {editingDocId ? (
                   <button
                     type="button"
@@ -570,26 +809,26 @@ function DocumentsHubContent() {
                       const doc = documents.find(d => d.id === editingDocId);
                       if (doc) handleDeleteDocument(doc);
                     }}
-                    style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
+                    className="text-xs text-red-600 hover:underline"
                   >
                     Delete Document
                   </button>
                 ) : <div />}
 
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #d1d5db', background: 'white', color: '#4b5563', cursor: 'pointer', fontSize: 13 }}
+                    className="btn-secondary text-xs"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={uploading}
-                    style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: '#059669', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: 13 }}
+                    className="btn-primary text-xs"
                   >
-                    {uploading ? 'Saving Document...' : editingDocId ? 'Save Changes' : 'Publish Document'}
+                    {uploading ? 'Publishing…' : 'Publish Document'}
                   </button>
                 </div>
               </div>
@@ -601,9 +840,9 @@ function DocumentsHubContent() {
   );
 }
 
-export default function DocumentsHubPage() {
+export default function DocumentsPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading training portal...</div>}>
+    <Suspense fallback={<div className="p-12 text-center text-ink-muted">Loading documents…</div>}>
       <DocumentsHubContent />
     </Suspense>
   );
