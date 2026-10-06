@@ -566,15 +566,19 @@ export default function EmployeeDetail() {
 
   return (
     <div className="pb-16 max-w-7xl mx-auto">
-      {/* Top Breadcrumb & Return Nav */}
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <a href="/employees" className="btn-quiet text-xs font-semibold text-ink-muted hover:text-ink">
-          ← Back to Employees Directory
-        </a>
-        <div className="text-2xs font-mono text-ink-muted">
-          Employee Ref: <span className="font-bold text-ink">{id}</span>
+      {/* =========================================================================
+          INTERACTIVE SCREEN UI (Hidden when printing full dossier)
+          ========================================================================= */}
+      <div className="print:hidden">
+        {/* Top Breadcrumb & Return Nav */}
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <a href="/employees" className="btn-quiet text-xs font-semibold text-ink-muted hover:text-ink">
+            ← Back to Employees Directory
+          </a>
+          <div className="text-2xs font-mono text-ink-muted">
+            Employee Ref: <span className="font-bold text-ink">{id}</span>
+          </div>
         </div>
-      </div>
 
       {/* Global Alerts & Feedback */}
       {error && (
@@ -1950,6 +1954,335 @@ export default function EmployeeDetail() {
           </div>
         </div>
       )}
+      </div> {/* End print:hidden interactive UI */}
+
+      {/* =========================================================================
+          PRINT-ONLY COMPREHENSIVE DOSSIER (Collates details from ALL pages/tabs)
+          ========================================================================= */}
+      <div className="hidden print:block font-sans text-xs text-gray-900 leading-relaxed max-w-4xl mx-auto">
+        {/* Document Header */}
+        <div className="border-b-2 border-gray-900 pb-3 mb-5 flex justify-between items-end">
+          <div>
+            <div className="text-3xs uppercase tracking-widest font-bold text-gray-500">
+              Atelier Hospitality HRMS · Official Personnel Dossier
+            </div>
+            <h1 className="font-serif text-2xl font-bold text-gray-900 mt-0.5">
+              Employee Master Record — {employee.name}
+            </h1>
+          </div>
+          <div className="text-right text-3xs text-gray-500 font-mono">
+            <div>Employee ID: {id}</div>
+            <div>Printed: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+          </div>
+        </div>
+
+        {/* Core Profile Snapshot */}
+        <div className="border border-gray-300 rounded p-3 mb-4 bg-gray-50/60">
+          <div className="flex gap-4 items-start">
+            {photoUrl ? (
+              <img src={photoUrl} alt="" className="w-16 h-16 object-cover rounded border border-gray-300" />
+            ) : (
+              <div className="w-16 h-16 rounded bg-gray-200 flex items-center justify-center font-bold text-lg text-gray-600 border border-gray-300">
+                {initials}
+              </div>
+            )}
+            <div className="flex-1 grid grid-cols-3 gap-x-4 gap-y-2">
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Full Legal Name</div>
+                <div className="font-bold text-sm text-gray-900">{employee.name}</div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Designation / Role</div>
+                <div className="font-semibold text-gray-900">{employee.designation || 'Staff'}</div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Department</div>
+                <div className="font-semibold text-gray-900">{employee.department || 'Unassigned'}</div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Status & Onboarding Stage</div>
+                <div className="font-semibold capitalize text-gray-900">
+                  {employee.status || 'Active'} · Stage: {employee.onboarding_status || 'Active'}
+                </div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Date of Joining</div>
+                <div className="font-semibold text-gray-900">{employee.date_of_joining || '—'} ({tenure})</div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Reporting Manager</div>
+                <div className="font-semibold text-gray-900">{reportingManagerObj?.name || employee.reporting_manager_id || 'Direct Admin'}</div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Primary Contact Phone</div>
+                <div className="font-mono text-gray-900">{employee.phone || '—'}</div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Email Address</div>
+                <div className="text-gray-900">{employee.email || '—'}</div>
+              </div>
+              <div>
+                <div className="text-3xs uppercase text-gray-500 font-bold">Contract & Daily Hours</div>
+                <div className="capitalize text-gray-900">{employee.employment_type || 'Full-time'} · {standardHours} hrs/day</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 1: Personal, Demographic & Emergency Details */}
+        <div className="mb-4">
+          <div className="text-xs uppercase font-bold tracking-wider text-gray-900 border-b border-gray-400 pb-1 mb-2">
+            1. Personal Demographics & Emergency Contacts
+          </div>
+          <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs border border-gray-200 rounded p-3">
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">Date of Birth</span>
+              <span className="font-medium text-gray-900">{personal.dob || '—'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">Gender</span>
+              <span className="font-medium text-gray-900">{personal.gender || '—'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">Blood Group</span>
+              <span className="font-medium text-gray-900">{personal.blood_group || '—'}</span>
+            </div>
+            <div className="col-span-3">
+              <span className="text-gray-500 text-3xs uppercase block font-bold">Residential Address</span>
+              <span className="font-medium text-gray-900">{personal.address || '—'}</span>
+            </div>
+            <div className="col-span-3 bg-red-50 border border-red-200 rounded p-2 grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-red-900 text-3xs uppercase block font-bold">Emergency Contact Person</span>
+                <span className="font-bold text-red-950">{personal.emergency_contact_name || '—'}</span>
+              </div>
+              <div>
+                <span className="text-red-900 text-3xs uppercase block font-bold">Emergency Phone</span>
+                <span className="font-bold text-red-950 font-mono">{personal.emergency_contact_phone || '—'}</span>
+              </div>
+            </div>
+            {personal.previous_work_history && (
+              <div className="col-span-3">
+                <span className="text-gray-500 text-3xs uppercase block font-bold">Prior Experience</span>
+                <span className="text-gray-800">{personal.previous_work_history}</span>
+              </div>
+            )}
+            {personal.education_history && (
+              <div className="col-span-3">
+                <span className="text-gray-500 text-3xs uppercase block font-bold">Education & Qualifications</span>
+                <span className="text-gray-800">{personal.education_history}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Section 2: Statutory ID & Bank Details */}
+        <div className="mb-4">
+          <div className="text-xs uppercase font-bold tracking-wider text-gray-900 border-b border-gray-400 pb-1 mb-2">
+            2. Government ID Proofs & Bank Payout Account
+          </div>
+          <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs border border-gray-200 rounded p-3">
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">ID Proof Document</span>
+              <span className="font-medium text-gray-900">{personal.id_proof_type || 'Aadhaar Card'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">ID Document Number</span>
+              <span className="font-mono font-medium text-gray-900">{sensitive.id_proof_number || '—'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">PF / ESI Coverage</span>
+              <span className="font-medium text-gray-900">
+                PF: {employee.pf_applicable ? (sensitive.pf_number || 'Applicable') : 'No'} · ESI: {employee.esi_applicable ? (sensitive.esi_number || 'Applicable') : 'No'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">Bank Beneficiary Name</span>
+              <span className="font-medium text-gray-900">{sensitive.bank_account_holder_name || employee.name}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">Bank Name & IFSC</span>
+              <span className="font-medium text-gray-900">{sensitive.bank_name || '—'} · {sensitive.bank_ifsc_code || '—'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 text-3xs uppercase block font-bold">Bank Account Number</span>
+              <span className="font-mono font-bold text-gray-900">{sensitive.bank_account_number || '—'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Compensation & Historical Salary Split */}
+        <div className="mb-4">
+          <div className="text-xs uppercase font-bold tracking-wider text-gray-900 border-b border-gray-400 pb-1 mb-2">
+            3. Compensation Structure & Historical Salary Revisions
+          </div>
+          <div className="grid grid-cols-3 gap-4 p-3 bg-gray-50 border border-gray-200 rounded mb-2 text-xs">
+            <div>
+              <div className="text-3xs uppercase text-gray-500 font-bold">Current Fixed CTC</div>
+              <div className="text-base font-bold text-gray-900">₹{Number(employee.current_fixed_salary || 0).toLocaleString('en-IN')} / mo</div>
+            </div>
+            <div>
+              <div className="text-3xs uppercase text-gray-500 font-bold">Variable Pay Pool Target</div>
+              <div className="text-base font-bold text-gray-900">₹{Number(employee.current_variable_salary || 0).toLocaleString('en-IN')} / mo</div>
+            </div>
+            <div>
+              <div className="text-3xs uppercase text-gray-500 font-bold">Assigned Incentive Scheme</div>
+              <div className="font-semibold text-gray-900">{employee.variable_pay_scheme || 'Standard / Manual %'}</div>
+            </div>
+          </div>
+
+          {salaryHistory.length > 0 && (
+            <table className="w-full text-2xs border border-gray-200 text-left">
+              <thead className="bg-gray-100 font-bold text-gray-700 border-b border-gray-300">
+                <tr>
+                  <th className="p-1.5">Effective Date</th>
+                  <th className="p-1.5">Fixed</th>
+                  <th className="p-1.5">Variable</th>
+                  <th className="p-1.5">Statutory Split (Basic · HRA · Other)</th>
+                  <th className="p-1.5">Reason</th>
+                  <th className="p-1.5">Recorded By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {salaryHistory.map(s => (
+                  <tr key={s.id}>
+                    <td className="p-1.5 font-semibold">{s.effective_from}</td>
+                    <td className="p-1.5 font-bold">₹{Number(s.fixed || 0).toLocaleString('en-IN')}</td>
+                    <td className="p-1.5">₹{Number(s.variable || 0).toLocaleString('en-IN')}</td>
+                    <td className="p-1.5 font-mono text-3xs">Basic: ₹{s.basic_da ?? '—'} · HRA: ₹{s.hra ?? '—'} · Other: ₹{s.other_allowances ?? '—'}</td>
+                    <td className="p-1.5 text-gray-600">{s.reason || '—'}</td>
+                    <td className="p-1.5 text-gray-500 text-3xs font-mono">{s.changed_by || 'system'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Section 4: Assets & Facilities Issued */}
+        <div className="mb-4">
+          <div className="text-xs uppercase font-bold tracking-wider text-gray-900 border-b border-gray-400 pb-1 mb-2">
+            4. Assets & Equipment Inventory ({assets.length} items · ₹{totalAssetsDeposit.toLocaleString('en-IN')} deposit held)
+          </div>
+          {assets.length === 0 ? (
+            <p className="text-2xs text-gray-500 italic p-2 border border-gray-200 rounded">No assets tagged to this employee.</p>
+          ) : (
+            <table className="w-full text-2xs border border-gray-200 text-left">
+              <thead className="bg-gray-100 font-bold text-gray-700 border-b border-gray-300">
+                <tr>
+                  <th className="p-1.5">Asset Name</th>
+                  <th className="p-1.5">Tag / Spec / Room #</th>
+                  <th className="p-1.5">Units</th>
+                  <th className="p-1.5">Deposit Amount</th>
+                  <th className="p-1.5">Date Issued</th>
+                  <th className="p-1.5">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {assets.map(a => (
+                  <tr key={a.id}>
+                    <td className="p-1.5 font-semibold">{a.name}</td>
+                    <td className="p-1.5 font-mono">{a.asset_number || '—'}</td>
+                    <td className="p-1.5">{a.units ?? 1}</td>
+                    <td className="p-1.5 font-semibold">{Number(a.deposit_amount) > 0 ? `₹${Number(a.deposit_amount).toLocaleString('en-IN')}` : '—'}</td>
+                    <td className="p-1.5">{a.date_issued || a.date_handed_over || '—'}</td>
+                    <td className="p-1.5 font-bold">{a.status || (a.returned ? 'Returned' : 'Issued')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Section 5: Compliance, Training & Documents on File */}
+        <div className="mb-4">
+          <div className="text-xs uppercase font-bold tracking-wider text-gray-900 border-b border-gray-400 pb-1 mb-2">
+            5. Compliance, Training Checklists & Documents on File
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-2xs">
+            <div className="border border-gray-200 rounded p-2">
+              <div className="font-bold text-gray-700 uppercase mb-1 text-3xs">Training Checklists</div>
+              {trainingRecords.length === 0 ? (
+                <div className="text-gray-500 italic">None assigned</div>
+              ) : (
+                <ul className="space-y-1">
+                  {trainingRecords.map(t => (
+                    <li key={t.id} className="flex justify-between">
+                      <span>{t.training_name || `Module #${t.id}`}</span>
+                      <span className="font-bold uppercase text-3xs">{t.status} {t.completed_date ? `(${t.completed_date})` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="border border-gray-200 rounded p-2">
+              <div className="font-bold text-gray-700 uppercase mb-1 text-3xs">Documents on File</div>
+              {documents.length === 0 ? (
+                <div className="text-gray-500 italic">No files on file</div>
+              ) : (
+                <ul className="space-y-1">
+                  {documents.map(d => (
+                    <li key={d.id} className="flex justify-between">
+                      <span>{d.doc_type}</span>
+                      <span className="text-gray-500 text-3xs font-mono">{d.date_added} · {d.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 6: Performance Record (if any) */}
+        {trackRecord.length > 0 && (
+          <div className="mb-4">
+            <div className="text-xs uppercase font-bold tracking-wider text-gray-900 border-b border-gray-400 pb-1 mb-2">
+              6. Performance Record & Track Log
+            </div>
+            <div className="space-y-1 text-2xs border border-gray-200 rounded p-2.5">
+              {trackRecord.map(t => (
+                <div key={t.id} className="flex gap-2">
+                  <span className="font-bold font-mono text-3xs uppercase text-gray-600">[{t.type}] {t.date}:</span>
+                  <span className="text-gray-800">{t.text}</span>
+                  <span className="text-gray-400 text-3xs">({t.author || 'Admin'})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Signatures & Verification */}
+        <div className="mt-8 pt-6 border-t border-gray-400 grid grid-cols-2 gap-12 text-center text-xs">
+          <div>
+            <div className="border-b border-gray-400 pb-8 mb-2"></div>
+            <div className="font-bold text-gray-900">{employee.name}</div>
+            <div className="text-3xs text-gray-500 uppercase font-semibold">Employee Signature & Date</div>
+          </div>
+          <div>
+            <div className="border-b border-gray-400 pb-8 mb-2"></div>
+            <div className="font-bold text-gray-900">Atelier Hospitality Operations / HR</div>
+            <div className="text-3xs text-gray-500 uppercase font-semibold">Authorized Signatory & Date</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Global CSS for Print */}
+      <style jsx global>{`
+        @media print {
+          nav, header, aside, .no-print {
+            display: none !important;
+          }
+          body {
+            background: white !important;
+            color: #111827 !important;
+            font-size: 12px !important;
+          }
+          @page {
+            margin: 12mm 15mm 12mm 15mm;
+            size: A4 portrait;
+          }
+        }
+      `}</style>
     </div>
   );
 }
