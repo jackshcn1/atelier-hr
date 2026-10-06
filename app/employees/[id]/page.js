@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabaseClient';
 import { computeSalarySplit } from '../../../lib/salarySplit';
@@ -90,6 +90,17 @@ export default function EmployeeDetail() {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [idFrontUrl, setIdFrontUrl] = useState(null);
   const [idBackUrl, setIdBackUrl] = useState(null);
+
+  // Photo Crop Modal State (square 1:1 crop enforced before upload)
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState(null);
+  const [cropImageEl, setCropImageEl] = useState(null);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 }); // px offset from center
+  const [cropScale, setCropScale] = useState(1);
+  const [cropDragging, setCropDragging] = useState(false);
+  const [cropDragStart, setCropDragStart] = useState({ x: 0, y: 0 });
+  const [cropOffsetStart, setCropOffsetStart] = useState({ x: 0, y: 0 });
+  const cropCanvasRef = useRef(null);
 
   async function load() {
     const { data: emp } = await supabase.from('employees').select('*').eq('employee_id', id).single();
@@ -325,15 +336,8 @@ export default function EmployeeDetail() {
   async function uploadPassportPhoto(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingPhoto(true);
-    setError('');
-    const path = `passport-photos/${id}-${Date.now()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage.from('documents').upload(path, file);
-    if (uploadError) { setError(uploadError.message + ' (only admins can upload files right now)'); setUploadingPhoto(false); return; }
-    await supabase.from('employees').update({ passport_photo_url: path }).eq('employee_id', id);
-    setUploadingPhoto(false);
-    notify('Passport photo updated.');
-    load();
+    e.target.value = '';
+    openCropModal(file);
   }
 
   async function uploadIdProof(side, e) {
@@ -425,6 +429,88 @@ export default function EmployeeDetail() {
     if (dbError) setError(dbError.message);
     setUploadingLetter(false);
     notify('Resignation letter archived.');
+    load();
+  }
+
+  // Photo crop helpers — enforce a square 1:1 crop before uploading
+  function openCropModal(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setCropImageSrc(e.target.result);
+      setCropScale(1);
+      setCropOffset({ x: 0, y: 0 });
+      setCropDragging(false);
+      setShowCropModal(true);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function closeCropModal() {
+    setShowCropModal(false);
+    setCropImageSrc(null);
+    setCropImageEl(null);
+  }
+
+  function onCropImageLoad(img) {
+    setCropImageEl(img);
+    setCropScale(1);
+    setCropOffset({ x: 0, y: 0 });
+  }
+
+  function applyCropAndUpload() {
+    if (!cropImageEl) return;
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const OUTPUT_SIZE = 512; // 512x512 high-res square output
+    canvas.width = OUTPUT_SIZE;
+    canvas.height = OUTPUT_SIZE;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+
+    const img = cropImageEl;
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const BOX_SIZE = 288; // 288px preview box (w-72)
+    const ratio = OUTPUT_SIZE / BOX_SIZE;
+
+    ctx.save();
+    // Center of canvas
+    ctx.translate(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2);
+    // User drag pan offset
+    ctx.translate(cropOffset.x * ratio, cropOffset.y * ratio);
+    // User zoom
+    ctx.scale(cropScale, cropScale);
+
+    let renderW, renderH;
+    if (imgAspect >= 1) {
+      renderH = BOX_SIZE * ratio;
+      renderW = renderH * imgAspect;
+    } else {
+      renderW = BOX_SIZE * ratio;
+      renderH = renderW / imgAspect;
+    }
+
+    ctx.drawImage(img, -renderW / 2, -renderH / 2, renderW, renderH);
+    ctx.restore();
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const croppedFile = new File([blob], `passport-${id}-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      uploadPassportPhotoFile(croppedFile);
+    }, 'image/jpeg', 0.92);
+  }
+
+  async function uploadPassportPhotoFile(file) {
+    setUploadingPhoto(true);
+    setError('');
+    const path = `passport-photos/${id}-${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage.from('documents').upload(path, file);
+    if (uploadError) { setError(uploadError.message + ' (only admins can upload files right now)'); setUploadingPhoto(false); return; }
+    await supabase.from('employees').update({ passport_photo_url: path }).eq('employee_id', id);
+    setUploadingPhoto(false);
+    closeCropModal();
+    notify('Passport photo cropped & uploaded successfully.');
     load();
   }
 
@@ -1955,6 +2041,142 @@ export default function EmployeeDetail() {
         </div>
       )}
       </div> {/* End print:hidden interactive UI */}
+
+      {/* =========================================================================
+          SQUARE 1:1 PHOTO CROPPER MODAL (Enforces 1:1 aspect ratio, pan & zoom)
+          ========================================================================= */}
+      {showCropModal && (
+        <div className="fixed inset-0 bg-ink/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-settle">
+          <div className="bg-surface border border-rule rounded-card max-w-md w-full shadow-2xl p-6 text-center">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-rule-soft">
+              <h3 className="font-serif text-lg font-bold text-ink">Crop Passport Photo</h3>
+              <button
+                type="button"
+                onClick={closeCropModal}
+                className="text-ink-muted hover:text-ink text-sm p-1 rounded hover:bg-page"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-ink-muted mb-4">
+              Drag to reposition or use zoom to fit inside the square avatar frame.
+            </p>
+
+            {/* Square Viewport Frame */}
+            <div className="flex justify-center mb-4">
+              <div
+                className="w-72 h-72 rounded-2xl bg-page border-2 border-accent overflow-hidden relative shadow-inner cursor-grab active:cursor-grabbing select-none"
+                onMouseDown={(e) => {
+                  setCropDragging(true);
+                  setCropDragStart({ x: e.clientX, y: e.clientY });
+                  setCropOffsetStart({ ...cropOffset });
+                }}
+                onMouseMove={(e) => {
+                  if (cropDragging) {
+                    setCropOffset({
+                      x: cropOffsetStart.x + (e.clientX - cropDragStart.x),
+                      y: cropOffsetStart.y + (e.clientY - cropDragStart.y)
+                    });
+                  }
+                }}
+                onMouseUp={() => setCropDragging(false)}
+                onMouseLeave={() => setCropDragging(false)}
+                onTouchStart={(e) => {
+                  if (e.touches[0]) {
+                    setCropDragging(true);
+                    setCropDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                    setCropOffsetStart({ ...cropOffset });
+                  }
+                }}
+                onTouchMove={(e) => {
+                  if (cropDragging && e.touches[0]) {
+                    setCropOffset({
+                      x: cropOffsetStart.x + (e.touches[0].clientX - cropDragStart.x),
+                      y: cropOffsetStart.y + (e.touches[0].clientY - cropDragStart.y)
+                    });
+                  }
+                }}
+                onTouchEnd={() => setCropDragging(false)}
+              >
+                {cropImageSrc && (
+                  <img
+                    src={cropImageSrc}
+                    alt="Crop preview"
+                    draggable={false}
+                    onLoad={(e) => onCropImageLoad(e.currentTarget)}
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      width: cropImageEl && (cropImageEl.naturalWidth / cropImageEl.naturalHeight >= 1) ? 'auto' : '100%',
+                      height: cropImageEl && (cropImageEl.naturalWidth / cropImageEl.naturalHeight >= 1) ? '100%' : 'auto',
+                      transform: `translate(-50%, -50%) translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${cropScale})`,
+                      transformOrigin: 'center center',
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                      userSelect: 'none',
+                      pointerEvents: 'none'
+                    }}
+                  />
+                )}
+                {/* Visual Square Grid Overlay */}
+                <div className="absolute inset-0 pointer-events-none border border-white/40 rounded-2xl grid grid-cols-3 grid-rows-3">
+                  <div className="border-r border-b border-white/20"></div>
+                  <div className="border-r border-b border-white/20"></div>
+                  <div className="border-b border-white/20"></div>
+                  <div className="border-r border-b border-white/20"></div>
+                  <div className="border-r border-b border-white/20"></div>
+                  <div className="border-b border-white/20"></div>
+                  <div className="border-r border-white/20"></div>
+                  <div className="border-r border-white/20"></div>
+                  <div></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Zoom Slider Control */}
+            <div className="flex items-center justify-between gap-3 px-2 mb-6">
+              <span className="text-2xs font-semibold text-ink-muted">🔍 Zoom:</span>
+              <input
+                type="range"
+                min="0.6"
+                max="3"
+                step="0.05"
+                value={cropScale}
+                onChange={(e) => setCropScale(parseFloat(e.target.value))}
+                className="flex-1 accent-accent cursor-pointer h-1.5 bg-rule rounded-lg"
+              />
+              <span className="text-2xs font-mono font-bold text-ink w-8 text-right">
+                {cropScale.toFixed(1)}x
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-rule-soft">
+              <button
+                type="button"
+                onClick={closeCropModal}
+                disabled={uploadingPhoto}
+                className="btn-secondary text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyCropAndUpload}
+                disabled={uploadingPhoto}
+                className="btn-primary text-xs flex items-center gap-1.5"
+              >
+                {uploadingPhoto ? 'Uploading…' : '✓ Crop & Save Photo'}
+              </button>
+            </div>
+          </div>
+
+          {/* Hidden Offscreen Canvas for Pixel Output */}
+          <canvas ref={cropCanvasRef} className="hidden" />
+        </div>
+      )}
 
       {/* =========================================================================
           PRINT-ONLY COMPREHENSIVE DOSSIER (Collates details from ALL pages/tabs)
