@@ -9,7 +9,6 @@ const ADMIN_NAV = [
     links: [
       { href: '/recruitment', label: 'Recruitment' },
       { href: '/employees', label: 'Employees' },
-      { href: '/orgchart', label: 'Org Chart' },
     ]
   },
   {
@@ -44,7 +43,6 @@ const ADMIN_NAV = [
 const ADMIN_STANDALONE = [
   { href: '/export', label: 'Export' },
   { href: '/settings', label: 'Settings' },
-  { href: '/recruitment', label: 'Recruitment' },
 ];
 
 const EMPLOYEE_NAV = [

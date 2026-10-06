@@ -133,6 +133,10 @@ export default function EmployeesPage() {
   const [depositSettings, setDepositSettings] = useState({ uniform_deposit_amount: 500, accommodation_deposit_amount: 2000 });
   const [payrollSettings, setPayrollSettings] = useState({ basic_da_floor: 18000, hra_split_percent: 50 });
 
+  // New Filter state
+  const [filterDept, setFilterDept] = useState('All');
+  const [filterStatus, setFilterStatus] = useState(['active', 'on-notice']);
+
   const [form, setForm] = useState(initialEmptyForm);
   const [assetsForm, setAssetsForm] = useState(initialAssetsForm);
   const [showForm, setShowForm] = useState(false);
@@ -640,12 +644,22 @@ export default function EmployeesPage() {
           <p style={{ color: '#666', margin: 0 }}>Showing active and on-notice staff records.</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <a href="/orgchart" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', fontWeight: 700, background: '#eff6ff', padding: '6px 12px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
-            👥 Org Chart →
-          </a>
-          <a href="/employees/all" style={{ fontSize: 13, color: '#4b5563', textDecoration: 'none', fontWeight: 600 }}>View all (incl. past) →</a>
-          <a href="/employees/deleted" style={{ fontSize: 13, color: '#4b5563', textDecoration: 'none', fontWeight: 600 }}>Deleted →</a>
-          <a href="/employees/bulk-import" style={{ fontSize: 13, color: '#4b5563', textDecoration: 'none', fontWeight: 600 }}>Bulk import →</a>
+          <label style={{ fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            Department:
+            <select value={filterDept} onChange={e => setFilterDept(e.target.value)} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }}>
+              <option value="All">All</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </label>
+          <label style={{ fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            Status:
+            <select value={filterStatus.join(',')} onChange={e => setFilterStatus(e.target.value.split(','))} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }}>
+              <option value="active,on-notice">Active + Notice</option>
+              <option value="active">Active Only</option>
+              <option value="on-notice">On Notice Only</option>
+              <option value="exited">Exited</option>
+            </select>
+          </label>
           <button
             onClick={() => setShowForm(s => !s)}
             style={{

@@ -432,16 +432,6 @@ function VariableTargetPolicyContent() {
             <div className="font-bold text-xs text-ink uppercase tracking-wider">
               4. Governance & Operational Guidelines
             </div>
-            {isManager && (
-              <a
-                href="/settings/variable-pay"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-3xs text-accent font-semibold hover:underline no-print"
-              >
-                ⚙️ Edit Guidelines in Settings →
-              </a>
-            )}
           </div>
           {docModel.scheme?.policy_guidelines ? (
             <div className="whitespace-pre-line leading-relaxed text-ink-muted">
