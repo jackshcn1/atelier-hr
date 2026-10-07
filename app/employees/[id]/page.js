@@ -279,6 +279,12 @@ export default function EmployeeDetail() {
         return;
     }
 
+    if (statusEdit === 'exited' && exitRecord?.clearance_status !== 'cleared') {
+        setError('Cannot move employee directly to Exited. The Exit Clearance Form must be completed, signed off, and cleared first. Click "Exit Clearance →" above to finalize.');
+        setSavingStatus(false);
+        return;
+    }
+
     const { error: upErr } = await supabase.from('employees').update(update).eq('employee_id', id);
     setSavingStatus(false);
 
@@ -655,6 +661,15 @@ export default function EmployeeDetail() {
     { id: 'compliance', label: 'Compliance & Training', icon: '📑' },
     { id: 'notes', label: 'Notes & Record', icon: '📝', count: trackRecord.length }
   ];
+
+  if (employee.status === 'exited' || employee.status === 'on-notice' || exitRecord) {
+    TABS.push({
+      id: 'exit',
+      label: 'Exit & Offboarding',
+      icon: '🚪',
+      badge: exitRecord?.clearance_status === 'cleared' ? '✓ Cleared' : (employee.status === 'on-notice' ? '⏳ Notice' : null)
+    });
+  }
 
   return (
     <div className="pb-16 max-w-7xl mx-auto">
@@ -2048,6 +2063,217 @@ export default function EmployeeDetail() {
           </div>
         </div>
       )}
+
+      {/* =========================================================================
+          TAB 7: EXIT & OFFBOARDING CLEARANCE RECORD (Full Historical Record)
+          ========================================================================= */}
+      {activeTab === 'exit' && (
+        <div className="space-y-6 animate-settle">
+          {/* Executive Clearance Status Banner */}
+          <div className={`panel panel-body border shadow-sm p-6 ${
+            exitRecord?.clearance_status === 'cleared'
+              ? 'bg-emerald-50/70 border-emerald-300'
+              : 'bg-amber-50/70 border-amber-300'
+          }`}>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-3xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                    exitRecord?.clearance_status === 'cleared'
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                      : 'bg-amber-100 text-amber-900 border-amber-300'
+                  }`}>
+                    {exitRecord?.clearance_status === 'cleared' ? '✓ Clearance Complete & Signed Off' : '⏳ Pending Exit Clearance Protocol'}
+                  </span>
+                  <span className="text-3xs font-mono text-ink-muted">
+                    Official Exit Date: <strong className="text-ink">{exitRecord?.last_working_day || employee.date_of_leaving || '—'}</strong>
+                  </span>
+                </div>
+                <h2 className="font-serif text-xl font-bold text-ink">
+                  Permanent Exit & Offboarding Dossier
+                </h2>
+                <p className="text-xs text-ink-muted mt-0.5 max-w-2xl">
+                  Historical archive of asset returns, security deposit settlement, statutory gratuity, and handover compliance.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <a
+                  href={`/exit-clearance?id=${id}`}
+                  className="btn-primary text-xs flex items-center gap-1.5 shadow-xs"
+                >
+                  <span>🚪</span> Open Exit Clearance Form →
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Metrics Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="panel p-4 bg-surface">
+              <div className="text-3xs uppercase font-bold text-ink-muted">Exit Classification</div>
+              <div className="font-serif text-lg font-bold text-ink capitalize mt-0.5">
+                {exitRecord?.exit_type ? exitRecord.exit_type.replace(/_/g, ' ') : employee.exit_reason ? employee.exit_reason.replace(/_/g, ' ') : 'Voluntary'}
+              </div>
+              <div className="text-3xs text-ink-muted mt-1">
+                Notice: {exitRecord?.notice_served ? `Served (${exitRecord?.notice_period_days ?? 30} days)` : 'Not served / Waived'}
+              </div>
+            </div>
+
+            <div className="panel p-4 bg-surface">
+              <div className="text-3xs uppercase font-bold text-ink-muted">Statutory Gratuity</div>
+              <div className="font-serif text-lg font-bold text-emerald-800 mt-0.5">
+                ₹{Number(exitRecord?.gratuity_payable || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="text-3xs text-ink-muted mt-1">
+                Status: {exitRecord?.gratuity_paid ? '✓ Disbursed' : 'Unpaid / Excluded'}
+              </div>
+            </div>
+
+            <div className="panel p-4 bg-surface">
+              <div className="text-3xs uppercase font-bold text-ink-muted">Deposits Refunded</div>
+              <div className="font-serif text-lg font-bold text-ink mt-0.5">
+                ₹{totalAssetsDeposit.toLocaleString('en-IN')}
+              </div>
+              <div className="text-3xs text-ink-muted mt-1">
+                {exitRecord?.deposit_settled ? `✓ Settled on ${exitRecord?.settled_on || 'file'}` : 'Pending settlement'}
+              </div>
+            </div>
+
+            <div className="panel p-4 bg-surface">
+              <div className="text-3xs uppercase font-bold text-ink-muted">Clearance Sign-off</div>
+              <div className="font-semibold text-xs text-ink truncate mt-1">
+                {exitRecord?.settled_by || 'HR Operations'}
+              </div>
+              <div className="text-3xs text-ink-muted mt-1">
+                {exitRecord?.settled_on ? `Approved on ${exitRecord.settled_on}` : 'Pending sign-off'}
+              </div>
+            </div>
+          </div>
+
+          {/* Asset Handover Verification Table */}
+          <div className="panel panel-body bg-surface">
+            <h3 className="panel-title text-base font-bold text-ink mb-2">📦 Asset Return & Handover Inventory</h3>
+            <p className="text-xs text-ink-muted mb-4">
+              Detailed tracking of all equipment, room keys, and uniforms verified at departure.
+            </p>
+
+            <div className="overflow-x-auto border border-rule-soft rounded-control">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="bg-page/70 border-b border-rule-soft text-3xs uppercase font-bold text-ink-muted">
+                    <th className="py-2.5 px-3">Asset Description</th>
+                    <th className="py-2.5 px-3">Asset Tag / Serial / Room #</th>
+                    <th className="py-2.5 px-3">Units</th>
+                    <th className="py-2.5 px-3">Deposit (₹)</th>
+                    <th className="py-2.5 px-3">Return Status</th>
+                    <th className="py-2.5 px-3">Date Returned</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rule-soft text-ink">
+                  <tr>
+                    <td className="py-2.5 px-3 font-semibold">Staff Uniform</td>
+                    <td className="py-2.5 px-3 font-mono text-2xs text-ink-muted">—</td>
+                    <td className="py-2.5 px-3">Standard</td>
+                    <td className="py-2.5 px-3 font-semibold">₹500</td>
+                    <td className="py-2.5 px-3 font-bold">
+                      <span className={`px-2 py-0.5 rounded text-3xs ${
+                        exitRecord?.uniform_returned ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+                      }`}>
+                        {exitRecord?.uniform_returned ? '✓ Returned' : 'Not Returned'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-3xs text-ink-muted">
+                      {exitRecord?.uniform_returned ? (exitRecord?.last_working_day || 'Verified') : '—'}
+                    </td>
+                  </tr>
+                  {assets.map(a => (
+                    <tr key={a.id} className="hover:bg-page/30">
+                      <td className="py-2.5 px-3 font-semibold">{a.name}</td>
+                      <td className="py-2.5 px-3 font-mono text-2xs text-accent font-bold">{a.asset_number || '—'}</td>
+                      <td className="py-2.5 px-3">{a.units || 1}</td>
+                      <td className="py-2.5 px-3 font-semibold">
+                        {Number(a.deposit_amount) > 0 ? `₹${Number(a.deposit_amount).toLocaleString('en-IN')}` : '—'}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold">
+                        <span className={`px-2 py-0.5 rounded text-3xs ${
+                          a.returned ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+                        }`}>
+                          {a.returned ? '✓ Returned' : 'Not Returned'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-3xs text-ink-muted">
+                        {a.date_returned || (a.returned ? 'Verified' : '—')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pending Dues Reconciliations & Exit Remarks */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="panel panel-body bg-surface">
+              <h3 className="panel-title text-base font-bold text-ink mb-2">💳 Financial Settlement & Pending Dues</h3>
+              <p className="text-xs text-ink-muted mb-4">Reconciled damage deductions and salary advance balances.</p>
+
+              {(exitRecord?.pending_dues || []).length === 0 ? (
+                <p className="text-xs text-ink-muted italic py-2">No outstanding financial dues or deductions recorded.</p>
+              ) : (
+                <div className="space-y-2 mb-4">
+                  {(exitRecord.pending_dues).map((d, i) => (
+                    <div key={i} className="p-2.5 bg-page border border-rule-soft rounded-control flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-semibold text-ink">{d.label}</span>
+                        {d.date && <span className="text-3xs text-ink-muted ml-2 font-mono">({d.date})</span>}
+                      </div>
+                      <span className="font-bold font-mono text-red-700">₹{Number(d.amount || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-rule-soft text-xs text-ink-muted flex justify-between">
+                <span>Total Deductions Settled:</span>
+                <strong className="text-ink font-mono">
+                  ₹{(exitRecord?.pending_dues || []).reduce((sum, d) => sum + Number(d.amount || 0), 0).toLocaleString('en-IN')}
+                </strong>
+              </div>
+            </div>
+
+            <div className="panel panel-body bg-surface">
+              <h3 className="panel-title text-base font-bold text-ink mb-2">📜 Handover Remarks & Resignation Paperwork</h3>
+              <p className="text-xs text-ink-muted mb-4">Archived documentation for future reference and rehire reviews.</p>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="text-3xs uppercase font-bold text-ink-muted block">Resignation Letter:</span>
+                  {resignationLetter ? (
+                    <a
+                      href={resignationLetter.file_url ? (resignationLetter.file_url.startsWith('http') ? resignationLetter.file_url : '#') : '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 mt-0.5"
+                    >
+                      <span>📄</span> View Archived Resignation Letter ({resignationLetter.date_added}) →
+                    </a>
+                  ) : (
+                    <span className="text-ink-muted italic">No separate letter uploaded</span>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-3xs uppercase font-bold text-ink-muted block">Administrative Handover Notes:</span>
+                  <p className="bg-page/60 p-3 rounded border border-rule-soft text-ink font-sans whitespace-pre-wrap mt-1">
+                    {exitRecord?.open_remarks || employee.notes || 'No specific departure notes recorded.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div> {/* End print:hidden interactive UI */}
 
       {/* =========================================================================
@@ -2477,6 +2703,48 @@ export default function EmployeeDetail() {
                   <span className="text-gray-400 text-3xs">({t.author || 'Admin'})</span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section 7: Exit Clearance & Departure Settlement Archive (for Exited Staff) */}
+        {(employee.status === 'exited' || exitRecord) && (
+          <div className="mb-4">
+            <div className="text-xs uppercase font-bold tracking-wider text-gray-900 border-b border-gray-400 pb-1 mb-2">
+              7. Exit Clearance & Departure Settlement Archive
+            </div>
+            <div className="border border-gray-200 rounded p-3 bg-gray-50/50 space-y-2 text-2xs">
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <span className="text-3xs uppercase text-gray-500 font-bold block">Leaving Date</span>
+                  <strong>{exitRecord?.last_working_day || employee.date_of_leaving || '—'}</strong>
+                </div>
+                <div>
+                  <span className="text-3xs uppercase text-gray-500 font-bold block">Exit Classification</span>
+                  <span className="capitalize">{exitRecord?.exit_type || employee.exit_reason || 'Voluntary'}</span>
+                </div>
+                <div>
+                  <span className="text-3xs uppercase text-gray-500 font-bold block">Notice Served</span>
+                  <span>{exitRecord?.notice_served ? `Served (${exitRecord?.notice_period_days ?? 30} days)` : 'Waived/Pending'}</span>
+                </div>
+                <div>
+                  <span className="text-3xs uppercase text-gray-500 font-bold block">Clearance Status</span>
+                  <strong>{exitRecord?.clearance_status === 'cleared' ? '✓ Fully Cleared & Settled' : 'Pending'}</strong>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                <div>
+                  <div className="font-bold text-gray-700 uppercase text-3xs">Financial Reconciliation</div>
+                  <div>Statutory Gratuity: ₹{Number(exitRecord?.gratuity_payable || 0).toLocaleString('en-IN')} ({exitRecord?.gratuity_paid ? 'Paid' : 'Unpaid'})</div>
+                  <div>Deposits Refunded: ₹{totalAssetsDeposit.toLocaleString('en-IN')} ({exitRecord?.deposit_settled ? `Settled ${exitRecord?.settled_on || ''}` : 'Pending'})</div>
+                </div>
+                <div>
+                  <div className="font-bold text-gray-700 uppercase text-3xs">Handover Sign-off</div>
+                  <div>Settled by: {exitRecord?.settled_by || 'HR Authority'}</div>
+                  <div>Settled on: {exitRecord?.settled_on || '—'}</div>
+                </div>
+              </div>
             </div>
           </div>
         )}
