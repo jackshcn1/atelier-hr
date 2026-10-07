@@ -5,15 +5,18 @@ import { createClient } from '../../lib/supabaseClient';
 export default function SettingsPage() {
   const supabase = createClient();
 
+  // Payroll split settings
   const [floor, setFloor] = useState('');
   const [hraPct, setHraPct] = useState('');
   const [payrollSaved, setPayrollSaved] = useState(false);
 
+  // Company policy text
   const [guidelines, setGuidelines] = useState('');
   const [leavePolicy, setLeavePolicy] = useState('');
   const [noticePeriod, setNoticePeriod] = useState('');
   const [policiesSaved, setPoliciesSaved] = useState(false);
 
+  // Deposit amounts
   const [uniformDeposit, setUniformDeposit] = useState('');
   const [accommodationDeposit, setAccommodationDeposit] = useState('');
   const [depositsSaved, setDepositsSaved] = useState(false);
