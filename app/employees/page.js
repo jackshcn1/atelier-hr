@@ -133,9 +133,9 @@ export default function EmployeesPage() {
   const [depositSettings, setDepositSettings] = useState({ uniform_deposit_amount: 500, accommodation_deposit_amount: 2000 });
   const [payrollSettings, setPayrollSettings] = useState({ basic_da_floor: 18000, hra_split_percent: 50 });
 
-  // New Filter state
-  const [filterDept, setFilterDept] = useState('All');
-  const [filterStatus, setFilterStatus] = useState(['active', 'on-notice']);
+  // Filter states (multi-select / toggle arrays)
+  const [selectedDepts, setSelectedDepts] = useState([]); // empty = all
+  const [selectedStatuses, setSelectedStatuses] = useState(['active', 'on-notice']); // default active + on-notice
 
   const [form, setForm] = useState(initialEmptyForm);
   const [assetsForm, setAssetsForm] = useState(initialAssetsForm);
@@ -163,9 +163,8 @@ export default function EmployeesPage() {
   const [message, setMessage] = useState('');
 
   async function load() {
-    const [visible, all, depts, desigs, schemeData, depSetData, tmplData, pSetData] = await Promise.all([
-      supabase.from('employees').select('*').in('status', ['active', 'on-notice']).is('deleted_at', null).order('name'),
-      supabase.from('employees').select('*').is('deleted_at', null),
+    const [all, depts, desigs, schemeData, depSetData, tmplData, pSetData] = await Promise.all([
+      supabase.from('employees').select('*').is('deleted_at', null).order('name'),
       supabase.from('departments').select('name').order('name'),
       supabase.from('designations').select('*').order('name'),
       supabase.from('variable_pay_schemes').select('name, display_name').eq('is_active', true),
@@ -174,9 +173,11 @@ export default function EmployeesPage() {
       supabase.from('payroll_settings').select('*').eq('id', 1).maybeSingle()
     ]);
 
-    if (visible.error) setError(visible.error.message);
-    else setEmployees(visible.data || []);
-    setAllEmployees(all.data || []);
+    if (all.error) setError(all.error.message);
+    else {
+      setEmployees(all.data || []);
+      setAllEmployees(all.data || []);
+    }
     setDepartments((depts.data || []).map(d => d.name));
     setDesignations(desigs.data || []);
     setSchemes(schemeData.data || []);
@@ -641,25 +642,9 @@ export default function EmployeesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ margin: '0 0 4px 0' }}>Employees</h1>
-          <p style={{ color: '#666', margin: 0 }}>Showing active and on-notice staff records.</p>
+          <p style={{ color: '#666', margin: 0 }}>Showing staff directory with multi-department & status filters.</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <label style={{ fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-            Department:
-            <select value={filterDept} onChange={e => setFilterDept(e.target.value)} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }}>
-              <option value="All">All</option>
-              {departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </label>
-          <label style={{ fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-            Status:
-            <select value={filterStatus.join(',')} onChange={e => setFilterStatus(e.target.value.split(','))} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }}>
-              <option value="active,on-notice">Active + Notice</option>
-              <option value="active">Active Only</option>
-              <option value="on-notice">On Notice Only</option>
-              <option value="exited">Exited</option>
-            </select>
-          </label>
           <button
             onClick={() => setShowForm(s => !s)}
             style={{
@@ -675,6 +660,100 @@ export default function EmployeesPage() {
           >
             {showForm ? '✕ Close Form' : '+ Add New Employee'}
           </button>
+        </div>
+      </div>
+
+      {/* Multi-Select Toggle Filters Bar */}
+      <div style={{ background: 'white', padding: '12px 16px', borderRadius: 8, border: '1px solid #e5e7eb', marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Status Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', minWidth: 60 }}>Status:</span>
+          {[
+            { id: 'active', label: '✓ Active', activeColor: '#059669', activeBg: '#ecfdf5', activeBorder: '#a7f3d0' },
+            { id: 'on-notice', label: '⏳ On Notice', activeColor: '#d97706', activeBg: '#fffbeb', activeBorder: '#fde68a' },
+            { id: 'exited', label: '🚪 Exited', activeColor: '#dc2626', activeBg: '#fef2f2', activeBorder: '#fecaca' }
+          ].map(st => {
+            const isSelected = selectedStatuses.includes(st.id);
+            return (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => {
+                  setSelectedStatuses(prev => {
+                    if (prev.includes(st.id)) {
+                      return prev.length === 1 ? prev : prev.filter(x => x !== st.id);
+                    } else {
+                      return [...prev, st.id];
+                    }
+                  });
+                }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 16,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: isSelected ? st.activeBg : '#f8fafc',
+                  color: isSelected ? st.activeColor : '#64748b',
+                  border: isSelected ? `1.5px solid ${st.activeBorder}` : '1px solid #cbd5e1',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {st.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Department Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', minWidth: 60 }}>Department:</span>
+          <button
+            type="button"
+            onClick={() => setSelectedDepts([])}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 16,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              background: selectedDepts.length === 0 ? '#1e40af' : '#f8fafc',
+              color: selectedDepts.length === 0 ? 'white' : '#64748b',
+              border: selectedDepts.length === 0 ? '1.5px solid #1e40af' : '1px solid #cbd5e1'
+            }}
+          >
+            All Departments
+          </button>
+          {departments.map(dept => {
+            const isSelected = selectedDepts.includes(dept);
+            return (
+              <button
+                key={dept}
+                type="button"
+                onClick={() => {
+                  setSelectedDepts(prev => {
+                    if (prev.includes(dept)) {
+                      return prev.filter(d => d !== dept);
+                    } else {
+                      return [...prev, dept];
+                    }
+                  });
+                }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 16,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: isSelected ? '#eff6ff' : '#f8fafc',
+                  color: isSelected ? '#1d4ed8' : '#64748b',
+                  border: isSelected ? '1.5px solid #93c5fd' : '1px solid #cbd5e1'
+                }}
+              >
+                {dept}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1827,8 +1906,8 @@ export default function EmployeesPage() {
           <tbody>
             {(() => {
               const visibleData = employees.filter(emp => {
-                const deptMatch = filterDept === 'All' || emp.department === filterDept;
-                const statusMatch = filterStatus.includes(emp.status);
+                const deptMatch = selectedDepts.length === 0 || selectedDepts.includes(emp.department);
+                const statusMatch = selectedStatuses.length === 0 || selectedStatuses.includes(emp.status);
                 return deptMatch && statusMatch;
               });
               if (visibleData.length === 0) return (

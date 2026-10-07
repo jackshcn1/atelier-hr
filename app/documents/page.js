@@ -527,6 +527,39 @@ function DocumentsHubContent() {
           </div>
 
           {/* Documents Grid */}
+          {/* Admin Master Variable Pay Policy Overview (Visible to Admins / Managers in Targets or All category) */}
+          {(selectedCategory === 'targets' || selectedCategory === 'all') && canManageDocs && (
+            <div className="mb-6 p-5 sm:p-6 bg-gradient-to-br from-indigo-50/90 via-blue-50/40 to-surface border-2 border-indigo-200 rounded-card shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-3xs font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
+                      👑 Admin Executive Master
+                    </span>
+                    <span className="text-3xs font-medium text-ink-muted">
+                      All Schemes, Metrics & Formulas in 1 Live Master Document
+                    </span>
+                  </div>
+                  <h3 className="font-serif text-lg sm:text-xl font-bold text-ink">
+                    Master Variable Pay Policy & Schemes Directory
+                  </h3>
+                  <p className="text-xs text-ink-muted mt-1 max-w-2xl">
+                    Executive reference document compiling all role-based variable incentive schemes (Captains, Kitchen, B2B, Delivery), metric weight allocations, benchmark qualification floors, and legal governance guidelines.
+                  </p>
+                </div>
+
+                <div className="shrink-0 w-full sm:w-auto">
+                  <a
+                    href="/documents/master-variable-pay-policy"
+                    className="btn-secondary text-xs w-full sm:w-auto justify-center shadow-xs flex items-center gap-1.5"
+                  >
+                    <span>📑</span> Open Master Document →
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Personalized Variable Pay Target Policy Card (Featured for Targets or All category) */}
           {(selectedCategory === 'targets' || selectedCategory === 'all') && (
             <div className="mb-6 p-5 sm:p-6 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-surface border-2 border-accent/40 rounded-card shadow-sm">
