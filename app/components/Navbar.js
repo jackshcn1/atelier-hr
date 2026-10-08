@@ -17,6 +17,9 @@ const ADMIN_NAV = [
     links: [
       { href: '/checklists', label: 'Checklists' },
       { href: '/tasks', label: 'Tasks' },
+      { href: '/operations/assets', label: 'Assets' },
+      { href: '/operations/maintenance', label: 'Maintenance' },
+      { href: '/operations/compliance', label: 'Compliance' },
     ]
   },
   {
@@ -39,6 +42,13 @@ const ADMIN_NAV = [
       { href: '/documents?category=onboarding_documentation', label: 'Onboarding Terms & Clauses' },
     ]
   },
+  {
+    label: 'Sales',
+    links: [
+      { href: '/sales/analytics', label: 'Sales Analytics' },
+      { href: '/sales/ceo', label: 'CEO Dashboard' },
+    ]
+  },
 ];
 
 const ADMIN_STANDALONE = [
@@ -52,6 +62,9 @@ const EMPLOYEE_NAV = [
     links: [
       { href: '/checklists', label: 'Checklists' },
       { href: '/tasks', label: 'Tasks' },
+      { href: '/operations/assets', label: 'Assets' },
+      { href: '/operations/maintenance', label: 'Maintenance' },
+      { href: '/operations/compliance', label: 'Compliance' },
     ]
   },
   {

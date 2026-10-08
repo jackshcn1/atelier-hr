@@ -117,20 +117,18 @@ function PayslipsListContent() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h1 style={{ margin: '0 0 4px 0' }}>Payslips Directory</h1>
-          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
+          <h1 className="page-title">Payslips Directory</h1>
+          <p className="page-purpose">
             Search, view, and print official A4 salary payslips for all historical employee payouts.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <a
             href="/payroll/processing"
-            style={{
-              background: '#2563eb', color: 'white', padding: '8px 16px', borderRadius: 6,
-              textDecoration: 'none', fontWeight: 'bold', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6
-            }}
+            className="btn-primary"
+            style={{ textDecoration: 'none' }}
           >
             💳 Salary Processing →
           </a>

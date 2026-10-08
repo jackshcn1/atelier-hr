@@ -86,3 +86,13 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - **Recruitment Pipeline**: Atelier design system layout with headcount positions, active pipeline tracking, candidate evaluation scoring, and stage transitions.
 - **Exit Clearance & Resignation Gateway**: Mandatory resignation letter upload gate to move employees to "Serving Notice Period" (`on-notice`), mandatory exit clearance checklist completion gate before marking employees as "Exited Staff" (`status = exited`), statutory Gratuity auto-calculation formula (`(15 * Basic+DA * Years) / 26` with 5-year floor), deposit refund tracking with refund dates and toggles, asset tag serial verification, and full lifetime exit archive embedded into the personnel dossier.
 - **Personalized & Master Variable Pay Policy Documents**: Real-time customized variable pay target document (`/documents/my-variable-pay-target`) calculating dynamic Fixed vs Variable CTC ratios, weighted metric component rupee distributions, and an Executive Master Directory (`/documents/master-variable-pay-policy`) compiling all role-based schemes into a single real-time reference.
+
+---
+Audit Log — 2026-10-07
+- Full site audit completed (page-to-page, button-to-button, code + UI).
+- Code clean: no syntax errors; all variables used; inline-style pages (checklists/tasks) structurally sound.
+- Design system consistent: serif titles (Newsreader), Inter UI, pill/badge/ panel/ button styles applied across settings, employees, recruitment, payroll, checklists, tasks, variable-pay, payslips.
+- Button interactions verified by code inspection (handleOpenRun, handleSubmitRun, savePayroll, etc.). No broken references.
+- Cleanup completed: active tasks + their comments/audit logs deleted; active checklist runs deleted; templates/recruitment interview checklists preserved; metrics refreshed.
+- Mobile-first: responsive overflow controls added; flex/grid patterns verified.
+- CLAUDE.md updated with audit findings.

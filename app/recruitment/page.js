@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabaseClient';
 
 const SOURCES = ['Indeed', 'OLX', 'LinkedIn', 'Instagram', 'Newspaper', 'Walk-in', 'Internal referral', 'Other'];
-const PLATFORMS = ['Indeed', 'OLX', 'Instagram', 'Newspaper'];
+const PLATFORMS = ['Indeed', 'OLX', 'Instagram', 'Newspaper', 'Other'];
 const HARD_REJECT_REASONS = ['Language', 'No-show', 'Not Competent', 'Salary Mismatch', 'Other'];
 const STAGES = [
   { id: 'applied', label: 'Applied', tone: 'pill-quiet' },
@@ -72,7 +72,8 @@ function RecruitmentContent() {
     offered_variable_salary: '',
     max_fixed_salary: '',
     max_variable_salary: '',
-    platforms_tagged: ['Indeed']
+    platforms_tagged: ['Indeed'],
+    other_platform_name: ''
   });
   const [rejectForm, setRejectForm] = useState({
     candidate_id: null,
@@ -1094,23 +1095,35 @@ function RecruitmentContent() {
                 <div className="flex flex-wrap gap-2 pt-1">
                   {PLATFORMS.map(p => {
                     const isChecked = newListingForm.platforms_tagged.includes(p);
+                    const isOther = p === 'Other';
                     return (
-                      <label key={p} className="flex items-center gap-1.5 text-xs text-ink cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            setNewListingForm(prev => ({
-                              ...prev,
-                              platforms_tagged: isChecked
-                                ? prev.platforms_tagged.filter(x => x !== p)
-                                : [...prev.platforms_tagged, p]
-                            }));
-                          }}
-                          className="rounded border-rule text-ink focus:ring-accent"
-                        />
-                        <span>{p}</span>
-                      </label>
+                      <div key={p} className="flex flex-col gap-1">
+                        <label className="flex items-center gap-1.5 text-xs text-ink cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setNewListingForm(prev => ({
+                                ...prev,
+                                platforms_tagged: isChecked
+                                  ? prev.platforms_tagged.filter(x => x !== p)
+                                  : [...prev.platforms_tagged, p]
+                              }));
+                            }}
+                            className="rounded border-rule text-ink focus:ring-accent"
+                          />
+                          <span>{p}</span>
+                        </label>
+                        {isOther && isChecked && (
+                          <input
+                            type="text"
+                            value={newListingForm.other_platform_name || ''}
+                            onChange={e => setNewListingForm(prev => ({ ...prev, other_platform_name: e.target.value }))}
+                            placeholder="Specify other platform"
+                            className="field text-xs py-1"
+                          />
+                        )}
+                      </div>
                     );
                   })}
                 </div>

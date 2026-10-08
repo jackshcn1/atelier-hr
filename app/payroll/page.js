@@ -607,20 +607,12 @@ export default function PayrollPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head" style={{ marginBottom: 16 }}>
         <div>
-          <h1 style={{ margin: '0 0 4px 0' }}>Payroll Calculation & Adjustments</h1>
-          <p style={{ color: '#666', margin: 0 }}>
-            Process standard monthly payroll or ad-hoc mid-term payouts (with automatic prior payout deductions).
-          </p>
+          <h1 className="page-title">Payroll Calculation &amp; Adjustments</h1>
+          <p className="page-purpose">Process standard monthly payroll or ad-hoc mid-term payouts (with automatic prior payout deductions).</p>
         </div>
-        <a
-          href="/payroll/processing"
-          style={{
-            background: '#2563eb', color: 'white', padding: '10px 16px', borderRadius: 6,
-            textDecoration: 'none', fontWeight: 'bold', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6
-          }}
-        >
+        <a href="/payroll/processing" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
           💳 Go to Salary Processing →
         </a>
       </div>

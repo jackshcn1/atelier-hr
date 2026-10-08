@@ -639,32 +639,23 @@ export default function EmployeesPage() {
   return (
     <div style={{ paddingBottom: 40 }}>
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h1 style={{ margin: '0 0 4px 0' }}>Employees</h1>
-          <p style={{ color: '#666', margin: 0 }}>Showing staff directory with multi-department & status filters.</p>
+          <h1 className="page-title">Employees</h1>
+          <p className="page-purpose">Showing staff directory with multi-department &amp; status filters.</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             onClick={() => setShowForm(s => !s)}
-            style={{
-              background: showForm ? '#e5e7eb' : '#2563eb',
-              color: showForm ? '#1f2937' : 'white',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: 6,
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: 'pointer'
-            }}
+            className={showForm ? 'btn-secondary' : 'btn-primary'}
           >
             {showForm ? '✕ Close Form' : '+ Add New Employee'}
           </button>
         </div>
       </div>
 
-      {/* Multi-Select Toggle Filters Bar */}
-      <div style={{ background: 'white', padding: '12px 16px', borderRadius: 8, border: '1px solid #e5e7eb', marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="panel" style={{ marginTop: 14 }}>
+        <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {/* Status Filters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', minWidth: 60 }}>Status:</span>
@@ -687,14 +678,13 @@ export default function EmployeesPage() {
                     }
                   });
                 }}
+                className={isSelected ? 'pill-good' : 'btn-quiet'}
                 style={{
                   padding: '4px 10px',
                   borderRadius: 16,
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: isSelected ? st.activeBg : '#f8fafc',
-                  color: isSelected ? st.activeColor : '#64748b',
                   border: isSelected ? `1.5px solid ${st.activeBorder}` : '1px solid #cbd5e1',
                   transition: 'all 0.15s ease'
                 }}
@@ -711,15 +701,13 @@ export default function EmployeesPage() {
           <button
             type="button"
             onClick={() => setSelectedDepts([])}
+            className={selectedDepts.length === 0 ? 'btn-primary' : 'btn-quiet'}
             style={{
               padding: '4px 10px',
               borderRadius: 16,
               fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer',
-              background: selectedDepts.length === 0 ? '#1e40af' : '#f8fafc',
-              color: selectedDepts.length === 0 ? 'white' : '#64748b',
-              border: selectedDepts.length === 0 ? '1.5px solid #1e40af' : '1px solid #cbd5e1'
+              cursor: 'pointer'
             }}
           >
             All Departments
@@ -739,21 +727,20 @@ export default function EmployeesPage() {
                     }
                   });
                 }}
+                className={isSelected ? 'btn-primary' : 'btn-quiet'}
                 style={{
                   padding: '4px 10px',
                   borderRadius: 16,
                   fontSize: 12,
                   fontWeight: 600,
-                  cursor: 'pointer',
-                  background: isSelected ? '#eff6ff' : '#f8fafc',
-                  color: isSelected ? '#1d4ed8' : '#64748b',
-                  border: isSelected ? '1.5px solid #93c5fd' : '1px solid #cbd5e1'
+                  cursor: 'pointer'
                 }}
               >
                 {dept}
               </button>
             );
           })}
+        </div>
         </div>
       </div>
 
@@ -1895,12 +1882,12 @@ export default function EmployeesPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb', background: '#f9fafb', fontSize: 12, textTransform: 'uppercase', color: '#6b7280' }}>
-              <th style={{ padding: '10px 14px' }}>Employee</th>
-              <th style={{ padding: '10px 14px' }}>Designation</th>
-              <th style={{ padding: '10px 14px' }}>Department</th>
-              <th style={{ padding: '10px 14px' }}>Contact</th>
-              <th style={{ padding: '10px 14px' }}>Status</th>
-              <th style={{ padding: '10px 14px' }}>Actions</th>
+              <th className="table-head">Employee</th>
+              <th className="table-head">Designation</th>
+              <th className="table-head">Department</th>
+              <th className="table-head">Contact</th>
+              <th className="table-head">Status</th>
+              <th className="table-head">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1915,7 +1902,7 @@ export default function EmployeesPage() {
               );
               return visibleData.map(emp => (
                 <tr key={emp.employee_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '12px 14px' }}>
+                  <td className="table-cell">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#eff6ff', color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 12 }}>
                         {emp.name.slice(0, 2).toUpperCase()}
@@ -1926,23 +1913,23 @@ export default function EmployeesPage() {
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151', fontWeight: 500 }}>{emp.designation || 'Staff'}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#374151' }}>{emp.department || 'Unassigned'}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, color: '#4b5563' }}>{emp.phone || '—'}</td>
-                  <td style={{ padding: '12px 14px' }}>
+                  <td className="table-cell" style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>{emp.designation || 'Staff'}</td>
+                  <td className="table-cell" style={{ fontSize: 13, color: '#374151' }}>{emp.department || 'Unassigned'}</td>
+                  <td className="table-cell" style={{ fontSize: 13, color: '#4b5563' }}>{emp.phone || '—'}</td>
+                  <td className="table-cell">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: emp.status === 'active' ? '#dcfce7' : emp.status === 'on-notice' ? '#fef3c7' : '#fee2e2', color: emp.status === 'active' ? '#15803d' : emp.status === 'on-notice' ? '#b45309' : '#991b1b' }}>
+                      <span className={emp.status === 'active' ? 'pill-good' : emp.status === 'on-notice' ? 'pill-warn' : 'pill-bad'} style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
                         {emp.status === 'active' ? '✓ Active' : emp.status === 'on-notice' ? '⏳ On Notice' : '🚪 Exited'}
                       </span>
                       {emp.onboarding_status && (
-                        <span style={{ padding: '1px 6px', borderRadius: 10, fontSize: 10, fontWeight: 600, background: emp.onboarding_status === 'Active' ? '#f0fdf4' : '#eff6ff', color: emp.onboarding_status === 'Active' ? '#166534' : '#1e40af', border: `1px solid ${emp.onboarding_status === 'Active' ? '#bbf7d0' : '#bfdbfe'}` }}>
+                        <span className={emp.onboarding_status === 'Active' ? 'pill-good' : 'pill-quiet'} style={{ padding: '1px 6px', borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
                           {emp.onboarding_status}
                         </span>
                       )}
                     </div>
                   </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <a href={`/employees/${emp.employee_id}`} style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>View / Edit →</a>
+                  <td className="table-cell">
+                    <a href={`/employees/${emp.employee_id}`} className="btn-quiet" style={{ fontSize: 13, textDecoration: 'none' }}>View / Edit →</a>
                   </td>
                 </tr>
               ));

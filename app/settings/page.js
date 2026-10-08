@@ -10,12 +10,6 @@ export default function SettingsPage() {
   const [hraPct, setHraPct] = useState('');
   const [payrollSaved, setPayrollSaved] = useState(false);
 
-  // Company policy text
-  const [guidelines, setGuidelines] = useState('');
-  const [leavePolicy, setLeavePolicy] = useState('');
-  const [noticePeriod, setNoticePeriod] = useState('');
-  const [policiesSaved, setPoliciesSaved] = useState(false);
-
   // Deposit amounts
   const [uniformDeposit, setUniformDeposit] = useState('');
   const [accommodationDeposit, setAccommodationDeposit] = useState('');
@@ -27,9 +21,6 @@ export default function SettingsPage() {
     supabase.from('payroll_settings').select('*').eq('id', 1).single().then(({ data, error }) => {
       if (error) setError(error.message + ' (only admins can view/edit settings)');
       if (data) { setFloor(data.basic_da_floor); setHraPct(data.hra_split_percent); }
-    });
-    supabase.from('company_policies').select('*').eq('id', 1).single().then(({ data }) => {
-      if (data) { setGuidelines(data.guidelines_text); setLeavePolicy(data.leave_policy_text); setNoticePeriod(data.notice_period_text); }
     });
     supabase.from('deposit_settings').select('*').eq('id', 1).single().then(({ data }) => {
       if (data) { setUniformDeposit(data.uniform_deposit_amount); setAccommodationDeposit(data.accommodation_deposit_amount); }
@@ -43,15 +34,6 @@ export default function SettingsPage() {
       .update({ basic_da_floor: floor, hra_split_percent: hraPct, updated_at: new Date().toISOString() })
       .eq('id', 1);
     if (error) setError(error.message); else setPayrollSaved(true);
-  }
-
-  async function savePolicies(e) {
-    e.preventDefault();
-    setError(''); setPoliciesSaved(false);
-    const { error } = await supabase.from('company_policies')
-      .update({ guidelines_text: guidelines, leave_policy_text: leavePolicy, notice_period_text: noticePeriod, updated_at: new Date().toISOString() })
-      .eq('id', 1);
-    if (error) setError(error.message); else setPoliciesSaved(true);
   }
 
   async function saveDeposits(e) {
@@ -103,19 +85,16 @@ export default function SettingsPage() {
         </section>
 
         <section className="panel panel-body">
-          <h2 className="panel-title mb-4">Company policies</h2>
-          <form onSubmit={savePolicies} className="space-y-4">
-            <label className="field-label">Guidelines
-              <textarea value={guidelines} onChange={e => setGuidelines(e.target.value)} rows={4} className="field" />
+          <h2 className="panel-title mb-4">Deposits</h2>
+          <form onSubmit={saveDeposits} className="space-y-4">
+            <label className="field-label">Uniform deposit (₹)
+              <input type="number" value={uniformDeposit} onChange={e => setUniformDeposit(e.target.value)} className="field" />
             </label>
-            <label className="field-label">Leave policy
-              <textarea value={leavePolicy} onChange={e => setLeavePolicy(e.target.value)} rows={4} className="field" />
-            </label>
-            <label className="field-label">Notice period terms
-              <textarea value={noticePeriod} onChange={e => setNoticePeriod(e.target.value)} rows={4} className="field" />
+            <label className="field-label">Accommodation deposit (₹)
+              <input type="number" value={accommodationDeposit} onChange={e => setAccommodationDeposit(e.target.value)} className="field" />
             </label>
             <button type="submit" className="btn-primary text-xs">Save</button>
-            {policiesSaved && <span className="text-good text-xs ml-3">✓ Saved</span>}
+            {depositsSaved && <span className="text-good text-xs ml-3">✓ Saved</span>}
           </form>
         </section>
       </div>

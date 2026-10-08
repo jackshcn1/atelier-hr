@@ -635,7 +635,7 @@ function ChecklistsHubContent() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, maxWidth: '100%', overflowX: 'hidden' }}>
               {activeRuns.map(run => {
                 const isOverdue = run.status === 'overdue';
                 const isRecheck = run.status === 'recheck_requested';
@@ -807,7 +807,7 @@ function ChecklistsHubContent() {
             </button>
           </div>
 
-          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e5e7eb', overflowX: 'auto' }}>
+          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e5e7eb', overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>

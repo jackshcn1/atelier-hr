@@ -253,20 +253,12 @@ function SalaryProcessingContent() {
   return (
     <div>
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div className="page-head">
         <div>
-          <h1 style={{ margin: '0 0 4px 0' }}>Salary Processing (Bank Payouts)</h1>
-          <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
-            Review employee bank details, copy pre-generated payslip numbers for bank narration, and record payment transaction references.
-          </p>
+          <h1 className="page-title">Salary Processing (Bank Payouts)</h1>
+          <p className="page-purpose">Review employee bank details, copy pre-generated payslip numbers for bank narration, and record payment transaction references.</p>
         </div>
-        <a
-          href="/payroll"
-          style={{
-            background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db',
-            padding: '8px 16px', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: 13
-          }}
-        >
+        <a href="/payroll" className="btn-secondary" style={{ textDecoration: 'none' }}>
           ← Back to Payroll Calculation
         </a>
       </div>
