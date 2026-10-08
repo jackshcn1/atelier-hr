@@ -182,10 +182,47 @@ export default function Navbar() {
   }
 
   const isLoginPage = pathname === '/login';
+  const isLandingPage = pathname === '/';
   if (isLoginPage) return null;
 
-  const navGroups = isAdmin ? ADMIN_NAV : EMPLOYEE_NAV;
-  const standaloneLinks = isAdmin ? ADMIN_STANDALONE : [];
+  const currentModule = pathname.startsWith('/operations') ? 'operations' :
+                        pathname.startsWith('/sales') ? 'sales' : 'hrms';
+
+  // Define module-specific navigations
+  const MODULE_NAV = {
+    hrms: {
+      admin: [
+        { label: 'Employees', links: [{ href: '/recruitment', label: 'Recruitment' }, { href: '/employees', label: 'Employees' }, { href: '/orgchart', label: 'Org Chart' }] },
+        { label: 'Operations', links: [{ href: '/checklists', label: 'Checklists' }, { href: '/tasks', label: 'Tasks' }] },
+        { label: 'Payroll', links: [{ href: '/payroll', label: 'Payroll' }, { href: '/payroll/processing', label: 'Salary Processing' }, { href: '/my-variable-pay', label: 'My Variable Pay' }, { href: '/payroll/variable-pay/attainment', label: 'Attainment' }, { href: '/payslips', label: 'Payslips' }] },
+        { label: 'Documents', links: [{ href: '/documents?category=sop', label: 'SOPs and Workflows' }, { href: '/documents?category=training', label: 'Training Material' }, { href: '/documents?category=targets', label: 'Variable Pay Targets' }, { href: '/documents?category=policy', label: 'Company Policies' }, { href: '/documents?category=onboarding_documentation', label: 'Onboarding Terms & Clauses' }] },
+      ],
+      employee: [
+        { label: 'Operations', links: [{ href: '/checklists', label: 'Checklists' }, { href: '/tasks', label: 'Tasks' }] },
+        { label: 'Payroll', links: [{ href: '/my-variable-pay', label: 'My Variable Pay' }, { href: '/my-payslips', label: 'My Payslips' }] },
+        { label: 'Documents', links: [{ href: '/documents?category=sop', label: 'SOPs and Workflows' }, { href: '/documents?category=training', label: 'Training Material' }, { href: '/documents?category=targets', label: 'Variable Pay Targets' }, { href: '/documents?category=policy', label: 'Company Policies' }] },
+      ]
+    },
+    operations: {
+      admin: [
+        { label: 'Operations', links: [{ href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/compliance', label: 'Compliance' }] },
+      ],
+      employee: [
+        { label: 'Operations', links: [{ href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/compliance', label: 'Compliance' }] },
+      ]
+    },
+    sales: {
+      admin: [
+        { label: 'Sales', links: [{ href: '/sales/analytics', label: 'Sales Analytics' }, { href: '/sales/ceo', label: 'CEO Dashboard' }] },
+      ],
+      employee: [
+        { label: 'Sales', links: [{ href: '/sales/analytics', label: 'Sales Analytics' }, { href: '/sales/ceo', label: 'CEO Dashboard' }] },
+      ]
+    }
+  };
+
+  const navGroups = isLandingPage ? [] : (isAdmin ? MODULE_NAV[currentModule].admin : MODULE_NAV[currentModule].employee);
+  const standaloneLinks = isLandingPage ? [] : (isAdmin ? (currentModule === 'hrms' ? ADMIN_STANDALONE : []) : []);
 
   const linkClass = (href) => [
     'px-3 py-1.5 rounded-control text-sm transition-colors whitespace-nowrap',

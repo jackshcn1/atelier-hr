@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 export default function MaintenancePage() {
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
