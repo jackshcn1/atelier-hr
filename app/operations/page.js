@@ -39,6 +39,10 @@ export default function OperationsOverview() {
           <Link href="/" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">← Home</Link>
           <span className="text-[#8b6f4e] text-sm">Module / Operations</span>
         </div>
+        <div className="flex items-center gap-3 mb-6">
+          <a href="/" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">← Home</a>
+          <span className="text-[#8b6f4e] text-sm">Module / Operations</span>
+        </div>
         <div className="page-head mb-12">
           <h1 className="page-title font-serif text-4xl lg:text-5xl">Operations</h1>
           <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">Asset management, maintenance scheduling, and compliance tracking</p>
