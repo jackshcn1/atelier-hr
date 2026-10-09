@@ -17,7 +17,7 @@ export default function Home() {
       title: 'Operations',
       subtitle: 'Assets, Maintenance & Compliance',
       description: 'Asset inventory with employee linking, work orders, compliance licenses',
-      href: '/operations',
+      href: '/operations/assets',
       accent: '#8b6f4e',
     },
     {
