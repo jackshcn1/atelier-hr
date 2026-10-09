@@ -15,12 +15,12 @@ const LOCATION_OPTIONS = [
 export default function AssetsPageFull() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
-    name: '', category: '', type: '', quantity: 1,
+    name: '', category: '', type: '', quantity: '',
     brand: '', model: '', serial: '', vendor: '', purchaseDate: '',
     newOrUsed: 'Brand New', condition: 'Brand New', status: 'Available',
     location: '', assignedEmployee: '',
-    warrantyMonths: 12, extendedWarranty: false,
-    buyingPrice: '', notes: '',
+    warrantyMonths: 0, extendedWarranty: false, extendedWarrantyMonths: 12,
+    warrantyContact: '', buyingPrice: '', notes: '',
   });
   const [groups, setGroups] = useState([
     { category: 'Kitchen Equipment', name: 'Chiller', total: 3, brand: 'Hoshizaki', condition: 'Brand New', status: 'Available', location: 'Kitchen', expanded: false },
@@ -106,23 +106,21 @@ export default function AssetsPageFull() {
                 </select>
 
                 <input className="field text-sm" type="number" placeholder="Quantity" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})} />
-                <input className="field text-sm" placeholder="Brand" value={form.brand} onChange={e=>setForm({...form,brand:e.target.value})} />
-                <input className="field text-sm" placeholder="Model Name" value={form.model} onChange={e=>setForm({...form,model:e.target.value})} />
+                <input className="field text-sm" placeholder="Vendor" list="vendor-list" value={form.vendor} onChange={e=>setForm({...form,vendor:e.target.value})} />
+                <datalist id="vendor-list">
+                  {vendorSuggestions.map(v => <option key={v} value={v} />)}
+                </datalist>
 
-                <div className="flex gap-2 col-span-1 md:col-span-2 lg:col-span-3">
-                  <input className="field text-sm flex-1" placeholder="Serial Number (auto: CC-TTTTT)" value={form.serial} onChange={e=>{
-                    setForm({...form,serial:e.target.value});
-                    const val = e.target.value;
-                    const cat = form.category ? form.category.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'XX';
-                    const typ = form.type ? form.type.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'YY';
-                    const num = val.substring(cat.length + typ.length);
-                    if (val.startsWith(cat+typ) && num.length !== 5) setSerialError('Serial must include 5-digit number after prefix');
-                    else setSerialError('');
-                  }} />
-                </div>
-                {serialError && <span className="text-xs text-red-600 col-span-3">{serialError}</span>}
+                <input className="field text-sm" placeholder="Brand" list="brand-list" value={form.brand} onChange={e=>setForm({...form,brand:e.target.value})} />
+                <datalist id="brand-list">
+                  {[...new Set(groups.map(g => g.brand))].map(b => <option key={b} value={b} />)}
+                </datalist>
 
-                <input className="field text-sm" placeholder="Vendor" value={form.vendor} onChange={e=>setForm({...form,vendor:e.target.value})} />
+                <input className="field text-sm" placeholder="Model Name" list="model-list" value={form.model} onChange={e=>setForm({...form,model:e.target.value})} />
+                <datalist id="model-list">
+                  {[...new Set(groups.map(g => g.name))].map(m => <option key={m} value={m} />)}
+                </datalist>
+
                 <input className="field text-sm" type="date" placeholder="Purchase Date" value={form.purchaseDate} onChange={e=>setForm({...form,purchaseDate:e.target.value})} />
 
                 <select className="field text-sm bg-white" value={form.newOrUsed} onChange={e=>setForm({...form,newOrUsed:e.target.value})}>
@@ -143,8 +141,15 @@ export default function AssetsPageFull() {
                 </select>
                 <input className="field text-sm" placeholder="Assigned Employee" value={form.assignedEmployee} onChange={e=>setForm({...form,assignedEmployee:e.target.value})} />
 
-                <input className="field text-sm" type="number" placeholder="Warranty Period (months)" value={form.warrantyMonths} onChange={e=>setForm({...form,warrantyMonths:e.target.value})} />
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.extendedWarranty} onChange={e=>setForm({...form,extendedWarranty:e.target.checked})} /> Extended Warranty</label>
+                <input className="field text-sm" type="number" placeholder="Warranty Period (months)" value={form.warrantyMonths === 0 ? '' : form.warrantyMonths} onChange={e=>setForm({...form,warrantyMonths:parseInt(e.target.value)||0})} />
+                <input className="field text-sm" placeholder="Warranty Contact Number" value={form.warrantyContact} onChange={e=>setForm({...form,warrantyContact:e.target.value})} />
+
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.extendedWarranty} onChange={e=>setForm({...form,extendedWarranty:e.target.checked})} /> Extended Warranty</label>
+                  {form.extendedWarranty && (
+                    <input className="field text-sm" type="number" placeholder="Extended Period (months)" value={form.extendedWarrantyMonths} onChange={e=>setForm({...form,extendedWarrantyMonths:parseInt(e.target.value)||0})} />
+                  )}
+                </div>
 
                 <input className="field text-sm" placeholder="Buying Price (₹)" value={form.buyingPrice} onChange={e=>setForm({...form,buyingPrice:e.target.value})} />
 

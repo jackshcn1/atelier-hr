@@ -206,9 +206,11 @@ export default function Navbar() {
     operations: {
       admin: [
         { label: 'Operations', links: [{ href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/compliance', label: 'Compliance' }] },
+        { label: 'Settings', links: [{ href: '/settings/assets-config', label: 'Asset Config' }, { href: '/operations/vendors', label: 'Vendors' }] },
       ],
       employee: [
         { label: 'Operations', links: [{ href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/compliance', label: 'Compliance' }] },
+        { label: 'Settings', links: [{ href: '/settings/assets-config', label: 'Asset Config' }] },
       ]
     },
     sales: {
