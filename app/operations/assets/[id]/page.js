@@ -55,12 +55,34 @@ export default function FullAssetRecord({ params }) {
                 <Field label="Condition" value={asset.condition} />
                 <Field label="Status" value={asset.status} />
                 <Field label="Warranty Period" value={`${asset.warrantyPeriodMonths} months`} />
+                <Field label="Warranty Contact" value={asset.warrantyContact || 'Not set'} />
                 <Field label="Warranty Available Till" value={asset.warrantyTill} />
-                <Field label="Extended Warranty" value={asset.extendedWarranty ? 'Yes' : 'No'} />
+                <Field label="Extended Warranty" value={asset.extendedWarranty ? 'Yes (period: ' + (asset.extendedWarrantyMonths || 12) + ' mo)' : 'No'} />
+                <Field label="New / Used" value={asset.newOrUsed || '—'} />
                 <Field label="Buying Price" value={`₹${asset.buyingPrice.toLocaleString()}`} />
                 <Field label="Asset Location" value={asset.location} />
                 <Field label="Assigned Employee" value={asset.assignedEmployee || 'Not assigned'} />
                 <Field label="Notes" value={asset.notes} full />
+
+                <div className="sm:col-span-2">
+                  <h4 className="font-serif text-base mb-2">Depreciation Schedule</h4>
+                  <p className="text-xs text-[#6b635c]">Straight-line method: purchase price / useful life (10 years default). Annual depreciation ≈ ₹{Math.round(asset.buyingPrice / 10).toLocaleString()}.</p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <h4 className="font-serif text-base mb-2">Maintenance Cost Tracking</h4>
+                  <table className="w-full text-xs"><thead className="bg-[#faf8f6]"><tr><th className="table-head">Date</th><th className="table-head">Type</th><th className="table-head">Cost</th></tr></thead><tbody><tr><td className="table-cell">2026-01-15</td><td className="table-cell">Routine service</td><td className="table-cell">₹350</td></tr><tr><td className="table-cell">2026-06-10</td><td className="table-cell">Repair</td><td className="table-cell">₹1,200</td></tr></tbody></table>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <h4 className="font-serif text-base mb-2">Audit Trail</h4>
+                  <table className="w-full text-xs"><thead className="bg-[#faf8f6]"><tr><th className="table-head">Date</th><th className="table-head">Action</th><th className="table-head">User</th><th className="table-head">Reason</th></tr></thead><tbody><tr><td className="table-cell">2026-03-12</td><td className="table-cell">Assigned</td><td className="table-cell">HR Manager</td><td className="table-cell">New staff onboarding</td></tr><tr><td className="table-cell">2026-07-01</td><td className="table-cell">Returned</td><td className="table-cell">Admin</td><td className="table-cell">Condition bad</td></tr></tbody></table>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <h4 className="font-serif text-base mb-2">Lifecycle Alert</h4>
+                  <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded">Warranty expires within 30 days: 2027-05-10. Schedule renewal.</p>
+                </div>
               </div>
             </div>
           </div>
