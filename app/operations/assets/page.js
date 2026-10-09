@@ -27,6 +27,7 @@ export default function AssetsPageFull() {
     { category: 'Furniture', name: 'Chair', total: 60, brand: 'Western', condition: 'Good', status: 'Available', location: 'Restaurant', expanded: false },
     { category: 'Uniform', name: 'Staff Uniform', total: 20, brand: 'Local Tailor', condition: 'Brand New', status: 'Available', location: 'Employee', expanded: false },
   ]);
+  const [expandedId, setExpandedId] = useState(null);
   const [vendorSuggestions, setVendorSuggestions] = useState(['Thomson', 'Hoshizaki', 'Western', 'Local Tailor']);
   const [geoSuggestions, setGeoSuggestions] = useState(['Kitchen', 'Restaurant', 'Office', 'Sales Counter', 'Employee', 'Storage', 'Outside Outlet']);
   const [newType, setNewType] = useState('');

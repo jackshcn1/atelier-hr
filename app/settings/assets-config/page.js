@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 export default function AssetConfigPage() {
   const [categories, setCategories] = useState([
     'Kitchen Equipment', 'Furniture', 'Uniform', 'Electronics', 'Cleaning Supplies', 'Packaging', 'Other'
