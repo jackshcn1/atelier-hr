@@ -56,6 +56,7 @@ create table employees (
   variable_pay_scheme text,
   leave_balance numeric,
   notes text,
+  recruitment_cost numeric default 0,
   created_at timestamptz default now()
 );
 
@@ -642,5 +643,18 @@ create policy "offers_write" on offers for all to authenticated using (is_admin(
 create policy "candidates_anon_read_token" on candidates for select to anon using (true);
 create policy "interview_evaluations_anon_insert" on interview_evaluations for insert to anon with check (
   candidate_id is not null and interviewer_name is not null and interviewer_name != ''
+);
+
+-- =====================================================================
+-- 19. Marketing Spend Tracking
+-- =====================================================================
+create table if not exists marketing_spend (
+  id bigint generated always as identity primary key,
+  job_listing_id bigint not null references job_listings(id) on delete cascade,
+  platform text not null check (platform in ('Indeed', 'OLX', 'LinkedIn', 'Instagram', 'Newspaper', 'Other')),
+  amount numeric not null default 0,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 

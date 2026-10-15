@@ -1,0 +1,7 @@
+- [User Profile](user-profile.md) — Restaurant owner, no coding experience, needs plain-English explanations
+- [Tech Stack](tech-stack-atelier.md) — Next.js + Supabase + Vercel + Petpooja integration
+- [Project Status](project-atelier-hr.md) — Atelier HR tool roadmap, priorities, known bugs
+- [Payroll Logic](payroll-business-logic.md) — Petpooja-based payroll formula — do not change without asking
+- [Salary Split](salary-split-logic.md) — Kerala minimum wage floor, Basic+DA/HRA split rules
+- [Variable Pay Engine](variable-pay-engine.md) — Multi-metric incentive schemes, qualification floors, ceilings, and calculator
+- [Workflow Preferences](workflow-preferences.md) — Branches, plans before code, security rules, explanations

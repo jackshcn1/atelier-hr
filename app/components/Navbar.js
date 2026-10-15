@@ -49,6 +49,12 @@ const ADMIN_NAV = [
       { href: '/sales/ceo', label: 'CEO Dashboard' },
     ]
   },
+  {
+    label: 'Marketing',
+    links: [
+      { href: '/marketing', label: 'Spends & ROI' },
+    ]
+  },
 ];
 
 const ADMIN_STANDALONE = [
@@ -186,7 +192,8 @@ export default function Navbar() {
   if (isLoginPage) return null;
 
   const currentModule = pathname.startsWith('/operations') ? 'operations' :
-                        pathname.startsWith('/sales') ? 'sales' : 'hrms';
+                        pathname.startsWith('/sales') ? 'sales' :
+                        pathname.startsWith('/marketing') ? 'marketing' : 'hrms';
 
   // Define module-specific navigations
   const MODULE_NAV = {
@@ -219,6 +226,14 @@ export default function Navbar() {
       ],
       employee: [
         { label: 'Sales', links: [{ href: '/sales/analytics', label: 'Sales Analytics' }, { href: '/sales/ceo', label: 'CEO Dashboard' }] },
+      ]
+    },
+    marketing: {
+      admin: [
+        { label: 'Marketing', links: [{ href: '/marketing', label: 'Spends & ROI' }] },
+      ],
+      employee: [
+        { label: 'Marketing', links: [{ href: '/marketing', label: 'Spends & ROI' }] },
       ]
     }
   };

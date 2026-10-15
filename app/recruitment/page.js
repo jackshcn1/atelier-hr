@@ -73,7 +73,8 @@ function RecruitmentContent() {
     max_fixed_salary: '',
     max_variable_salary: '',
     platforms_tagged: ['Indeed'],
-    other_platform_name: ''
+    other_platform_name: '',
+    marketing_spends: []
   });
   const [rejectForm, setRejectForm] = useState({
     candidate_id: null,
@@ -89,6 +90,8 @@ function RecruitmentContent() {
   });
   const [cvFile, setCvFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [editingCandidateId, setEditingCandidateId] = useState(null);
+  const [editingListingId, setEditingListingId] = useState(null);
 
   useEffect(() => {
     loadAllRecruitmentData();
@@ -147,7 +150,7 @@ function RecruitmentContent() {
     }
   }
 
-  // Create Job Listing (One row = One Headcount)
+  // Create or Update Job Listing
   async function handleCreateListing(e) {
     e.preventDefault();
     if (!newListingForm.designation) {
@@ -159,30 +162,37 @@ function RecruitmentContent() {
     setError('');
 
     try {
-      // Generate serial: JL0001, JL0002...
-      const nextNum = (jobListings.length + 1).toString().padStart(4, '0');
-      const serial = `JL${nextNum}`;
-
       const payload = {
-        serial,
         department: newListingForm.department || null,
         designation: newListingForm.designation,
-        job_description_title: newListingForm.job_description_title || `${newListingForm.designation} (${serial})`,
+        job_description_title: newListingForm.job_description_title || `${newListingForm.designation}`,
         job_description_text: newListingForm.job_description_text || null,
         offered_fixed_salary: Number(newListingForm.offered_fixed_salary || 0),
         offered_variable_salary: Number(newListingForm.offered_variable_salary || 0),
         max_fixed_salary: Number(newListingForm.max_fixed_salary || newListingForm.offered_fixed_salary || 0),
         max_variable_salary: Number(newListingForm.max_variable_salary || newListingForm.offered_variable_salary || 0),
         platforms_tagged: newListingForm.platforms_tagged,
-        status: 'open',
-        listing_date: new Date().toISOString().slice(0, 10)
+        updated_at: new Date().toISOString()
       };
 
-      const { error: insErr } = await supabase.from('job_listings').insert([payload]);
-      if (insErr) throw insErr;
+      if (editingListingId) {
+        const { error: updErr } = await supabase.from('job_listings').update(payload).eq('id', editingListingId);
+        if (updErr) throw updErr;
+        setMessage(`✓ Headcount listing updated.`);
+      } else {
+        const nextNum = (jobListings.length + 1).toString().padStart(4, '0');
+        const serial = `JL${nextNum}`;
+        payload.serial = serial;
+        payload.status = 'open';
+        payload.listing_date = new Date().toISOString().slice(0, 10);
 
-      setMessage(`✓ Headcount listing ${serial} (${newListingForm.designation}) created.`);
+        const { error: insErr } = await supabase.from('job_listings').insert([payload]);
+        if (insErr) throw insErr;
+        setMessage(`✓ Headcount listing ${serial} (${newListingForm.designation}) created.`);
+      }
+
       setShowListingModal(false);
+      setEditingListingId(null);
       setNewListingForm({
         department: '',
         designation: '',
@@ -196,7 +206,7 @@ function RecruitmentContent() {
       });
       await loadAllRecruitmentData();
     } catch (err) {
-      setError(`Failed to create listing: ${err.message}`);
+      setError(`Failed to save listing: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -223,24 +233,20 @@ function RecruitmentContent() {
 
     try {
       // 1. Upload CV if provided
-      let cvPath = null;
+      let cvPath = editingCandidateId ? (candidates.find(c => c.id === editingCandidateId)?.cv_url || null) : null;
       if (cvFile) {
         const ext = cvFile.name.split('.').pop();
         const uploadPath = `resumes/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
-        const { data: uploadData, error: upErr } = await supabase.storage
+        const { data: uploadData, error: uploadErr } = await supabase.storage
           .from('documents')
           .upload(uploadPath, cvFile, { upsert: true });
 
-        if (upErr) throw upErr;
+        if (uploadErr) throw uploadErr;
         cvPath = uploadData.path;
       }
 
-      // 2. Generate sequential serial CAN0001, CAN0002...
-      const nextNum = (candidates.length + 1).toString().padStart(4, '0');
-      const serial = `CAN${nextNum}`;
-
+      // 2. Prepare payload
       const candidatePayload = {
-        serial,
         first_name: newCandidateForm.first_name.trim(),
         last_name: newCandidateForm.last_name.trim() || null,
         phone: newCandidateForm.phone.trim() || null,
@@ -259,28 +265,43 @@ function RecruitmentContent() {
         status: 'active'
       };
 
-      const { data: createdCand, error: insErr } = await supabase
-        .from('candidates')
-        .insert([candidatePayload])
-        .select()
-        .single();
+      if (editingCandidateId) {
+        const { error: upErr } = await supabase
+          .from('candidates')
+          .update(candidatePayload)
+          .eq('id', editingCandidateId);
+        if (upErr) throw upErr;
+        setMessage(`✓ Candidate ${newCandidateForm.first_name} updated.`);
+      } else {
+        // Generate sequential serial CAN0001, CAN0002...
+        const nextNum = (candidates.length + 1).toString().padStart(4, '0');
+        const serial = `CAN${nextNum}`;
+        candidatePayload.serial = serial;
 
-      if (insErr) throw insErr;
+        const { data: createdCand, error: insErr } = await supabase
+          .from('candidates')
+          .insert([candidatePayload])
+          .select()
+          .single();
 
-      // 3. Map to chosen Job Listings
-      if (newCandidateForm.mapped_listing_ids?.length > 0) {
-        const mappingRows = newCandidateForm.mapped_listing_ids.map(lid => ({
-          candidate_id: createdCand.id,
-          job_listing_id: Number(lid),
-          stage: newCandidateForm.interview_date ? 'interview_scheduled' : 'applied'
-        }));
+        if (insErr) throw insErr;
 
-        const { error: mapErr } = await supabase.from('candidate_job_mapping').insert(mappingRows);
-        if (mapErr) throw mapErr;
+        // 3. Map to chosen Job Listings (only for new candidates)
+        if (newCandidateForm.mapped_listing_ids?.length > 0) {
+          const mappingRows = newCandidateForm.mapped_listing_ids.map(lid => ({
+            candidate_id: createdCand.id,
+            job_listing_id: Number(lid),
+            stage: newCandidateForm.interview_date ? 'interview_scheduled' : 'applied'
+          }));
+
+          const { error: mapErr } = await supabase.from('candidate_job_mapping').insert(mappingRows);
+          if (mapErr) throw mapErr;
+        }
+        setMessage(`✓ Candidate ${serial} (${newCandidateForm.first_name}) added to pipeline.`);
       }
 
-      setMessage(`✓ Candidate ${serial} (${createdCand.first_name}) added to pipeline.`);
       setShowCandidateModal(false);
+      setEditingCandidateId(null);
       setCvFile(null);
       setNewCandidateForm({
         first_name: '',
@@ -415,6 +436,7 @@ function RecruitmentContent() {
         status: 'active',
         current_fixed_salary: acceptedFixed,
         current_variable_salary: acceptedVar,
+        recruitment_cost: (listing.marketing_spends || []).reduce((s, x) => s + Number(x.amount || 0), 0),
         created_at: new Date().toISOString()
       };
 
@@ -845,9 +867,35 @@ function RecruitmentContent() {
                           <span className="text-2xs text-ink-muted">No evaluations yet</span>
                         )}
                       </div>
-                      <span className="text-accent font-medium hover:underline text-2xs uppercase tracking-wide">
-                        View Details →
-                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            setEditingCandidateId(cand.id);
+                            setNewCandidateForm({
+                              first_name: cand.first_name || '',
+                              last_name: cand.last_name || '',
+                              phone: cand.phone || '',
+                              email: cand.email || '',
+                              source: cand.source || 'Indeed',
+                              source_details: cand.source === 'Other' ? (cand.source_details || '') : '',
+                              referred_by_employee_id: cand.referred_by_employee_id || '',
+                              interview_date: cand.interview_date || '',
+                              mapped_listing_ids: mappings.filter(m => m.candidate_id === cand.id).map(m => m.job_listing_id),
+                              expected_salary: cand.expected_fixed_salary ? String(cand.expected_fixed_salary) : '',
+                              current_salary: cand.current_salary ? String(cand.current_salary) : ''
+                            });
+                            setShowCandidateModal(true);
+                          }}
+                          className="btn-secondary text-2xs py-1"
+                          title="Edit candidate details"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <span className="text-accent font-medium hover:underline text-2xs uppercase tracking-wide cursor-pointer" onClick={e => { e.stopPropagation(); setSelectedCandidate(cand); }}>
+                          View Details →
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -870,7 +918,8 @@ function RecruitmentContent() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-rule bg-page/50">
-                    {['Serial', 'Designation', 'Department', 'Offered Budget', 'Max Ceiling', 'Platforms', 'Status', 'Candidates', 'Opened On'].map(h => (
+                    <th key="Actions" className="table-head">Actions</th>
+                {['Serial', 'Designation', 'Department', 'Offered Budget', 'Max Ceiling', 'Platforms', 'Status', 'Candidates', 'Opened On'].map(h => (
                       <th key={h} className="table-head">{h}</th>
                     ))}
                   </tr>
@@ -911,6 +960,30 @@ function RecruitmentContent() {
                         </td>
                         <td className="table-cell font-semibold text-ink">{mappedCount}</td>
                         <td className="table-cell text-ink-muted">{listing.listing_date}</td>
+                        <td className="table-cell">
+                          <button
+                            onClick={() => {
+                              setEditingListingId(listing.id);
+                              setNewListingForm({
+                                department: listing.department || '',
+                                designation: listing.designation || '',
+                                job_description_title: listing.job_description_title || '',
+                                job_description_text: listing.job_description_text || '',
+                                offered_fixed_salary: String(listing.offered_fixed_salary || ''),
+                                offered_variable_salary: String(listing.offered_variable_salary || ''),
+                                max_fixed_salary: String(listing.max_fixed_salary || ''),
+                                max_variable_salary: String(listing.max_variable_salary || ''),
+                                platforms_tagged: Array.isArray(listing.platforms_tagged) ? listing.platforms_tagged : ['Indeed'],
+                                other_platform_name: Array.isArray(listing.platforms_tagged) && listing.platforms_tagged.includes('Other') ? (listing.platforms_tagged.find(p => typeof p === 'string' && p.startsWith('Other:')) || '') : ''
+                              });
+                              setShowListingModal(true);
+                            }}
+                            className="btn-secondary text-2xs py-1"
+                            title="Edit headcount"
+                          >
+                            ✏️ Edit
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -991,7 +1064,7 @@ function RecruitmentContent() {
         <div className="fixed inset-0 bg-ink/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="panel panel-body max-w-lg w-full bg-surface shadow-2xl animate-settle max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-baseline border-b border-rule-soft pb-3 mb-5">
-              <h2 className="panel-title">Add Headcount Position</h2>
+              <h2 className="panel-title">{editingListingId ? 'Edit Headcount Position' : 'Add Headcount Position'}</h2>
               <button onClick={() => setShowListingModal(false)} className="text-ink-muted hover:text-ink">✕</button>
             </div>
 
@@ -1131,6 +1204,80 @@ function RecruitmentContent() {
 
               <div>
                 <label className="field-label">
+                  Marketing Spend — Manual Entries
+                  <span className="ml-2 font-normal text-ink-muted">
+                    Track each platform spend separately. Add more entries as you go.
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {(newListingForm.marketing_spends || []).map((sp, idx) => (
+                    <span key={idx} className="pill-quiet text-2xs py-1 px-2 flex items-center gap-2">
+                      <span className="font-medium">{sp.platform}</span>
+                      <span>₹{Number(sp.amount).toLocaleString('en-IN')}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const arr = [...(newListingForm.marketing_spends || [])];
+                          arr.splice(idx, 1);
+                          setNewListingForm(p => ({ ...p, marketing_spends: arr }));
+                        }}
+                        className="text-bad hover:text-bad ml-1"
+                        title="Remove entry"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={newListingForm.new_spend_platform || ''}
+                    onChange={e => setNewListingForm(p => ({ ...p, new_spend_platform: e.target.value }))}
+                    className="field w-32 text-xs py-1.5"
+                  >
+                    <option value="">Select platform</option>
+                    {['Indeed','OLX','LinkedIn','Instagram','Newspaper','Other'].map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Amount ₹"
+                    value={newListingForm.new_spend_amount || ''}
+                    onChange={e => setNewListingForm(p => ({ ...p, new_spend_amount: e.target.value }))}
+                    className="field w-28 text-xs py-1.5"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newListingForm.new_spend_platform || !newListingForm.new_spend_amount) return;
+                      const arr = [...(newListingForm.marketing_spends || [])];
+                      arr.push({
+                        platform: newListingForm.new_spend_platform,
+                        amount: Number(newListingForm.new_spend_amount)
+                      });
+                      setNewListingForm(p => ({
+                        ...p,
+                        marketing_spends: arr,
+                        new_spend_platform: '',
+                        new_spend_amount: ''
+                      }));
+                    }}
+                    className="btn-secondary text-xs py-1.5"
+                  >
+                    + Add Spend
+                  </button>
+                </div>
+                {(newListingForm.marketing_spends || []).length > 0 && (
+                  <p className="mt-2 text-xs font-medium text-ink">
+                    Total ad spend: ₹{(newListingForm.marketing_spends || []).reduce((s, x) => s + Number(x.amount || 0), 0).toLocaleString('en-IN')}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="field-label">
                   Job Description / Requirements
                   <span className="ml-2 font-normal text-ink-muted">
                     {newListingForm.designation ? 'Pre-filled from the saved description for this role' : 'Select a role first to pre-fill'}
@@ -1156,7 +1303,7 @@ function RecruitmentContent() {
                   Cancel
                 </button>
                 <button type="submit" disabled={submitting} className="btn-primary text-xs">
-                  {submitting ? 'Creating…' : 'Create Headcount'}
+                  {submitting ? (editingListingId ? 'Updating…' : 'Creating…') : (editingListingId ? 'Update Headcount' : 'Create Headcount')}
                 </button>
               </div>
             </form>
@@ -1532,6 +1679,29 @@ function RecruitmentContent() {
               {/* Bottom Candidate Actions */}
               <div className="pt-4 border-t border-rule-soft flex justify-between items-center">
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingCandidateId(selectedCandidate.id);
+                      setNewCandidateForm({
+                        first_name: selectedCandidate.first_name || '',
+                        last_name: selectedCandidate.last_name || '',
+                        phone: selectedCandidate.phone || '',
+                        email: selectedCandidate.email || '',
+                        source: selectedCandidate.source || 'Indeed',
+                        source_details: selectedCandidate.source === 'Other' ? (selectedCandidate.source_details || '') : '',
+                        referred_by_employee_id: selectedCandidate.referred_by_employee_id || '',
+                        interview_date: selectedCandidate.interview_date || '',
+                        mapped_listing_ids: [],
+                        expected_salary: selectedCandidate.expected_fixed_salary ? String(selectedCandidate.expected_fixed_salary) : '',
+                        current_salary: selectedCandidate.current_salary ? String(selectedCandidate.current_salary) : ''
+                      });
+                      setShowCandidateModal(true);
+                      setSelectedCandidate(null);
+                    }}
+                    className="btn-secondary text-xs"
+                  >
+                    ✏️ Edit Candidate
+                  </button>
                   <button
                     onClick={() => handleMoveToTalentPool(selectedCandidate)}
                     className="btn-secondary text-xs text-purple-700"
