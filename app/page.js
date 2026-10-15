@@ -27,6 +27,13 @@ export default function Home() {
       href: '/sales',
       accent: '#6b4423',
     },
+    {
+      title: 'Marketing',
+      subtitle: 'Spends & ROI',
+      description: 'Track manual advertising spend by job listing and aggregate ROI',
+      href: '/marketing',
+      accent: '#5e7d5e',
+    },
   ];
 
   return (
