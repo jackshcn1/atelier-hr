@@ -102,71 +102,96 @@ export default function AssetsPageFull() {
           <form onSubmit={e => { e.preventDefault(); handleAdd(); }} className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm mb-8">
             <div className="panel-body p-8 lg:p-10">
               <h3 className="font-serif text-xl mb-2">New Asset — Master Entry</h3>
-              <p className="text-xs text-[#8b6f4e] mb-6">All 17 fields. Category/Type dropdowns configurable from Settings. Serial number auto-generates (CC-TTTTT format).</p>
+              <p className="text-xs text-[#8b6f4e] mb-6">Asset # auto-generates based on quantity. Serial numbers enter individually.</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 1. Auto Asset # (locked) */}
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="text-xs font-medium text-[#6b635c] mb-1 block">Auto-Generated Asset Numbers (locked, based on quantity)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: Math.max(1, parseInt(form.quantity) || 1) }, (_, i) => (
+                      <div key={i} className="field text-sm bg-[#f6f4f2] text-[#8b6f4e] w-40 text-center select-none cursor-default">{(form.category ? form.category.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'XX') + (form.name ? form.name.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'YY')}{String(i+1).padStart(5,'0')}</div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Asset Name */}
                 <input className="field text-sm" placeholder="Asset Name *" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} />
 
-                <select className="field text-sm bg-white" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>
-                  <option value="">Category</option>
-                  {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                {/* 3. Brand */}
+                <input className="field text-sm" placeholder="Brand" list="brand-list" value={form.brand} onChange={e=>setForm({...form,brand:e.target.value})} />
+                <datalist id="brand-list">{[...new Set(groups.map(g => g.brand))].map(b => <option key={b} value={b} />)}</datalist>
 
+                {/* 4. Type of Asset */}
                 <select className="field text-sm bg-white" value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>
                   <option value="">Type of Asset</option>
                   {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                   <option value="__new__">+ Add new type...</option>
                 </select>
 
+                {/* 5. Category */}
+                <select className="field text-sm bg-white" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>
+                  <option value="">Category</option>
+                  {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+
+                {/* 6. Quantity */}
                 <input className="field text-sm" type="number" placeholder="Quantity" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})} />
 
-                {/* Multi-serial fields based on quantity */}
+                {/* 7. Model Number */}
+                <input className="field text-sm" placeholder="Model Number" list="model-list" value={form.model} onChange={e=>setForm({...form,model:e.target.value})} />
+                <datalist id="model-list">{[...new Set(groups.map(g => g.name))].map(m => <option key={m} value={m} />)}</datalist>
+
+                {/* 8. Serial Numbers */}
                 <div className="md:col-span-2 lg:col-span-3">
                   <label className="text-xs font-medium text-[#6b635c] mb-1 block">Serial Numbers (one per unit)</label>
                   <div className="flex flex-wrap gap-2">
                     {Array.from({ length: Math.max(1, parseInt(form.quantity) || 1) }, (_, i) => (
-                      <input key={i} className="field text-sm w-32" placeholder={`Serial ${i + 1}`} value={serials[i] || ''} onChange={e => { const updated = [...serials]; updated[i] = e.target.value; setSerials(updated); setForm({...form, serial: updated[0] || ''}); }} />
+                      <input key={i} className="field text-sm w-36" placeholder={`Serial ${i + 1}`} value={serials[i] || ''} onChange={e => { const updated = [...serials]; updated[i] = e.target.value; setSerials(updated); setForm({...form, serial: updated[0] || ''}); }} />
                     ))}
                   </div>
                 </div>
-                <input className="field text-sm" placeholder="Vendor" list="vendor-list" value={form.vendor} onChange={e=>setForm({...form,vendor:e.target.value})} />
-                <datalist id="vendor-list">
-                  {vendorSuggestions.map(v => <option key={v} value={v} />)}
-                </datalist>
 
-                <input className="field text-sm" placeholder="Brand" list="brand-list" value={form.brand} onChange={e=>setForm({...form,brand:e.target.value})} />
-                <datalist id="brand-list">
-                  {[...new Set(groups.map(g => g.brand))].map(b => <option key={b} value={b} />)}
-                </datalist>
+                {/* 9. Purchase Date */}
+                <input className="field text-sm" type="date" placeholder="Purchase / Transfer Date" value={form.purchaseDate} onChange={e=>setForm({...form,purchaseDate:e.target.value})} />
 
-                <input className="field text-sm" placeholder="Model Name" list="model-list" value={form.model} onChange={e=>setForm({...form,model:e.target.value})} />
-                <datalist id="model-list">
-                  {[...new Set(groups.map(g => g.name))].map(m => <option key={m} value={m} />)}
-                </datalist>
-
-                <input className="field text-sm" type="date" placeholder="Purchase Date" value={form.purchaseDate} onChange={e=>setForm({...form,purchaseDate:e.target.value})} />
-
+                {/* 10. Brand New / Used */}
                 <select className="field text-sm bg-white" value={form.newOrUsed} onChange={e=>setForm({...form,newOrUsed:e.target.value})}>
                   <option>Brand New</option><option>Used</option>
                 </select>
 
+                {/* 11. Condition */}
                 <select className="field text-sm bg-white" value={form.condition} onChange={e=>setForm({...form,condition:e.target.value})}>
                   <option>Brand New</option><option>Good</option><option>Requires Maintenance</option><option>Bad</option><option>Damaged/Unusable</option>
                 </select>
 
+                {/* 12. Status */}
                 <select className="field text-sm bg-white" value={form.status} onChange={e=>setForm({...form,status:e.target.value})}>
                   <option>Available</option><option>In-use</option><option>Employee-assigned</option><option>Maintenance</option><option>Returned</option><option>Discarded</option><option>Transferred</option><option>Sold</option>
                 </select>
 
+                {/* 13. Location */}
                 <select className="field text-sm bg-white" value={form.location} onChange={e=>setForm({...form,location:e.target.value})}>
                   <option value="">Location</option>
                   {LOCATION_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
-                <input className="field text-sm" placeholder="Assigned Employee" value={form.assignedEmployee} onChange={e=>setForm({...form,assignedEmployee:e.target.value})} />
 
+                {/* 14. Assigned Employee (only if Employee selected) */}
+                {form.location === 'Employee' && (
+                  <input className="field text-sm" placeholder="Assigned Employee" value={form.assignedEmployee} onChange={e=>setForm({...form,assignedEmployee:e.target.value})} />
+                )}
+
+                {/* 15. Vendor */}
+                <input className="field text-sm" placeholder="Vendor" list="vendor-list" value={form.vendor} onChange={e=>setForm({...form,vendor:e.target.value})} />
+                <datalist id="vendor-list">{vendorSuggestions.map(v => <option key={v} value={v} />)}</datalist>
+
+                {/* 16. Invoice Number */}
+                <input className="field text-sm" placeholder="Invoice Number" value={form.invoiceNumber || ''} onChange={e=>setForm({...form,invoiceNumber:e.target.value})} />
+
+                {/* 17. Warranty Period */}
                 <input className="field text-sm" type="number" placeholder="Warranty Period (months)" value={form.warrantyMonths === 0 ? '' : form.warrantyMonths} onChange={e=>setForm({...form,warrantyMonths:parseInt(e.target.value)||0})} />
-                <input className="field text-sm" placeholder="Warranty Contact Number" value={form.warrantyContact} onChange={e=>setForm({...form,warrantyContact:e.target.value})} />
 
+                {/* 18. Extended Warranty */}
                 <div className="flex flex-col gap-2">
                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.extendedWarranty} onChange={e=>setForm({...form,extendedWarranty:e.target.checked})} /> Extended Warranty</label>
                   {form.extendedWarranty && (
@@ -174,15 +199,18 @@ export default function AssetsPageFull() {
                   )}
                 </div>
 
+                {/* 19. Warranty Contact Number */}
+                <input className="field text-sm" placeholder="Warranty Contact Number" value={form.warrantyContact} onChange={e=>setForm({...form,warrantyContact:e.target.value})} />
+
+                {/* 20. Buying Price */}
                 <input className="field text-sm" placeholder="Buying Price (₹)" value={form.buyingPrice} onChange={e=>setForm({...form,buyingPrice:e.target.value})} />
 
+                {/* 21. Notes */}
                 <textarea className="field text-sm md:col-span-2 lg:col-span-2" rows={2} placeholder="Notes" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} />
 
+                {/* 22. Attach invoice */}
                 <label className="block text-sm text-[#6b635c] md:col-span-2 lg:col-span-2">Invoice Upload (Google Drive shared folder link or upload)</label>
-                <input className="field text-sm md:col-span-2 lg:col-span-2" type="file" accept=".pdf,.jpg,.png" onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file) alert('File selected: ' + file.name + '. In production, this uploads to a shared Google Drive folder (not Supabase).');
-                }} />
+                <input className="field text-sm md:col-span-2 lg:col-span-2" type="file" accept=".pdf,.jpg,.png" onChange={e => { const file = e.target.files?.[0]; if (file) alert('File selected: ' + file.name + '. In production, this uploads to a shared Google Drive folder (not Supabase).'); }} />
               </div>
               <div className="flex gap-3 mt-6">
                 <button type="submit" className="btn-primary text-sm px-5">Save Asset</button>
@@ -191,8 +219,6 @@ export default function AssetsPageFull() {
             </div>
           </form>
         )}
-
-        <div className="space-y-4">
           {groups.map((g, idx) => (
             <div key={g.category + g.name + idx} className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm">
               <button onClick={() => setExpandedId(expandedId === (g.category + g.name + idx) ? null : (g.category + g.name + idx))} className="w-full text-left px-6 py-5 flex items-center justify-between hover:bg-[#faf8f6] transition-colors">
