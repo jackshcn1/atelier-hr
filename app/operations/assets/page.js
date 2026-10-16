@@ -81,8 +81,9 @@ export default function AssetsPageFull() {
           <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">Complete restaurant asset inventory — master entry form, category groups, expand for details</p>
         </div>
 
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-between items-center mb-6">
           <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm px-4 py-2">+ Add Asset</button>
+          <button onClick={() => setExpandedId('ALL')} className="btn-secondary text-xs px-3 py-1.5">Expand All</button>
         </div>
 
         {showForm && (
@@ -182,27 +183,27 @@ export default function AssetsPageFull() {
                     </span>
                   </p>
                 </div>
-                <span className="btn-secondary text-xs px-3 py-1">{expandedId === (g.category + g.name + idx) ? 'Collapse' : 'Expand'}</span>
+                <span className="btn-secondary text-xs px-3 py-1">{expandedId === 'ALL' || expandedId === (g.category + g.name + idx) ? 'Collapse' : 'Expand'}</span>
               </button>
-              {expandedId === (g.category + g.name + idx) && (
+              {(expandedId === (g.category + g.name + idx) || expandedId === 'ALL') && (
                 <div className="panel-body border-t border-[#ebe8e4]">
-                  <table className="w-full text-sm">
-                    <thead><tr className="bg-[#faf8f6]"><th className="table-head text-left px-4 py-2">Asset #</th><th className="table-head text-left px-4 py-2">Name</th><th className="table-head text-left px-4 py-2">Brand / Model</th><th className="table-head text-left px-4 py-2">Serial</th><th className="table-head text-left px-4 py-2">Condition</th><th className="table-head text-left px-4 py-2">Status</th><th className="table-head text-left px-4 py-2">Location</th><th className="table-head text-left px-4 py-2">Assigned</th><th className="table-head text-left px-4 py-2">Warranty Till</th><th className="table-head text-left px-4 py-2">Notes</th></tr></thead>
+                  <table className="w-full text-xs">
+                    <thead><tr className="bg-[#faf8f6]"><th className="table-head text-left px-2 py-1">Asset #</th><th className="table-head text-left px-2 py-1">Brand / Model</th><th className="table-head text-left px-2 py-1">Serial #</th><th className="table-head text-left px-2 py-1">Condition</th><th className="table-head text-left px-2 py-1">Status</th><th className="table-head text-left px-2 py-1">Location</th><th className="table-head text-left px-2 py-1">Notes</th></tr></thead>
                     <tbody>
-                      {Array.from({ length: g.total }, (_, i) => i + 1).map(num => (
-                        <tr key={num} className="border-b border-[#ebe8e4] hover:bg-[#faf8f6]/40">
-                          <td className="table-cell px-4 py-3 text-[#8b6f4e] font-medium">{(g.category ? g.category.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'XX') + (g.name ? g.name.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'YY')}{String(num).padStart(5,'0')}</td>
-                          <td className="table-cell px-4 py-3 font-medium">{g.name}</td>
-                          <td className="table-cell px-4 py-3">{g.brand || '—'} / {g.name || 'Standard'}</td>
-                          <td className="table-cell px-4 py-3 text-xs">SN-{num}-{(g.category ? g.category.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'XX')}</td>
-                          <td className="table-cell px-4 py-3"><span className={g.condition === 'Brand New' || g.condition === 'Good' ? 'pill-good' : g.condition === 'Requires Maintenance' ? 'pill-warn' : 'pill-bad'}>{g.condition}</span></td>
-                          <td className="table-cell px-4 py-3"><span className={g.status === 'Available' ? 'pill-good' : g.status === 'In-use' ? 'pill-quiet' : g.status === 'Employee-assigned' ? 'pill-warn' : g.status === 'Maintenance' ? 'pill-bad' : g.status === 'Returned' ? 'pill-warn' : g.status === 'Discarded' ? 'pill-bad' : g.status === 'Transferred' || g.status === 'Sold' ? 'pill-quiet' : 'pill-quiet'}>{g.status}</span></td>
-                          <td className="table-cell px-4 py-3 text-xs">{g.location || '—'}</td>
-                          <td className="table-cell px-4 py-3 text-xs">{g.status === 'Employee-assigned' ? 'Employee '+ (num % 3 + 1) : '—'}</td>
-                          <td className="table-cell px-4 py-3 text-xs">2027-05-10</td>
-                          <td className="table-cell px-4 py-3 text-xs">Standard item notes</td>
-                        </tr>
-                      ))}
+                      {Array.from({ length: g.total }, (_, i) => i + 1).map(num => {
+                        const assetId = (g.category ? g.category.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'XX') + (g.name ? g.name.replace(/[^a-zA-Z]/g,'').substring(0,2).toUpperCase() : 'YY') + String(num).padStart(5,'0');
+                        return (
+                          <tr key={num} className="border-b border-[#ebe8e4] hover:bg-[#faf8f6]/40">
+                            <td className="table-cell px-2 py-1.5 text-[#8b6f4e] font-medium whitespace-nowrap"><a href={`/operations/assets/${encodeURIComponent(assetId)}`} className="hover:underline text-ink">{assetId}</a></td>
+                            <td className="table-cell px-2 py-1.5 whitespace-nowrap">{g.brand || '—'} / {g.name || 'Standard'}</td>
+                            <td className="table-cell px-2 py-1.5 whitespace-nowrap text-xs">SN-{num}</td>
+                            <td className="table-cell px-2 py-1.5 whitespace-nowrap"><span className={g.condition === 'Brand New' || g.condition === 'Good' ? 'pill-good text-[10px]' : g.condition === 'Requires Maintenance' ? 'pill-warn text-[10px]' : 'pill-bad text-[10px]'}>{g.condition}</span></td>
+                            <td className="table-cell px-2 py-1.5 whitespace-nowrap"><span className={g.status === 'Available' ? 'pill-good text-[10px]' : g.status === 'In-use' ? 'pill-quiet text-[10px]' : g.status === 'Employee-assigned' ? 'pill-warn text-[10px]' : g.status === 'Maintenance' ? 'pill-bad text-[10px]' : g.status === 'Returned' ? 'pill-warn text-[10px]' : g.status === 'Discarded' ? 'pill-bad text-[10px]' : 'pill-quiet text-[10px]'}>{g.status}</span></td>
+                            <td className="table-cell px-2 py-1.5 whitespace-nowrap text-xs">{g.location || '—'}</td>
+                            <td className="table-cell px-2 py-1.5 whitespace-nowrap text-xs">Standard notes</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   <div className="mt-4 pt-4 border-t border-[#ebe8e4] flex gap-3 flex-wrap">

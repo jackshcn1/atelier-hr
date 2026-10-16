@@ -1,119 +1,100 @@
 'use client';
-export default function FullAssetRecord({ params }) {
-  const asset = {
-    id: params.id,
-    name: 'Hoshizaki 2 Door Undercounter',
+import { useState } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+
+export default function AssetDetailPage() {
+  const params = useParams();
+  const assetId = params?.id || '';
+  const [form, setForm] = useState({
+    name: 'Chiller',
     category: 'Kitchen Equipment',
-    quantity: 1,
-    type: 'Kitchen Equipment',
-    purchaseDate: '2025-05-10',
-    condition: 'Good',
+    type: 'Chiller',
     brand: 'Hoshizaki',
-    model: '2 Door Undercounter Chiller',
-    serialNumber: 'HSZ-2045-882',
-    vendor: 'Kitchen Supply Co.',
-    warrantyPeriodMonths: 24,
-    warrantyTill: '2027-05-10',
-    extendedWarranty: false,
-    buyingPrice: 4200,
+    model: 'FM-300U',
+    serial: 'KICH00001',
+    vendor: 'Thomson',
+    purchaseDate: '2025-03-10',
+    newOrUsed: 'Brand New',
+    condition: 'Brand New',
+    status: 'Available',
     location: 'Kitchen',
-    assignedEmployee: null,
-    invoiceUrl: '#',
-    notes: 'Installed behind main prep station.',
-    status: 'available',
+    assignedEmployee: '',
+    warrantyMonths: 12,
+    warrantyContact: '+91 98765 43210',
+    extendedWarranty: false,
+    extendedWarrantyMonths: 12,
+    buyingPrice: '85000',
+    notes: 'Main kitchen chiller — keep clean.',
+  });
+  const [saved, setSaved] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm({ ...form, [name]: type === 'checkbox' ? checked : value });
   };
 
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
-      <div className="max-w-4xl mx-auto px-6 py-16 lg:py-24">
+      <div className="max-w-3xl mx-auto px-6 py-16 lg:py-24">
         <div className="flex items-center gap-3 mb-6">
-          <a href="/" className="btn-secondary text-xs px-3 py-1.5">← Home</a>
-          <a href="/operations" className="text-[#8b6f4e] text-sm hover:underline">Operations</a>
-          <span className="text-[#8b6f4e] text-sm">/</span>
-          <a href="/operations/assets" className="text-[#8b6f4e] text-sm hover:underline">Assets</a>
-          <span className="text-[#8b6f4e] text-sm">/</span>
-          <span className="text-[#6b635c] text-sm">{asset.name}</span>
+          <Link href="/operations/assets" className="btn-secondary text-xs px-3 py-1.5">← Assets</Link>
         </div>
-        <div className="page-head mb-10">
-          <h1 className="page-title font-serif text-4xl lg:text-5xl">{asset.name}</h1>
-          <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">Category: {asset.category} · Serial: {asset.serialNumber}</p>
+        <div className="page-head mb-8">
+          <h1 className="font-serif text-3xl text-[#1e1812]">Asset Details</h1>
+          <p className="text-xs text-[#6b635c] mt-1">Locked ID: {assetId}</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm lg:col-span-2">
-            <div className="panel-body p-8 lg:p-10">
-              <h2 className="font-serif text-xl mb-6">Asset Details</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-                <Field label="Asset Name" value={asset.name} />
-                <Field label="Quantity" value={String(asset.quantity)} />
-                <Field label="Type" value={asset.type} />
-                <Field label="Purchase Date" value={asset.purchaseDate} />
-                <Field label="Brand" value={asset.brand} />
-                <Field label="Model Name" value={asset.model} />
-                <Field label="Serial Number" value={asset.serialNumber} />
-                <Field label="Vendor" value={asset.vendor} />
-                <Field label="Condition" value={asset.condition} />
-                <Field label="Status" value={asset.status} />
-                <Field label="Warranty Period" value={`${asset.warrantyPeriodMonths} months`} />
-                <Field label="Warranty Contact" value={asset.warrantyContact || 'Not set'} />
-                <Field label="Warranty Available Till" value={asset.warrantyTill} />
-                <Field label="Extended Warranty" value={asset.extendedWarranty ? 'Yes (period: ' + (asset.extendedWarrantyMonths || 12) + ' mo)' : 'No'} />
-                <Field label="New / Used" value={asset.newOrUsed || '—'} />
-                <Field label="Buying Price" value={`₹${asset.buyingPrice.toLocaleString()}`} />
-                <Field label="Asset Location" value={asset.location} />
-                <Field label="Assigned Employee" value={asset.assignedEmployee || 'Not assigned'} />
-                <Field label="Notes" value={asset.notes} full />
+        <form onSubmit={e => { e.preventDefault(); setSaved(true); setTimeout(() => setSaved(false), 2500); }} className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm">
+          <div className="panel-body p-6 lg:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Asset #</span>
+                <input className="field text-sm bg-[#f6f4f2] text-[#8b6f4e]" disabled value={form.serial} />
+                <span className="text-xs text-[#8b6f4e] mt-1 block">Locked — cannot edit</span>
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Asset Name</span>
+                <input name="name" value={form.name} onChange={handleChange} className="field text-sm" />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Brand</span>
+                <input name="brand" value={form.brand} onChange={handleChange} className="field text-sm" />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Model</span>
+                <input name="model" value={form.model} onChange={handleChange} className="field text-sm" />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Condition</span>
+                <select name="condition" value={form.condition} onChange={handleChange} className="field text-sm bg-white">
+                  <option>Brand New</option><option>Good</option><option>Requires Maintenance</option><option>Bad</option><option>Damaged/Unusable</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Status</span>
+                <select name="status" value={form.status} onChange={handleChange} className="field text-sm bg-white">
+                  <option>Available</option><option>In-use</option><option>Employee-assigned</option><option>Maintenance</option><option>Returned</option><option>Discarded</option><option>Transferred</option><option>Sold</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Location</span>
+                <input name="location" value={form.location} onChange={handleChange} className="field text-sm" />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Notes</span>
+                <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className="field text-sm w-full" />
+              </label>
+            </div>
 
-                <div className="sm:col-span-2">
-                  <h4 className="font-serif text-base mb-2">Depreciation Schedule</h4>
-                  <p className="text-xs text-[#6b635c]">Straight-line method: purchase price / useful life (10 years default). Annual depreciation ≈ ₹{Math.round(asset.buyingPrice / 10).toLocaleString()}.</p>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <h4 className="font-serif text-base mb-2">Maintenance Cost Tracking</h4>
-                  <table className="w-full text-xs"><thead className="bg-[#faf8f6]"><tr><th className="table-head">Date</th><th className="table-head">Type</th><th className="table-head">Cost</th></tr></thead><tbody><tr><td className="table-cell">2026-01-15</td><td className="table-cell">Routine service</td><td className="table-cell">₹350</td></tr><tr><td className="table-cell">2026-06-10</td><td className="table-cell">Repair</td><td className="table-cell">₹1,200</td></tr></tbody></table>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <h4 className="font-serif text-base mb-2">Audit Trail</h4>
-                  <table className="w-full text-xs"><thead className="bg-[#faf8f6]"><tr><th className="table-head">Date</th><th className="table-head">Action</th><th className="table-head">User</th><th className="table-head">Reason</th></tr></thead><tbody><tr><td className="table-cell">2026-03-12</td><td className="table-cell">Assigned</td><td className="table-cell">HR Manager</td><td className="table-cell">New staff onboarding</td></tr><tr><td className="table-cell">2026-07-01</td><td className="table-cell">Returned</td><td className="table-cell">Admin</td><td className="table-cell">Condition bad</td></tr></tbody></table>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <h4 className="font-serif text-base mb-2">Lifecycle Alert</h4>
-                  <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded">Warranty expires within 30 days: 2027-05-10. Schedule renewal.</p>
-                </div>
-              </div>
+            <div className="flex gap-3 mt-6 pt-6 border-t border-[#ebe8e4]">
+              <button type="submit" className="btn-primary text-sm px-5">Save Changes</button>
+              <Link href="/operations/assets" className="btn-secondary text-sm px-5">Back</Link>
             </div>
           </div>
-
-          <div className="space-y-6">
-            <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm">
-              <div className="panel-body p-8">
-                <h3 className="font-serif text-lg mb-3">Invoice</h3>
-                <a href={asset.invoiceUrl} className="btn-secondary text-xs px-3 py-1.5">View Invoice PDF</a>
-              </div>
-            </div>
-            <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm">
-              <div className="panel-body p-8">
-                <h3 className="font-serif text-lg mb-3">Quick Actions</h3>
-                <div className="flex flex-col gap-2">
-                  <a href="/operations/assets" className="btn-primary text-xs text-center">Back to Assets List</a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        </form>
+        {saved && <div className="mt-3 text-sm text-green-700 font-medium">Changes saved successfully.</div>}
       </div>
     </main>
-  );
-}
-
-function Field({ label, value, full }) {
-  return (
-    <div className={full ? 'sm:col-span-2' : ''}>
-      <p className="text-xs text-[#8b6f4e] font-medium mb-1">{label}</p>
-      <p className="text-sm text-[#1e1812] font-medium">{value}</p>
-    </div>
   );
 }
