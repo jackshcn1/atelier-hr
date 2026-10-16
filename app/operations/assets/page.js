@@ -175,7 +175,12 @@ export default function AssetsPageFull() {
               <button onClick={() => setExpandedId(expandedId === (g.category + g.name + idx) ? null : (g.category + g.name + idx))} className="w-full text-left px-6 py-5 flex items-center justify-between hover:bg-[#faf8f6] transition-colors">
                 <div>
                   <h3 className="font-serif text-xl text-[#1e1812]">{g.name}</h3>
-                  <p className="text-xs text-[#6b635c] mt-1">Category: {g.category} · Brand: {g.brand} · Units: {g.total} · Condition: <span className={`font-medium ${g.condition === 'Brand New' ? 'text-green-700' : g.condition === 'Good' ? 'text-[#6b635c]' : g.condition === 'Requires Maintenance' ? 'text-amber-700' : 'text-red-700'}`}>{g.condition}</span> · Status: <span className="font-medium">{g.status}</span> · New/Used: {g.newOrUsed || '—'} · Location: {g.location}</p>
+                  <p className="text-xs text-[#6b635c] mt-1">
+                    Category: {g.category} · Units: {g.total}
+                    <span className="ml-2 inline-flex gap-1">
+                      <span className="px-1.5 py-0.5 rounded-full bg-page text-ink-muted">{g.location || 'Kitchen'}</span>
+                    </span>
+                  </p>
                 </div>
                 <span className="btn-secondary text-xs px-3 py-1">{expandedId === (g.category + g.name + idx) ? 'Collapse' : 'Expand'}</span>
               </button>
