@@ -219,6 +219,7 @@ export default function AssetsPageFull() {
             </div>
           </form>
         )}
+        <div className="space-y-4">
           {groups.map((g, idx) => (
             <div key={g.category + g.name + idx} className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm">
               <button onClick={() => setExpandedId(expandedId === (g.category + g.name + idx) ? null : (g.category + g.name + idx))} className="w-full text-left px-6 py-5 flex items-center justify-between hover:bg-[#faf8f6] transition-colors">
