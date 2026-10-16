@@ -49,24 +49,36 @@ export default function AssetsPageFull() {
     return numberPart.length === 5 && !alreadyExists;
   };
 
+  const [serials, setSerials] = useState([]);
+
+  const handleQuantityChange = (e) => {
+    const qty = parseInt(e.target.value) || 1;
+    setForm({ ...form, quantity: qty, serial: '' });
+    // Generate empty serial fields matching new quantity
+    setSerials(Array.from({ length: qty }, (_, i) => i === 0 ? form.serial || '' : ''));
+  };
   const handleAdd = () => {
     if (form.name.trim() === '') return;
     const qty = parseInt(form.quantity) || 1;
-    const serial = form.serial || generateSerial();
+    const baseSerial = form.serial || generateSerial();
     setSerialError('');
-    setGroups(prev => [...prev, {
+    // Create qty separate line items with unique asset IDs and serials
+    const newItems = Array.from({ length: qty }, (_, i) => ({
       category: form.category || 'General',
       name: form.name || 'Asset',
-      total: qty,
+      total: 1,
       brand: form.brand,
       newOrUsed: form.newOrUsed,
       condition: form.condition,
       status: form.status,
       location: form.location || 'TBD',
-      expanded: true,
-    }]);
+      expanded: false,
+      serialNum: baseSerial + '-' + (i + 1),
+    }));
+    setGroups(prev => [...prev, ...newItems]);
     setShowForm(false);
     setForm({ name: '', category: '', type: '', quantity: 1, brand: '', model: '', serial: '', vendor: '', purchaseDate: '', newOrUsed: 'Brand New', condition: 'Brand New', status: 'Available', location: '', assignedEmployee: '', warrantyMonths: 12, extendedWarranty: false, buyingPrice: '', notes: '' });
+    setSerials([]);
   };
 
   return (
@@ -107,6 +119,16 @@ export default function AssetsPageFull() {
                 </select>
 
                 <input className="field text-sm" type="number" placeholder="Quantity" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})} />
+
+                {/* Multi-serial fields based on quantity */}
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="text-xs font-medium text-[#6b635c] mb-1 block">Serial Numbers (one per unit)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: Math.max(1, parseInt(form.quantity) || 1) }, (_, i) => (
+                      <input key={i} className="field text-sm w-32" placeholder={`Serial ${i + 1}`} value={serials[i] || ''} onChange={e => { const updated = [...serials]; updated[i] = e.target.value; setSerials(updated); setForm({...form, serial: updated[0] || ''}); }} />
+                    ))}
+                  </div>
+                </div>
                 <input className="field text-sm" placeholder="Vendor" list="vendor-list" value={form.vendor} onChange={e=>setForm({...form,vendor:e.target.value})} />
                 <datalist id="vendor-list">
                   {vendorSuggestions.map(v => <option key={v} value={v} />)}
@@ -207,7 +229,7 @@ export default function AssetsPageFull() {
                     </tbody>
                   </table>
                   <div className="mt-4 pt-4 border-t border-[#ebe8e4] flex gap-3 flex-wrap">
-                    <Link href={`/operations/assets/${encodeURIComponent(g.category)}-${encodeURIComponent(g.name)}`} className="btn-secondary text-xs px-3 py-1.5">View Full Record →</Link>
+                    <span className="text-xs text-[#6b635c]">Individual assets listed above — click any ID to view/edit.</span>
                   </div>
                 </div>
               )}
