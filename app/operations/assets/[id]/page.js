@@ -100,6 +100,16 @@ export default function AssetDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
   const [pendingChanges, setPendingChanges] = useState(null);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [maintenanceForm, setMaintenanceForm] = useState({
+    serviceType: 'Routine Service',
+    issues: {
+      'Physical damage': false, 'Not functioning': false, 'Damaged part': false, 'Cosmetic repair': false,
+      'Water leak': false, 'Cooling issue': false, 'Poor functioning': false, 'Other': false
+    },
+    comments: '',
+    priority: 'Normal'
+  });
 
   // Fetch asset data based on assetId
   useEffect(() => {
@@ -227,9 +237,19 @@ export default function AssetDetailPage() {
     setPendingChanges(null);
   };
 
-  const handleCommentDialogClose = () => {
-    setShowCommentDialog(false);
-    setPendingChanges(null);
+  const handleMaintenanceSubmit = () => {
+    console.log('Maintenance request created:', { assetId, ...maintenanceForm });
+    alert(`Maintenance request logged: MNT-${Math.floor(1000 + Math.random() * 9000)}`);
+    setShowMaintenanceModal(false);
+    setMaintenanceForm({
+      serviceType: 'Routine Service',
+      issues: {
+        'Physical damage': false, 'Not functioning': false, 'Damaged part': false, 'Cosmetic repair': false,
+        'Water leak': false, 'Cooling issue': false, 'Poor functioning': false, 'Other': false
+      },
+      comments: '',
+      priority: 'Normal'
+    });
   };
 
   // Helper function to generate human-readable change details
@@ -447,6 +467,92 @@ export default function AssetDetailPage() {
               </div>
             )}
 
+            {/* Maintenance Request Modal */}
+            {showMaintenanceModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="bg-white rounded-card shadow-2xl max-w-lg mx-4 p-8 border border-[#ebe8e4] w-full max-h-[90vh] overflow-y-auto">
+                  <h3 className="font-serif text-2xl mb-2">Request Maintenance</h3>
+                  <p className="text-xs text-[#6b635c] mb-6">Asset: {assetId} — {form.name} ({form.category})</p>
+
+                  <div className="space-y-4 text-sm">
+                    <div>
+                      <label className="text-xs font-medium text-[#6b635c] mb-1 block">Service Type</label>
+                      <select
+                        className="field text-sm w-full bg-white"
+                        value={maintenanceForm.serviceType}
+                        onChange={e => setMaintenanceForm({...maintenanceForm, serviceType: e.target.value})}
+                      >
+                        <option>Routine Service</option>
+                        <option>Faulty or defective repair</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-[#6b635c] mb-2 block">Issues Identified (Select all that apply)</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.keys(maintenanceForm.issues).map(issue => (
+                          <label key={issue} className="flex items-center gap-2 text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={maintenanceForm.issues[issue]}
+                              onChange={e => {
+                                const updated = {...maintenanceForm.issues, [issue]: e.target.checked};
+                                setMaintenanceForm({...maintenanceForm, issues: updated});
+                              }}
+                              className="h-4 w-4"
+                            />
+                            <span>{issue}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-[#6b635c] mb-1 block">Priority Meter</label>
+                      <select
+                        className="field text-sm w-full bg-white"
+                        value={maintenanceForm.priority}
+                        onChange={e => setMaintenanceForm({...maintenanceForm, priority: e.target.value})}
+                      >
+                        <option>Urgent</option>
+                        <option>Normal</option>
+                        <option>Can take some time</option>
+                        <option>Low</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-[#6b635c] mb-1 block">Other Comments / Details</label>
+                      <textarea
+                        rows={3}
+                        className="field text-sm w-full"
+                        value={maintenanceForm.comments}
+                        onChange={e => setMaintenanceForm({...maintenanceForm, comments: e.target.value})}
+                        placeholder="Describe the problem, symptoms, or location specifics..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6 pt-4 border-t border-[#ebe8e4]">
+                    <button
+                      type="button"
+                      onClick={handleMaintenanceSubmit}
+                      className="btn-primary text-sm px-5 py-2"
+                    >
+                      Submit Request
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMaintenanceModal(false)}
+                      className="btn-secondary text-sm px-5 py-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Audit Log Section */}
             <div className="mt-8 pt-6 border-t border-[#ebe8e4]">
               <h2 className="font-serif text-xl mb-4">Audit Log</h2>
@@ -476,6 +582,13 @@ export default function AssetDetailPage() {
 
             <div className="flex gap-3 mt-6 pt-6 border-t border-[#ebe8e4]">
               <button type="submit" className="btn-primary text-sm px-5">Save Changes</button>
+              <button
+                type="button"
+                onClick={() => setShowMaintenanceModal(true)}
+                className="btn-secondary text-sm px-5 border-[#e11d48] text-[#e11d48] hover:bg-[#fff1f2]"
+              >
+                Requires Maintenance
+              </button>
               <Link href="/operations/assets" className="btn-secondary text-sm px-5">Back</Link>
             </div>
           </div>
