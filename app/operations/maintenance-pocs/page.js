@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const SPECIALITY_OPTIONS = [
@@ -67,26 +67,32 @@ export default function MaintenancePOCsPage() {
     attachments: ''
   });
 
+  useEffect(() => {
+    fetch('/api/maintenance/pocs').then(r => r.json()).then(d => {
+      if (d.pocs) setPocs(d.pocs);
+    }).catch(() => {});
+  }, []);
+
   const handleAddPOC = (e) => {
     e.preventDefault();
     if (!form.name || !form.contact) return;
-    const newPOC = {
-      id: `POC-00${pocs.length + 1}`,
-      ...form,
-      serviceHistory: [],
-      attachments: form.attachments ? [form.attachments] : []
-    };
-    setPocs([newPOC, ...pocs]);
-    setForm({
-      name: '',
-      speciality: 'Electrician',
-      contact: '',
-      alternateContact: '',
-      reference: '',
-      notes: '',
-      rating: 5,
-      attachments: ''
-    });
+    fetch('/api/maintenance/pocs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name,
+        speciality: form.speciality,
+        contact_primary: form.contact,
+        contact_alternate: form.alternateContact || null,
+        reference: form.reference || null,
+        notes: form.notes || null,
+        star_rating: form.rating,
+        attachment_url: form.attachments || null
+      })
+    }).then(r => r.json()).then(d => {
+      if (d.poc) setPocs([d.poc, ...pocs]);
+    }).catch(() => {});
+    setForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5, attachments: '' });
     setShowForm(false);
   };
 
