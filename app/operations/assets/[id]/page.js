@@ -401,7 +401,14 @@ export default function AssetDetailPage() {
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
                 <div className="bg-white rounded-card shadow-2xl max-w-md mx-4 p-6 border border-[#ebe8e4]">
                   <h3 className="font-serif text-xl mb-2">Document Change</h3>
-                  <p className="text-sm text-[#6b635c] mb-4">Changes detected: {pendingChanges?.length || 0}</p>
+                  <div className="text-sm text-[#6b635c] mb-4">
+                    <p className="font-medium mb-1">Changes detected:</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {pendingChanges?.map((change, i) => (
+                        <li key={i}>{generateChangeDetails(change)}</li>
+                      ))}
+                    </ul>
+                  </div>
                   <label className="block">
                     <span className="text-xs font-medium text-[#6b635c] mb-1 block">Change Comments</span>
                     <textarea
