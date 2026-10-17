@@ -168,8 +168,19 @@ export default function MaintenancePOCsPage() {
                   <textarea rows={2} className="field text-sm w-full" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} placeholder="Availability, reliability, hourly rates..." />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-[#6b635c] mb-1 block">Attachment (Drive Link or file name)</label>
-                  <input className="field text-sm w-full" value={form.attachments} onChange={e => setForm({...form, attachments: e.target.value})} placeholder="contract.pdf" />
+                  <label className="text-xs font-medium text-[#6b635c] mb-1 block">Attachment</label>
+                  <input
+                    type="file"
+                    className="field text-sm w-full bg-white p-1"
+                    accept=".pdf,.jpg,.png"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        alert('File selected: ' + file.name + '. In production, this uploads to a shared Google Drive folder (not Supabase).');
+                        setForm({...form, attachments: file.name});
+                      }
+                    }}
+                  />
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-[#ebe8e4]">
                   <button type="submit" className="btn-primary text-sm px-5 py-2">Save POC</button>
