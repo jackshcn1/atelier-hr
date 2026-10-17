@@ -658,3 +658,72 @@ create table if not exists marketing_spend (
   updated_at timestamptz not null default now()
 );
 
+
+-- =====================================================================
+-- 20. Maintenance Module (Maintenance POCs, Jobs, Quotes, Audit)
+-- =====================================================================
+
+create table maintenance_pocs (
+  id bigint generated always as identity primary key,
+  name text not null,
+  speciality text not null,
+  contact_primary text,
+  contact_alternate text,
+  reference text,
+  notes text,
+  star_rating int default 5 check (star_rating between 1 and 5),
+  attachment_url text,
+  created_at timestamptz default now()
+);
+
+create table maintenance_jobs (
+  id text primary key,
+  asset_serial text,
+  service_type text,
+  priority text default 'normal',
+  status text default 'pending_approval' check (status in ('pending_approval', 'approved', 'assigned', 'awaiting_poc', 'in_repair', 'awaiting_quote', 'completed')),
+  issues jsonb default '[]'::jsonb,
+  comments text,
+  requested_by text,
+  requested_at timestamptz default now(),
+  assigned_poc_id bigint references maintenance_pocs(id) on update cascade on delete set null,
+  completion_note text,
+  completion_cost numeric,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table job_quotes (
+  id bigint generated always as identity primary key,
+  job_id text references maintenance_jobs(id) on delete cascade,
+  vendor_name text,
+  quote_type text check (quote_type in ('material', 'parts', 'labour', 'overall')),
+  cost numeric,
+  estimated_delivery text,
+  status text default 'pending' check (status in ('pending', 'accepted', 'rejected')),
+  created_at timestamptz default now()
+);
+
+create table maintenance_audit_logs (
+  id bigint generated always as identity primary key,
+  job_id text references maintenance_jobs(id) on delete cascade,
+  actor_name text,
+  action text,
+  details text,
+  created_at timestamptz default now()
+);
+
+alter table maintenance_pocs enable row level security;
+alter table maintenance_jobs enable row level security;
+alter table job_quotes enable row level security;
+alter table maintenance_audit_logs enable row level security;
+
+create policy "maintenance_pocs_admin" on maintenance_pocs for all using (is_admin());
+create policy "maintenance_pocs_read" on maintenance_pocs for select using (true);
+
+create policy "maintenance_jobs_admin" on maintenance_jobs for all using (is_admin());
+create policy "maintenance_jobs_read" on maintenance_jobs for select using (true);
+
+create policy "job_quotes_admin" on job_quotes for all using (is_admin());
+
+create policy "maintenance_audit_admin" on maintenance_audit_logs for all using (is_admin());
