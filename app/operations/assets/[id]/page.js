@@ -238,8 +238,28 @@ export default function AssetDetailPage() {
   };
 
   const handleMaintenanceSubmit = () => {
-    console.log('Maintenance request created:', { assetId, ...maintenanceForm });
-    alert(`Maintenance request logged: MNT-${Math.floor(1000 + Math.random() * 9000)}`);
+    // Mark asset as Maintenance; update originalData so the change sticks after save
+    const nextStatus = 'Maintenance';
+    setForm(prev => ({ ...prev, status: nextStatus }));
+
+    // Update originalData so the status change is persisted on save
+    if (originalData) {
+      setOriginalData({ ...originalData, status: nextStatus });
+    }
+
+    // Log the booking in audit trail
+    const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' ' + new Date().toLocaleDateString();
+    const userName = 'Current User'; // Replace with actual logged-in user when auth is integrated
+    const newAuditEntry = {
+      timestamp: currentTime,
+      action: 'updated',
+      user: userName,
+      details: `Maintenance booked for asset ${assetId} — Status changed to Maintenance`,
+      comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
+    };
+    setAuditLog(prev => [...prev, newAuditEntry]);
+    console.log('Maintenance request created:', { assetId, ...maintenanceForm, bookedBy: userName, newStatus });
+    alert(`Maintenance request logged: MNT-${Math.floor(1000 + Math.random() * 9000)} for ${assetId}. Asset status moved to Maintenance.`);
     setShowMaintenanceModal(false);
     setMaintenanceForm({
       serviceType: 'Routine Service',
