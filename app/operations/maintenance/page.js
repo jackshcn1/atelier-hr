@@ -58,6 +58,7 @@ export default function MaintenancePage() {
               {jobs.filter(j => j.status === 'Pending approval').map(j => (
                 <div key={j.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-control border border-[#fde68a] text-xs">
                   <span>{j.id}</span>
+                  <Link href={`/operations/maintenance/${j.id}`} className="hover:underline text-ink font-medium">Open Job →</Link>
                   <button onClick={() => handleApprove(j.id)} className="btn-primary text-xs px-2 py-1">Approve</button>
                 </div>
               ))}
