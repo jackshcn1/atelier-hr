@@ -237,29 +237,47 @@ export default function AssetDetailPage() {
     setPendingChanges(null);
   };
 
-  const handleMaintenanceSubmit = () => {
-    // Mark asset as Maintenance; update originalData so the change sticks after save
+  const handleMaintenanceSubmit = async () => {
     const nextStatus = 'Maintenance';
     setForm(prev => ({ ...prev, status: nextStatus }));
 
-    // Update originalData so the status change is persisted on save
     if (originalData) {
       setOriginalData({ ...originalData, status: nextStatus });
     }
 
-    // Log the booking in audit trail
-    const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' ' + new Date().toLocaleDateString();
-    const userName = 'Current User'; // Replace with actual logged-in user when auth is integrated
-    const newAuditEntry = {
-      timestamp: currentTime,
-      action: 'updated',
-      user: userName,
-      details: `Maintenance booked for asset ${assetId} — Status changed to Maintenance`,
-      comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
-    };
-    setAuditLog(prev => [...prev, newAuditEntry]);
-    console.log('Maintenance request created:', { assetId, ...maintenanceForm, bookedBy: userName, newStatus });
-    alert(`Maintenance request logged: MNT-${Math.floor(1000 + Math.random() * 9000)} for ${assetId}. Asset status moved to Maintenance.`);
+    try {
+      const res = await fetch('/api/maintenance/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_serial: assetId,
+          service_type: maintenanceForm.serviceType,
+          issues: maintenanceForm.issues,
+          priority: maintenanceForm.priority,
+          comments: maintenanceForm.comments,
+          requested_by: 'Current User',
+          status: 'pending_approval'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create maintenance job');
+
+      const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' ' + new Date().toLocaleDateString();
+      const userName = 'Current User';
+      const newAuditEntry = {
+        timestamp: currentTime,
+        action: 'updated',
+        user: userName,
+        details: `Maintenance booked for asset ${assetId} (${data.job?.job_number || 'MNT-XXX'}) — Status changed to Maintenance`,
+        comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
+      };
+      setAuditLog(prev => [...prev, newAuditEntry]);
+      alert(`Maintenance request successfully logged: ${data.job?.job_number || 'MNT-XXX'} for ${assetId}. Asset status moved to Maintenance.`);
+    } catch (err) {
+      console.error('Error creating maintenance job:', err);
+      alert('Error creating maintenance job: ' + err.message);
+    }
+
     setShowMaintenanceModal(false);
     setMaintenanceForm({
       serviceType: 'Routine Service',
