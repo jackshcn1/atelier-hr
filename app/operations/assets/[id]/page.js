@@ -262,8 +262,20 @@ export default function AssetDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create maintenance job');
 
-      const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' ' + new Date().toLocaleDateString();
       const userName = 'Current User';
+      const auditRes = await fetch('/api/maintenance/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_id: data.job?.id,
+          user_name: userName,
+          action: 'created',
+          details: `Maintenance booked for asset ${assetId} (${data.job?.job_number || 'MNT-XXX'}) — Status changed to Maintenance`,
+          comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
+        })
+      });
+
+      const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' ' + new Date().toLocaleDateString();
       const newAuditEntry = {
         timestamp: currentTime,
         action: 'updated',

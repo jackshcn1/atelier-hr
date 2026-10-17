@@ -1,0 +1,1328 @@
+- generic [ref=f29e2]:
+  - navigation "Main menu":
+    - link "Skip to main content" [ref=f29e3] [cursor=pointer]:
+      - /url: "#wpbody-content"
+    - link "Skip to toolbar" [ref=f29e4] [cursor=pointer]:
+      - /url: "#wp-toolbar"
+    - list [ref=f29e7]:
+      - listitem [ref=f29e8]:
+        - link "Dashboard" [ref=f29e9] [cursor=pointer]:
+          - /url: index.php
+          - generic [aria-hidden] [ref=f29e10]: 
+        - list [ref=f29e12]:
+          - listitem [ref=f29e13]:
+            - link "Home" [ref=f29e14] [cursor=pointer]:
+              - /url: index.php
+          - listitem [ref=f29e15]:
+            - link "Updates 17" [ref=f29e16] [cursor=pointer]:
+              - /url: update-core.php
+              - text: Updates
+              - generic [ref=f29e17]: "17"
+      - listitem [aria-hidden] [ref=f29e18]
+      - listitem [ref=f29e20]:
+        - link "Posts" [ref=f29e21] [cursor=pointer]:
+          - /url: edit.php
+          - generic [aria-hidden] [ref=f29e22]: 
+        - list [ref=f29e24]:
+          - listitem [ref=f29e25]:
+            - link "All Posts" [ref=f29e26] [cursor=pointer]:
+              - /url: edit.php
+          - listitem [ref=f29e27]:
+            - link "Add Post" [ref=f29e28] [cursor=pointer]:
+              - /url: post-new.php
+          - listitem [ref=f29e29]:
+            - link "Categories" [ref=f29e30] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=category
+          - listitem [ref=f29e31]:
+            - link "Tags" [ref=f29e32] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=post_tag
+      - listitem [ref=f29e33]:
+        - link "Media" [ref=f29e34] [cursor=pointer]:
+          - /url: upload.php
+          - generic [aria-hidden] [ref=f29e35]: 
+        - list [ref=f29e37]:
+          - listitem [ref=f29e38]:
+            - link "Library" [ref=f29e39] [cursor=pointer]:
+              - /url: upload.php
+          - listitem [ref=f29e40]:
+            - link "Add Media File" [ref=f29e41] [cursor=pointer]:
+              - /url: media-new.php
+      - listitem [ref=f29e42]:
+        - link "Pages" [ref=f29e43] [cursor=pointer]:
+          - /url: edit.php?post_type=page
+          - generic [aria-hidden] [ref=f29e44]: 
+        - list [ref=f29e46]:
+          - listitem [ref=f29e47]:
+            - link "All Pages" [ref=f29e48] [cursor=pointer]:
+              - /url: edit.php?post_type=page
+          - listitem [ref=f29e49]:
+            - link "Add Page" [ref=f29e50] [cursor=pointer]:
+              - /url: post-new.php?post_type=page
+      - listitem [ref=f29e51]:
+        - link "Comments 84 Comments in moderation" [ref=f29e52] [cursor=pointer]:
+          - /url: edit-comments.php
+          - generic [aria-hidden] [ref=f29e53]: 
+          - generic [ref=f29e54]:
+            - text: Comments
+            - generic [ref=f29e55]:
+              - text: "84"
+              - generic [ref=f29e56]: 84 Comments in moderation
+      - listitem [ref=f29e57]:
+        - link "Projects" [ref=f29e58] [cursor=pointer]:
+          - /url: edit.php?post_type=project
+          - generic [aria-hidden] [ref=f29e59]: 
+        - list [ref=f29e61]:
+          - listitem [ref=f29e62]:
+            - link "All Projects" [ref=f29e63] [cursor=pointer]:
+              - /url: edit.php?post_type=project
+          - listitem [ref=f29e64]:
+            - link "Add New Project" [ref=f29e65] [cursor=pointer]:
+              - /url: post-new.php?post_type=project
+          - listitem [ref=f29e66]:
+            - link "Categories" [ref=f29e67] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_category&post_type=project
+          - listitem [ref=f29e68]:
+            - link "Tags" [ref=f29e69] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_tag&post_type=project
+      - listitem [ref=f29e70]:
+        - link "PhonePe PG Support" [ref=f29e71] [cursor=pointer]:
+          - /url: admin.php?page=phonepe-support
+          - generic [aria-hidden] [ref=f29e72]: 
+        - list [ref=f29e74]:
+          - listitem [ref=f29e75]:
+            - link "PhonePe PG Support" [ref=f29e76] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support
+          - listitem [ref=f29e77]:
+            - link "Download Error Logs" [ref=f29e78] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-logs
+          - listitem [ref=f29e79]:
+            - link "Compose Error Report" [ref=f29e80] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-mail
+      - listitem [aria-hidden] [ref=f29e81]
+      - listitem [ref=f29e83]:
+        - link "WooCommerce" [ref=f29e84] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin
+        - list [ref=f29e87]:
+          - listitem [ref=f29e88]:
+            - link "Home" [ref=f29e89] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin
+          - listitem [ref=f29e90]:
+            - link "Orders 32" [ref=f29e91] [cursor=pointer]:
+              - /url: admin.php?page=wc-orders
+              - text: Orders
+              - generic [ref=f29e92]: "32"
+          - listitem [ref=f29e93]:
+            - link "PhonePe settings" [ref=f29e94] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-settings
+          - listitem [ref=f29e95]:
+            - link "Customers" [ref=f29e96] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/customers
+          - listitem [ref=f29e97]:
+            - link "Reports" [ref=f29e98] [cursor=pointer]:
+              - /url: admin.php?page=wc-reports
+          - listitem [ref=f29e99]:
+            - link "Settings" [ref=f29e100] [cursor=pointer]:
+              - /url: admin.php?page=wc-settings
+          - listitem [ref=f29e101]:
+            - link "Status" [ref=f29e102] [cursor=pointer]:
+              - /url: admin.php?page=wc-status
+          - listitem [ref=f29e103]:
+            - link "Extensions" [ref=f29e104] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/extensions
+      - listitem [ref=f29e105]:
+        - link "Products" [ref=f29e106] [cursor=pointer]:
+          - /url: edit.php?post_type=product
+          - generic [aria-hidden] [ref=f29e107]: 
+        - list [ref=f29e109]:
+          - listitem [ref=f29e110]:
+            - link "All Products" [ref=f29e111] [cursor=pointer]:
+              - /url: edit.php?post_type=product
+          - listitem [ref=f29e112]:
+            - link "Add new product" [ref=f29e113] [cursor=pointer]:
+              - /url: post-new.php?post_type=product
+          - listitem [ref=f29e114]:
+            - link "Brands" [ref=f29e115] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_brand&post_type=product
+          - listitem [ref=f29e116]:
+            - link "Categories" [ref=f29e117] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_cat&post_type=product
+          - listitem [ref=f29e118]:
+            - link "Tags" [ref=f29e119] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_tag&post_type=product
+          - listitem [ref=f29e120]:
+            - link "Attributes" [ref=f29e121] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product_attributes
+          - listitem [ref=f29e122]:
+            - link "Reviews" [ref=f29e123] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product-reviews
+      - listitem [ref=f29e124]:
+        - link "Payments" [ref=f29e125] [cursor=pointer]:
+          - /url: admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM
+      - listitem [ref=f29e128]:
+        - link "Analytics" [ref=f29e129] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - generic [aria-hidden] [ref=f29e130]: 
+        - list [ref=f29e132]:
+          - listitem [ref=f29e133]:
+            - link "Overview" [ref=f29e134] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - listitem [ref=f29e135]:
+            - link "Products" [ref=f29e136] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/products
+          - listitem [ref=f29e137]:
+            - link "Revenue" [ref=f29e138] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/revenue
+          - listitem [ref=f29e139]:
+            - link "Orders" [ref=f29e140] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/orders
+          - listitem [ref=f29e141]:
+            - link "Variations" [ref=f29e142] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/variations
+          - listitem [ref=f29e143]:
+            - link "Categories" [ref=f29e144] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/categories
+          - listitem [ref=f29e145]:
+            - link "Coupons" [ref=f29e146] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/coupons
+          - listitem [ref=f29e147]:
+            - link "Taxes" [ref=f29e148] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/taxes
+          - listitem [ref=f29e149]:
+            - link "Downloads" [ref=f29e150] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/downloads
+          - listitem [ref=f29e151]:
+            - link "Stock" [ref=f29e152] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/stock
+          - listitem [ref=f29e153]:
+            - link "Settings" [ref=f29e154] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/settings
+      - listitem [ref=f29e155]:
+        - link "Marketing" [ref=f29e156] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/marketing
+          - generic [aria-hidden] [ref=f29e157]: 
+        - list [ref=f29e159]:
+          - listitem [ref=f29e160]:
+            - link "Overview" [ref=f29e161] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/marketing
+          - listitem [ref=f29e162]:
+            - link "Coupons" [ref=f29e163] [cursor=pointer]:
+              - /url: edit.php?post_type=shop_coupon
+      - listitem [aria-hidden] [ref=f29e164]
+      - listitem [ref=f29e166]:
+        - link "Appearance" [ref=f29e167] [cursor=pointer]:
+          - /url: themes.php
+          - generic [aria-hidden] [ref=f29e168]: 
+        - list [ref=f29e170]:
+          - listitem [ref=f29e171]:
+            - link "Themes 4" [ref=f29e172] [cursor=pointer]:
+              - /url: themes.php
+              - text: Themes
+              - generic [ref=f29e173]: "4"
+          - listitem [ref=f29e174]:
+            - link "Design" [ref=f29e175] [cursor=pointer]:
+              - /url: site-editor.php
+          - listitem [ref=f29e176]:
+            - link "Customize" [ref=f29e177] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fplugins.php
+          - listitem [ref=f29e178]:
+            - link "Widgets" [ref=f29e179] [cursor=pointer]:
+              - /url: widgets.php
+          - listitem [ref=f29e180]:
+            - link "Fonts" [ref=f29e181] [cursor=pointer]:
+              - /url: font-library.php
+          - listitem [ref=f29e182]:
+            - link "Menus" [ref=f29e183] [cursor=pointer]:
+              - /url: nav-menus.php
+          - listitem [ref=f29e184]:
+            - link "Background" [ref=f29e185] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fplugins.php&autofocus%5Bcontrol%5D=background_image
+          - listitem
+          - listitem [ref=f29e186]:
+            - link "Theme File Editor" [ref=f29e187] [cursor=pointer]:
+              - /url: theme-editor.php
+      - listitem [ref=f29e188]:
+        - link "Plugins 13" [ref=f29e189] [cursor=pointer]:
+          - /url: plugins.php
+          - generic [aria-hidden] [ref=f29e190]: 
+          - generic [ref=f29e191]:
+            - text: Plugins
+            - generic [ref=f29e192]: "13"
+        - list [ref=f29e193]:
+          - listitem [ref=f29e194]:
+            - link "Installed Plugins" [ref=f29e195] [cursor=pointer]:
+              - /url: plugins.php
+          - listitem [ref=f29e196]:
+            - link "Add Plugin" [ref=f29e197] [cursor=pointer]:
+              - /url: plugin-install.php
+          - listitem [ref=f29e198]:
+            - link "Plugin File Editor" [ref=f29e199] [cursor=pointer]:
+              - /url: plugin-editor.php
+      - listitem [ref=f29e200]:
+        - link "Users" [ref=f29e201] [cursor=pointer]:
+          - /url: users.php
+          - generic [aria-hidden] [ref=f29e202]: 
+        - list [ref=f29e204]:
+          - listitem [ref=f29e205]:
+            - link "All Users" [ref=f29e206] [cursor=pointer]:
+              - /url: users.php
+          - listitem [ref=f29e207]:
+            - link "Add User" [ref=f29e208] [cursor=pointer]:
+              - /url: user-new.php
+          - listitem [ref=f29e209]:
+            - link "Profile" [ref=f29e210] [cursor=pointer]:
+              - /url: profile.php
+      - listitem [ref=f29e211]:
+        - link "Tools" [ref=f29e212] [cursor=pointer]:
+          - /url: tools.php
+          - generic [aria-hidden] [ref=f29e213]: 
+        - list [ref=f29e215]:
+          - listitem [ref=f29e216]:
+            - link "Available Tools" [ref=f29e217] [cursor=pointer]:
+              - /url: tools.php
+          - listitem [ref=f29e218]:
+            - link "Import" [ref=f29e219] [cursor=pointer]:
+              - /url: import.php
+          - listitem [ref=f29e220]:
+            - link "Export" [ref=f29e221] [cursor=pointer]:
+              - /url: export.php
+          - listitem [ref=f29e222]:
+            - link "Site Health 1" [ref=f29e223] [cursor=pointer]:
+              - /url: site-health.php
+              - text: Site Health
+              - generic [ref=f29e224]: "1"
+          - listitem [ref=f29e225]:
+            - link "Export Personal Data" [ref=f29e226] [cursor=pointer]:
+              - /url: export-personal-data.php
+          - listitem [ref=f29e227]:
+            - link "Erase Personal Data" [ref=f29e228] [cursor=pointer]:
+              - /url: erase-personal-data.php
+          - listitem [ref=f29e229]:
+            - link "Scheduled Actions" [ref=f29e230] [cursor=pointer]:
+              - /url: tools.php?page=action-scheduler
+      - listitem [ref=f29e231]:
+        - link "Settings" [ref=f29e232] [cursor=pointer]:
+          - /url: options-general.php
+          - generic [aria-hidden] [ref=f29e233]: 
+        - list [ref=f29e235]:
+          - listitem [ref=f29e236]:
+            - link "General" [ref=f29e237] [cursor=pointer]:
+              - /url: options-general.php
+          - listitem [ref=f29e238]:
+            - link "Connectors" [ref=f29e239] [cursor=pointer]:
+              - /url: options-connectors.php
+          - listitem [ref=f29e240]:
+            - link "Writing" [ref=f29e241] [cursor=pointer]:
+              - /url: options-writing.php
+          - listitem [ref=f29e242]:
+            - link "Reading" [ref=f29e243] [cursor=pointer]:
+              - /url: options-reading.php
+          - listitem [ref=f29e244]:
+            - link "Discussion" [ref=f29e245] [cursor=pointer]:
+              - /url: options-discussion.php
+          - listitem [ref=f29e246]:
+            - link "Media" [ref=f29e247] [cursor=pointer]:
+              - /url: options-media.php
+          - listitem [ref=f29e248]:
+            - link "Permalinks" [ref=f29e249] [cursor=pointer]:
+              - /url: options-permalink.php
+          - listitem [ref=f29e250]:
+            - link "Privacy" [ref=f29e251] [cursor=pointer]:
+              - /url: options-privacy.php
+      - listitem [aria-hidden] [ref=f29e252]
+      - listitem [ref=f29e254]:
+        - link "Divi" [ref=f29e255] [cursor=pointer]:
+          - /url: admin.php?page=et_onboarding
+          - generic [aria-hidden] [ref=f29e256]: 
+        - list [ref=f29e258]:
+          - listitem [ref=f29e259]:
+            - link "Dashboard 1" [ref=f29e260] [cursor=pointer]:
+              - /url: admin.php?page=et_onboarding
+              - text: Dashboard
+              - generic [ref=f29e261]: "1"
+          - listitem [ref=f29e262]:
+            - link "Theme Options" [ref=f29e263] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_options
+          - listitem [ref=f29e264]:
+            - link "Theme Builder" [ref=f29e265] [cursor=pointer]:
+              - /url: admin.php?page=et_theme_builder
+          - listitem [ref=f29e266]:
+            - link "Theme Customizer" [ref=f29e267] [cursor=pointer]:
+              - /url: customize.php?et_customizer_option_set=theme
+          - listitem [ref=f29e268]:
+            - link "Role Editor" [ref=f29e269] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_role_editor
+          - listitem [ref=f29e270]:
+            - link "Divi Library" [ref=f29e271] [cursor=pointer]:
+              - /url: edit.php?post_type=et_pb_layout
+          - listitem [ref=f29e272]:
+            - link "Support Center" [ref=f29e273] [cursor=pointer]:
+              - /url: admin.php?page=et_support_center_divi
+      - listitem [ref=f29e274]:
+        - button "Collapse Main menu" [expanded] [ref=f29e275] [cursor=pointer]:
+          - generic [ref=f29e277]: Collapse Menu
+  - generic [ref=f29e278]:
+    - generic [ref=f29e279]:
+      - navigation "Toolbar":
+        - menu:
+          - group [ref=f29e280]:
+            - menuitem "About WordPress" [ref=f29e281] [cursor=pointer]
+          - group [ref=f29e284]:
+            - menuitem "Ambrosia - Staging" [ref=f29e285] [cursor=pointer]
+          - group [ref=f29e286]:
+            - menuitem "Live" [ref=f29e287] [cursor=pointer]
+          - group [ref=f29e288]:
+            - menuitem "17 updates available" [ref=f29e289] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f29e291]: "17"
+          - group [ref=f29e293]:
+            - menuitem "⌘K Open command palette" [ref=f29e294] [cursor=pointer]:
+              - generic [ref=f29e296]:
+                - text: ⌘K
+                - generic [ref=f29e297]: Open command palette
+          - group [ref=f29e298]:
+            - menuitem "84 Comments in moderation" [ref=f29e299] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f29e301]: "84"
+          - group [ref=f29e303]:
+            - menuitem "New" [ref=f29e304] [cursor=pointer]
+        - menu [ref=f29e307]:
+          - group [ref=f29e308]:
+            - menuitem "Howdy, amborsia-admin" [ref=f29e309] [cursor=pointer]
+    - main [ref=f29e310]:
+      - generic [ref=f29e311]:
+        - generic [ref=f29e312]:
+          - button "Screen Options" [ref=f29e314] [cursor=pointer]
+          - button "Help" [ref=f29e316] [cursor=pointer]
+        - generic [ref=f29e317]:
+          - heading "Plugins" [level=1] [ref=f29e318]
+          - link "Add Plugin" [ref=f29e319] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php
+          - generic [ref=f29e320]:
+            - link "Dismiss" [ref=f29e321] [cursor=pointer]:
+              - /url: /wp-admin/plugins.php?wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-wordpress-untested&_wc_notice_nonce=727d665dee
+            - paragraph [ref=f29e322]:
+              - strong [ref=f29e323]: Pinterest for WooCommerce
+              - text: "- 1.4.12 is untested with WordPress 7.1.3."
+          - generic [ref=f29e324]:
+            - link "Dismiss" [ref=f29e325] [cursor=pointer]:
+              - /url: /wp-admin/plugins.php?wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-woocommerce-untested&_wc_notice_nonce=727d665dee
+            - paragraph [ref=f29e326]:
+              - strong [ref=f29e327]: Pinterest for WooCommerce
+              - text: "- version 1.4.12 is untested with WooCommerce 10.3.7."
+          - paragraph [ref=f29e329]:
+            - text: The plugin
+            - code [ref=f29e330]: ajax-search-lite/ajax-search-lite.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e332]:
+            - text: The plugin
+            - code [ref=f29e333]: classic-editor/classic-editor.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e335]:
+            - text: The plugin
+            - code [ref=f29e336]: classic-widgets/classic-widgets.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e338]:
+            - text: The plugin
+            - code [ref=f29e339]: coderockz-woocommerce-delivery-date-time-pro/coderockz-woo-delivery.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e341]:
+            - text: The plugin
+            - code [ref=f29e342]: contact-form-7/wp-contact-form-7.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e344]:
+            - text: The plugin
+            - code [ref=f29e345]: google-listings-and-ads/google-listings-and-ads.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e347]:
+            - text: The plugin
+            - code [ref=f29e348]: jetpack/jetpack.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e350]:
+            - text: The plugin
+            - code [ref=f29e351]: limit-login-attempts-reloaded/limit-login-attempts-reloaded.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e353]:
+            - text: The plugin
+            - code [ref=f29e354]: mailchimp-for-woocommerce/mailchimp-woocommerce.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e356]:
+            - text: The plugin
+            - code [ref=f29e357]: pinterest-for-woocommerce/pinterest-for-woocommerce.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e359]:
+            - text: The plugin
+            - code [ref=f29e360]: supreme-modules-pro-for-divi/supreme-modules-pro-for-divi.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e362]:
+            - text: The plugin
+            - code [ref=f29e363]: themify-wc-product-filter/themify-wc-product-filter.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e365]:
+            - text: The plugin
+            - code [ref=f29e366]: woo-essential/woo-essential.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e368]:
+            - text: The plugin
+            - code [ref=f29e369]: woo-razorpay/woo-razorpay.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e371]:
+            - text: The plugin
+            - code [ref=f29e372]: woocommerce-table-rate-shipping/woocommerce-table-rate-shipping.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e374]:
+            - text: The plugin
+            - code [ref=f29e375]: wordfence/wordfence.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e377]:
+            - text: The plugin
+            - code [ref=f29e378]: wp-migrate-db/wp-migrate-db.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - paragraph [ref=f29e380]:
+            - text: The plugin
+            - code [ref=f29e381]: wps-hide-login/wps-hide-login.php
+            - text: "has been deactivated due to an error: Plugin file does not exist."
+          - heading "Filter plugins list" [level=2] [ref=f29e382]
+          - list [ref=f29e383]:
+            - listitem [ref=f29e384]:
+              - link "All (22)" [ref=f29e385] [cursor=pointer]:
+                - /url: plugins.php?plugin_status=all
+              - text: "|"
+            - listitem [ref=f29e386]:
+              - link "Active (3)" [ref=f29e387] [cursor=pointer]:
+                - /url: plugins.php?plugin_status=active
+              - text: "|"
+            - listitem [ref=f29e388]:
+              - link "Inactive (19)" [ref=f29e389] [cursor=pointer]:
+                - /url: plugins.php?plugin_status=inactive
+              - text: "|"
+            - listitem [ref=f29e390]:
+              - link "Update Available (13)" [ref=f29e391] [cursor=pointer]:
+                - /url: plugins.php?plugin_status=upgrade
+              - text: "|"
+            - listitem [ref=f29e392]:
+              - link "Must-Use (1)" [ref=f29e393] [cursor=pointer]:
+                - /url: plugins.php?plugin_status=mustuse
+              - text: "|"
+            - listitem [ref=f29e394]:
+              - link "Auto-updates Disabled (22)" [ref=f29e395] [cursor=pointer]:
+                - /url: plugins.php?plugin_status=auto-update-disabled
+          - paragraph [ref=f29e396]:
+            - generic [ref=f29e397]: Search installed plugins
+            - searchbox "Search installed plugins" [ref=f29e398]
+          - generic [ref=f29e399]:
+            - generic [ref=f29e400]:
+              - generic [ref=f29e401]:
+                - generic [ref=f29e402]: Select bulk action
+                - combobox "Select bulk action" [ref=f29e403] [cursor=pointer]:
+                  - option "Bulk actions" [selected]
+                  - option "Activate"
+                  - option "Deactivate"
+                  - option "Update"
+                  - option "Delete"
+                  - option "Enable Auto-updates"
+                  - option "Disable Auto-updates"
+                - button "Apply" [ref=f29e404] [cursor=pointer]
+              - generic [ref=f29e405]: 22 items
+            - heading "Plugins list" [level=2] [ref=f29e407]
+            - table [ref=f29e408]:
+              - rowgroup [ref=f29e409]:
+                - row [ref=f29e410]:
+                  - cell "Select All" [ref=f29e411]:
+                    - checkbox "Select All" [ref=f29e412] [cursor=pointer]
+                  - columnheader "Plugin" [ref=f29e415]
+                  - columnheader "Description" [ref=f29e416]
+                  - columnheader "Automatic Updates" [ref=f29e417]
+              - rowgroup [ref=f29e418]:
+                - row [ref=f29e419]:
+                  - cell [ref=f29e420]:
+                    - checkbox "Select 1 Razorpay" [ref=f29e423] [cursor=pointer]
+                  - rowheader "1 Razorpay" [ref=f29e424]:
+                    - strong [ref=f29e425]: 1 Razorpay
+                    - generic [ref=f29e426]:
+                      - generic [ref=f29e427]:
+                        - link "Activate 1 Razorpay" [ref=f29e428] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=woo-razorpay.disabled%2Fwoo-razorpay.php&plugin_status=all&paged=1&s&_wpnonce=994e0bec02
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete 1 Razorpay" [ref=f29e430] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=woo-razorpay.disabled%2Fwoo-razorpay.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e431]:
+                    - paragraph [ref=f29e433]: "Razorpay Payment Gateway Integration for WooCommerce.Razorpay Welcome Back Offer: New to Razorpay? Sign up to enjoy FREE payments* of INR 2 lakh till March 31st! Transact before January 10th to grab the offer."
+                    - generic [ref=f29e434]:
+                      - text: Version 4.8.3 | By
+                      - link "Team Razorpay" [ref=f29e435] [cursor=pointer]:
+                        - /url: https://razorpay.com
+                      - text: "|"
+                      - link "More information about 1 Razorpay" [ref=f29e436] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woo-razorpay&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e437]:
+                    - button "Enable auto-updates" [ref=f29e438] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e439]:
+                  - cell [ref=f29e440]:
+                    - paragraph [ref=f29e442]:
+                      - text: There is a new version of 1 Razorpay available.
+                      - link "View 1 Razorpay version 4.8.8 details" [ref=f29e443] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woo-razorpay&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 4.8.8 details
+                      - text: or
+                      - link "Update 1 Razorpay now" [ref=f29e444] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=woo-razorpay.disabled%2Fwoo-razorpay.php&_wpnonce=787cc98663
+                        - text: update now
+                      - text: .
+                - row [ref=f29e445]:
+                  - cell [ref=f29e446]:
+                    - checkbox "Select Ajax Search Lite" [ref=f29e449] [cursor=pointer]
+                  - rowheader "Ajax Search Lite" [ref=f29e450]:
+                    - strong [ref=f29e451]: Ajax Search Lite
+                    - generic [ref=f29e452]:
+                      - generic [ref=f29e453]:
+                        - link "Activate Ajax Search Lite" [ref=f29e454] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=ajax-search-lite.disabled%2Fajax-search-lite.php&plugin_status=all&paged=1&s&_wpnonce=3c84ec7a01
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Ajax Search Lite" [ref=f29e456] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=ajax-search-lite.disabled%2Fajax-search-lite.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e457]:
+                    - paragraph [ref=f29e459]: The lite version of the most powerful ajax powered search engine for WordPress.
+                    - generic [ref=f29e460]:
+                      - text: Version 4.14.5 | By
+                      - link "Ernest Marcinko" [ref=f29e461] [cursor=pointer]:
+                        - /url: http://wp-dreams.com
+                      - text: "|"
+                      - link "More information about Ajax Search Lite" [ref=f29e462] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=ajax-search-lite&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e463]:
+                    - button "Enable auto-updates" [ref=f29e464] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e465]:
+                  - cell [ref=f29e466]:
+                    - paragraph [ref=f29e468]:
+                      - text: There is a new version of Ajax Search Lite available.
+                      - link "View Ajax Search Lite version 4.14.6 details" [ref=f29e469] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=ajax-search-lite&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 4.14.6 details
+                      - text: or
+                      - link "Update Ajax Search Lite now" [ref=f29e470] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=ajax-search-lite.disabled%2Fajax-search-lite.php&_wpnonce=2348f788b2
+                        - text: update now
+                      - text: .
+                - row [ref=f29e471]:
+                  - cell [ref=f29e472]:
+                    - checkbox "Select Ambrosia Delivery Manager" [ref=f29e475] [cursor=pointer]
+                  - rowheader "Ambrosia Delivery Manager" [ref=f29e476]:
+                    - strong [ref=f29e477]: Ambrosia Delivery Manager
+                    - generic [ref=f29e478]:
+                      - generic [ref=f29e479]:
+                        - link "Activate Ambrosia Delivery Manager" [ref=f29e480] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=ambrosia-delivery%2Fambrosia-delivery.php&plugin_status=all&paged=1&s&_wpnonce=0482e43b33
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Ambrosia Delivery Manager" [ref=f29e482] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=ambrosia-delivery%2Fambrosia-delivery.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e483]:
+                    - paragraph [ref=f29e485]: Custom delivery routing, pincode-based zones, distance pricing, order status workflow, and delivery agent management for Ambrosia Bakery.
+                    - generic [ref=f29e486]:
+                      - text: Version 1.0.0 | By
+                      - link "Claude Code + Ambrosia Team" [ref=f29e487] [cursor=pointer]:
+                        - /url: https://www.theambrosia.com
+                      - text: "|"
+                      - link "Visit plugin site for Ambrosia Delivery Manager" [ref=f29e488] [cursor=pointer]:
+                        - /url: https://theambrosia.com
+                        - text: Visit plugin site
+                  - cell [ref=f29e489]
+                - row [ref=f29e490]:
+                  - cell [ref=f29e491]:
+                    - checkbox "Select Classic Editor" [ref=f29e494] [cursor=pointer]
+                  - rowheader "Classic Editor" [ref=f29e495]:
+                    - strong [ref=f29e496]: Classic Editor
+                    - generic [ref=f29e497]:
+                      - generic [ref=f29e498]:
+                        - link "Activate Classic Editor" [ref=f29e499] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=classic-editor.disabled%2Fclassic-editor.php&plugin_status=all&paged=1&s&_wpnonce=9793438f7b
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Classic Editor" [ref=f29e501] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=classic-editor.disabled%2Fclassic-editor.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e502]:
+                    - paragraph [ref=f29e504]: Enables the WordPress classic editor and the old-style Edit Post screen with TinyMCE, Meta Boxes, etc. Supports the older plugins that extend this screen.
+                    - generic [ref=f29e505]:
+                      - text: Version 1.6.6 | By
+                      - link "WordPress Contributors" [ref=f29e506] [cursor=pointer]:
+                        - /url: https://github.com/WordPress/classic-editor/
+                      - text: "|"
+                      - link "More information about Classic Editor" [ref=f29e507] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=classic-editor&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e508]:
+                    - button "Enable auto-updates" [ref=f29e509] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e510]:
+                  - cell [ref=f29e511]:
+                    - paragraph [ref=f29e513]:
+                      - text: There is a new version of Classic Editor available.
+                      - link "View Classic Editor version 1.7.0 details" [ref=f29e514] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=classic-editor&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 1.7.0 details
+                      - text: or
+                      - link "Update Classic Editor now" [ref=f29e515] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=classic-editor.disabled%2Fclassic-editor.php&_wpnonce=7967a1849d
+                        - text: update now
+                      - text: .
+                - row [ref=f29e516]:
+                  - cell [ref=f29e517]:
+                    - checkbox "Select Classic Widgets" [ref=f29e520] [cursor=pointer]
+                  - rowheader "Classic Widgets" [ref=f29e521]:
+                    - strong [ref=f29e522]: Classic Widgets
+                    - generic [ref=f29e523]:
+                      - generic [ref=f29e524]:
+                        - link "Activate Classic Widgets" [ref=f29e525] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=classic-widgets.disabled%2Fclassic-widgets.php&plugin_status=all&paged=1&s&_wpnonce=1d79956d34
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Classic Widgets" [ref=f29e527] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=classic-widgets.disabled%2Fclassic-widgets.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e528]:
+                    - paragraph [ref=f29e530]: Enables the classic widgets settings screens in Appearance - Widgets and the Customizer. Disables the block editor from managing widgets.
+                    - generic [ref=f29e531]:
+                      - text: Version 0.3 | By
+                      - link "WordPress Contributors" [ref=f29e532] [cursor=pointer]:
+                        - /url: https://github.com/WordPress/classic-widgets/
+                      - text: "|"
+                      - link "More information about Classic Widgets" [ref=f29e533] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=classic-widgets&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e534]:
+                    - button "Enable auto-updates" [ref=f29e535] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e536]:
+                  - cell [ref=f29e537]:
+                    - checkbox "Select Contact Form 7" [ref=f29e540] [cursor=pointer]
+                  - rowheader "Contact Form 7" [ref=f29e541]:
+                    - strong [ref=f29e542]: Contact Form 7
+                    - generic [ref=f29e543]:
+                      - generic [ref=f29e544]:
+                        - link "Activate Contact Form 7" [ref=f29e545] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=contact-form-7.disabled%2Fwp-contact-form-7.php&plugin_status=all&paged=1&s&_wpnonce=8c80eeb84e
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Contact Form 7" [ref=f29e547] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=contact-form-7.disabled%2Fwp-contact-form-7.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e548]:
+                    - paragraph [ref=f29e550]: Just another contact form plugin. Simple but flexible.
+                    - generic [ref=f29e551]:
+                      - text: Version 6.0.6 | By
+                      - link "Takayuki Miyoshi" [ref=f29e552] [cursor=pointer]:
+                        - /url: https://ideasilo.wordpress.com/
+                      - text: "|"
+                      - link "Visit plugin site for Contact Form 7" [ref=f29e553] [cursor=pointer]:
+                        - /url: https://contactform7.com/
+                        - text: Visit plugin site
+                  - cell [ref=f29e554]
+                - row [ref=f29e555]:
+                  - cell [ref=f29e556]:
+                    - checkbox "Select Custom Order Status for WooCommerce" [ref=f29e559] [cursor=pointer]
+                  - rowheader "Custom Order Status for WooCommerce" [ref=f29e560]:
+                    - strong [ref=f29e561]: Custom Order Status for WooCommerce
+                    - generic [ref=f29e562]:
+                      - generic [ref=f29e563]:
+                        - link "Settings" [ref=f29e564] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/admin.php?page=wc-settings&tab=custom-order-statuses-for-woocommerce
+                        - text: "|"
+                      - generic [ref=f29e565]:
+                        - link "Unlock All" [ref=f29e566] [cursor=pointer]:
+                          - /url: https://www.tychesoftwares.com/store/premium-plugins/custom-order-status-woocommerce/?utm_source=cosupgradetopro&utm_medium=unlockall&utm_campaign=CustomOrderStatusLite
+                        - text: "|"
+                      - link "Deactivate Custom Order Status for WooCommerce" [ref=f29e568] [cursor=pointer]:
+                        - /url: plugins.php?action=deactivate&plugin=custom-order-statuses-woocommerce%2Fcustom-order-statuses-for-woocommerce.php&plugin_status=all&paged=1&s&_wpnonce=68ae2881a8
+                        - text: Deactivate
+                  - cell [ref=f29e569]:
+                    - paragraph [ref=f29e571]: Create and manage custom order statuses for WooCommerce.
+                    - generic [ref=f29e572]:
+                      - text: Version 3.0.1 | By
+                      - link "Tyche Softwares" [ref=f29e573] [cursor=pointer]:
+                        - /url: https://www.tychesoftwares.com/
+                      - text: "|"
+                      - link "More information about Custom Order Status for WooCommerce" [ref=f29e574] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=custom-order-statuses-woocommerce&TB_iframe=true&width=600&height=550
+                        - text: View details
+                    - paragraph [ref=f29e576]:
+                      - strong [ref=f29e577]: "Requires:"
+                      - link "More information about WooCommerce" [ref=f29e578] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woocommerce&TB_iframe=true&width=600&height=550
+                        - text: WooCommerce
+                  - cell [ref=f29e579]:
+                    - button "Enable auto-updates" [ref=f29e580] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e581]:
+                  - cell [ref=f29e582]:
+                    - checkbox "Select Divi Supreme Pro" [ref=f29e585] [cursor=pointer]
+                  - rowheader "Divi Supreme Pro" [ref=f29e586]:
+                    - strong [ref=f29e587]: Divi Supreme Pro
+                    - generic [ref=f29e588]:
+                      - generic [ref=f29e589]:
+                        - link "Activate Divi Supreme Pro" [ref=f29e590] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=supreme-modules-pro-for-divi.disabled%2Fsupreme-modules-pro-for-divi.php&plugin_status=all&paged=1&s&_wpnonce=9204389749
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Divi Supreme Pro" [ref=f29e592] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=supreme-modules-pro-for-divi.disabled%2Fsupreme-modules-pro-for-divi.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e593]:
+                    - paragraph [ref=f29e595]: Divi Supreme Pro enhances the experience and features found on Divi and extend with custom creative modules to help you build amazing websites.
+                    - generic [ref=f29e596]:
+                      - text: Version 4.9.02 | By
+                      - link "Divi Supreme" [ref=f29e597] [cursor=pointer]:
+                        - /url: https://divisupreme.com
+                      - text: "|"
+                      - link "Visit plugin site for Divi Supreme Pro" [ref=f29e598] [cursor=pointer]:
+                        - /url: https://divisupreme.com
+                        - text: Visit plugin site
+                  - cell [ref=f29e599]
+                - row [ref=f29e600]:
+                  - cell [ref=f29e601]:
+                    - checkbox "Select Google for WooCommerce" [ref=f29e604] [cursor=pointer]
+                  - rowheader "Google for WooCommerce" [ref=f29e605]:
+                    - strong [ref=f29e606]: Google for WooCommerce
+                    - generic [ref=f29e607]:
+                      - generic [ref=f29e608]:
+                        - link "Activate Google for WooCommerce" [ref=f29e609] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=google-listings-and-ads.disabled%2Fgoogle-listings-and-ads.php&plugin_status=all&paged=1&s&_wpnonce=6584995157
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Google for WooCommerce" [ref=f29e611] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=google-listings-and-ads.disabled%2Fgoogle-listings-and-ads.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e612]:
+                    - paragraph [ref=f29e614]: Native integration with Google that allows merchants to easily display their products across Google’s network.
+                    - generic [ref=f29e615]:
+                      - text: Version 2.9.0 | By
+                      - link "WooCommerce" [ref=f29e616] [cursor=pointer]:
+                        - /url: https://woocommerce.com/
+                      - text: "|"
+                      - link "More information about Google for WooCommerce" [ref=f29e617] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=google-listings-and-ads&TB_iframe=true&width=600&height=550
+                        - text: View details
+                    - paragraph [ref=f29e619]:
+                      - strong [ref=f29e620]: "Requires:"
+                      - link "More information about WooCommerce" [ref=f29e621] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woocommerce&TB_iframe=true&width=600&height=550
+                        - text: WooCommerce
+                  - cell [ref=f29e622]:
+                    - button "Enable auto-updates" [ref=f29e623] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e624]:
+                  - cell [ref=f29e625]:
+                    - paragraph [ref=f29e627]:
+                      - text: There is a new version of Google for WooCommerce available.
+                      - link "View Google for WooCommerce version 3.9.6 details" [ref=f29e628] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=google-listings-and-ads&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 3.9.6 details
+                      - text: or
+                      - link "Update Google for WooCommerce now" [ref=f29e629] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=google-listings-and-ads.disabled%2Fgoogle-listings-and-ads.php&_wpnonce=acd8cefcc8
+                        - text: update now
+                      - text: .
+                - row [ref=f29e630]:
+                  - cell [ref=f29e631]:
+                    - checkbox "Select Jetpack" [ref=f29e634] [cursor=pointer]
+                  - rowheader "Jetpack" [ref=f29e635]:
+                    - strong [ref=f29e636]: Jetpack
+                    - generic [ref=f29e637]:
+                      - generic [ref=f29e638]:
+                        - link "Activate Jetpack" [ref=f29e639] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=jetpack.disabled%2Fjetpack.php&plugin_status=all&paged=1&s&_wpnonce=ae8d9f5cf2
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Jetpack" [ref=f29e641] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=jetpack.disabled%2Fjetpack.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e642]:
+                    - paragraph [ref=f29e644]: Security, performance, and marketing tools made by WordPress experts. Jetpack keeps your site protected so you can focus on more important things.
+                    - generic [ref=f29e645]:
+                      - text: Version 14.1.1 | By
+                      - link "Automattic" [ref=f29e646] [cursor=pointer]:
+                        - /url: https://jetpack.com
+                      - text: "|"
+                      - link "More information about Jetpack" [ref=f29e647] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=jetpack&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e648]:
+                    - button "Enable auto-updates" [ref=f29e649] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e650]:
+                  - cell [ref=f29e651]:
+                    - paragraph [ref=f29e653]:
+                      - text: There is a new version of Jetpack available.
+                      - link "View Jetpack version 16.3.1 details" [ref=f29e654] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=jetpack&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 16.3.1 details
+                      - text: or
+                      - link "Update Jetpack now" [ref=f29e655] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=jetpack.disabled%2Fjetpack.php&_wpnonce=b94bed8b36
+                        - text: update now
+                      - text: .
+                - row [ref=f29e656]:
+                  - cell [ref=f29e657]:
+                    - checkbox "Select Limit Login Attempts Reloaded" [ref=f29e660] [cursor=pointer]
+                  - rowheader "Limit Login Attempts Reloaded" [ref=f29e661]:
+                    - strong [ref=f29e662]: Limit Login Attempts Reloaded
+                    - generic [ref=f29e663]:
+                      - generic [ref=f29e664]:
+                        - link "Activate Limit Login Attempts Reloaded" [ref=f29e665] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=limit-login-attempts-reloaded.disabled%2Flimit-login-attempts-reloaded.php&plugin_status=all&paged=1&s&_wpnonce=ebf25bfee5
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Limit Login Attempts Reloaded" [ref=f29e667] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=limit-login-attempts-reloaded.disabled%2Flimit-login-attempts-reloaded.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e668]:
+                    - paragraph [ref=f29e670]: Block excessive login attempts and protect your site against brute force attacks. Simple, yet powerful tools to improve site performance.
+                    - generic [ref=f29e671]:
+                      - text: Version 2.26.16 | By
+                      - link "Limit Login Attempts Reloaded" [ref=f29e672] [cursor=pointer]:
+                        - /url: https://www.limitloginattempts.com/
+                      - text: "|"
+                      - link "More information about Limit Login Attempts Reloaded" [ref=f29e673] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=limit-login-attempts-reloaded&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e674]:
+                    - button "Enable auto-updates" [ref=f29e675] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e676]:
+                  - cell [ref=f29e677]:
+                    - paragraph [ref=f29e679]:
+                      - text: There is a new version of Limit Login Attempts Reloaded available.
+                      - link "View Limit Login Attempts Reloaded version 3.3.10 details" [ref=f29e680] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=limit-login-attempts-reloaded&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 3.3.10 details
+                      - text: or
+                      - link "Update Limit Login Attempts Reloaded now" [ref=f29e681] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=limit-login-attempts-reloaded.disabled%2Flimit-login-attempts-reloaded.php&_wpnonce=1a326d2c98
+                        - text: update now
+                      - text: .
+                - row [ref=f29e682]:
+                  - cell [ref=f29e683]:
+                    - checkbox "Select Mailchimp for WooCommerce" [ref=f29e686] [cursor=pointer]
+                  - rowheader "Mailchimp for WooCommerce" [ref=f29e687]:
+                    - strong [ref=f29e688]: Mailchimp for WooCommerce
+                    - generic [ref=f29e689]:
+                      - generic [ref=f29e690]:
+                        - link "Activate Mailchimp for WooCommerce" [ref=f29e691] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=mailchimp-for-woocommerce.disabled%2Fmailchimp-woocommerce.php&plugin_status=all&paged=1&s&_wpnonce=5e1eac11ff
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Mailchimp for WooCommerce" [ref=f29e693] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=mailchimp-for-woocommerce.disabled%2Fmailchimp-woocommerce.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e694]:
+                    - paragraph [ref=f29e696]: Connects WooCommerce to Mailchimp to sync your store data, send targeted campaigns to your customers, and sell more stuff.
+                    - generic [ref=f29e697]:
+                      - text: Version 6.2 | By
+                      - link "Mailchimp" [ref=f29e698] [cursor=pointer]:
+                        - /url: https://mailchimp.com
+                      - text: "|"
+                      - link "More information about Mailchimp for WooCommerce" [ref=f29e699] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=mailchimp-for-woocommerce&TB_iframe=true&width=600&height=550
+                        - text: View details
+                    - paragraph [ref=f29e701]:
+                      - strong [ref=f29e702]: "Requires:"
+                      - link "More information about WooCommerce" [ref=f29e703] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woocommerce&TB_iframe=true&width=600&height=550
+                        - text: WooCommerce
+                  - cell [ref=f29e704]:
+                    - button "Enable auto-updates" [ref=f29e705] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e706]:
+                  - cell [ref=f29e707]:
+                    - paragraph [ref=f29e709]:
+                      - text: There is a new version of Mailchimp for WooCommerce available.
+                      - link "View Mailchimp for WooCommerce version 6.3 details" [ref=f29e710] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=mailchimp-for-woocommerce&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 6.3 details
+                      - text: or
+                      - link "Update Mailchimp for WooCommerce now" [ref=f29e711] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=mailchimp-for-woocommerce.disabled%2Fmailchimp-woocommerce.php&_wpnonce=d748daf40f
+                        - text: update now
+                      - text: .
+                - row [ref=f29e712]:
+                  - cell [ref=f29e713]:
+                    - checkbox "Select PhonePe Payment Solutions" [ref=f29e716] [cursor=pointer]
+                  - rowheader "PhonePe Payment Solutions" [ref=f29e717]:
+                    - strong [ref=f29e718]: PhonePe Payment Solutions
+                    - generic [ref=f29e719]:
+                      - generic [ref=f29e720]:
+                        - link "Deactivate PhonePe Payment Solutions" [ref=f29e721] [cursor=pointer]:
+                          - /url: plugins.php?action=deactivate&plugin=phonepe-payment-solutions%2Findex.php&plugin_status=all&paged=1&s&_wpnonce=848d0f4419
+                          - text: Deactivate
+                        - text: "|"
+                      - link "Settings" [ref=f29e723] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/admin.php?page=wc-settings&tab=checkout&section=phonepe
+                  - cell [ref=f29e724]:
+                    - paragraph [ref=f29e726]: Using this plugin you can accept payments through PhonePe. After activating this plugin, you can see the PhonePe option linked to the checkout page of woocommerce site. On configuring with the provided Merchant credentials, you can enable this plugin in Preprod/Prod environment.
+                    - generic [ref=f29e727]:
+                      - text: Version 3.1.1 | By PhonePe |
+                      - link "More information about PhonePe Payment Solutions" [ref=f29e728] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=phonepe-payment-solutions&TB_iframe=true&width=600&height=550
+                        - text: View details
+                      - text: "| New to PhonePe PG?"
+                      - link "Plugin Additional Links" [ref=f29e729] [cursor=pointer]:
+                        - /url: https://www.phonepe.com/business-solutions/payment-gateway/register/
+                        - text: Register here!
+                  - cell [ref=f29e730]:
+                    - button "Enable auto-updates" [ref=f29e731] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e732]:
+                  - cell [ref=f29e733]:
+                    - checkbox "Select Pinterest for WooCommerce" [ref=f29e736] [cursor=pointer]
+                  - rowheader "Pinterest for WooCommerce" [ref=f29e737]:
+                    - strong [ref=f29e738]: Pinterest for WooCommerce
+                    - generic [ref=f29e739]:
+                      - generic [ref=f29e740]:
+                        - link "Activate Pinterest for WooCommerce" [ref=f29e741] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=pinterest-for-woocommerce.disabled%2Fpinterest-for-woocommerce.php&plugin_status=all&paged=1&s&_wpnonce=41a4979500
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Pinterest for WooCommerce" [ref=f29e743] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=pinterest-for-woocommerce.disabled%2Fpinterest-for-woocommerce.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e744]:
+                    - paragraph [ref=f29e746]: Grow your business on Pinterest! Use this official plugin to allow shoppers to Pin products while browsing your store, track conversions, and advertise on Pinterest.
+                    - generic [ref=f29e747]:
+                      - text: Version 1.4.12 | By
+                      - link "WooCommerce" [ref=f29e748] [cursor=pointer]:
+                        - /url: https://woocommerce.com
+                      - text: "|"
+                      - link "More information about Pinterest for WooCommerce" [ref=f29e749] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=pinterest-for-woocommerce&TB_iframe=true&width=600&height=550
+                        - text: View details
+                    - paragraph [ref=f29e751]:
+                      - strong [ref=f29e752]: "Requires:"
+                      - link "More information about WooCommerce" [ref=f29e753] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woocommerce&TB_iframe=true&width=600&height=550
+                        - text: WooCommerce
+                  - cell [ref=f29e754]:
+                    - button "Enable auto-updates" [ref=f29e755] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e756]:
+                  - cell [ref=f29e757]:
+                    - paragraph [ref=f29e759]:
+                      - text: There is a new version of Pinterest for WooCommerce available.
+                      - link "View Pinterest for WooCommerce version 1.5.4 details" [ref=f29e760] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=pinterest-for-woocommerce&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 1.5.4 details
+                      - text: or
+                      - link "Update Pinterest for WooCommerce now" [ref=f29e761] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=pinterest-for-woocommerce.disabled%2Fpinterest-for-woocommerce.php&_wpnonce=09f55030bb
+                        - text: update now
+                      - text: .
+                - row [ref=f29e762]:
+                  - cell [ref=f29e763]:
+                    - checkbox "Select Themify - WooCommerce Product Filter" [ref=f29e766] [cursor=pointer]
+                  - rowheader "Themify - WooCommerce Product Filter" [ref=f29e767]:
+                    - strong [ref=f29e768]: Themify - WooCommerce Product Filter
+                    - generic [ref=f29e769]:
+                      - generic [ref=f29e770]:
+                        - link "Activate Themify - WooCommerce Product Filter" [ref=f29e771] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=themify-wc-product-filter.disabled%2Fthemify-wc-product-filter.php&plugin_status=all&paged=1&s&_wpnonce=f68ccf90b4
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Themify - WooCommerce Product Filter" [ref=f29e773] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=themify-wc-product-filter.disabled%2Fthemify-wc-product-filter.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e774]:
+                    - paragraph [ref=f29e776]: This plugin allows you to create unlimited product filters for WooCommerce. Users can refine product search by applying multiple filters/conditions such as categories, tags, price, in-stock, on-sale, and even attributes such as colors and sizes.
+                    - generic [ref=f29e777]:
+                      - text: Version 1.5.2 | By
+                      - link "Themify" [ref=f29e778] [cursor=pointer]:
+                        - /url: https://themify.me
+                      - text: "|"
+                      - link "More information about Themify - WooCommerce Product Filter" [ref=f29e779] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=themify-wc-product-filter&TB_iframe=true&width=600&height=550
+                        - text: View details
+                    - paragraph [ref=f29e781]:
+                      - strong [ref=f29e782]: "Requires:"
+                      - link "More information about WooCommerce" [ref=f29e783] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woocommerce&TB_iframe=true&width=600&height=550
+                        - text: WooCommerce
+                  - cell [ref=f29e784]:
+                    - button "Enable auto-updates" [ref=f29e785] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e786]:
+                  - cell [ref=f29e787]:
+                    - paragraph [ref=f29e789]:
+                      - text: There is a new version of Themify - WooCommerce Product Filter available.
+                      - link "View Themify - WooCommerce Product Filter version 1.5.9 details" [ref=f29e790] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=themify-wc-product-filter&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 1.5.9 details
+                      - text: or
+                      - link "Update Themify - WooCommerce Product Filter now" [ref=f29e791] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=themify-wc-product-filter.disabled%2Fthemify-wc-product-filter.php&_wpnonce=7d1f7930c6
+                        - text: update now
+                      - text: .
+                - row [ref=f29e792]:
+                  - cell [ref=f29e793]:
+                    - checkbox "Select Woo Essential" [ref=f29e796] [cursor=pointer]
+                  - rowheader "Woo Essential" [ref=f29e797]:
+                    - strong [ref=f29e798]: Woo Essential
+                    - generic [ref=f29e799]:
+                      - generic [ref=f29e800]:
+                        - link "Activate Woo Essential" [ref=f29e801] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=woo-essential.disabled%2Fwoo-essential.php&plugin_status=all&paged=1&s&_wpnonce=dc7cb3333d
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Woo Essential" [ref=f29e803] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=woo-essential.disabled%2Fwoo-essential.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e804]:
+                    - paragraph [ref=f29e806]: Must needed modules for designing with Divi and WooCommerce
+                    - generic [ref=f29e807]:
+                      - text: Version 1.6 | By
+                      - link "Divi Next" [ref=f29e808] [cursor=pointer]:
+                        - /url: http://www.divinext.com
+                      - text: "|"
+                      - link "Visit plugin site for Woo Essential" [ref=f29e809] [cursor=pointer]:
+                        - /url: http://www.wooessential.com
+                        - text: Visit plugin site
+                  - cell [ref=f29e810]
+                - row [ref=f29e811]:
+                  - cell [ref=f29e812]:
+                    - checkbox "Select WooCommerce" [disabled] [ref=f29e815]
+                  - rowheader "WooCommerce" [ref=f29e816]:
+                    - strong [ref=f29e817]: WooCommerce
+                    - generic [ref=f29e818]:
+                      - generic [ref=f29e819]:
+                        - link "View WooCommerce settings" [ref=f29e820] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/admin.php?page=wc-settings
+                          - text: Settings
+                        - text: "|"
+                      - generic [ref=f29e821]:
+                        - text: Deactivate
+                        - generic [ref=f29e822]: You cannot deactivate this plugin as other plugins depend on it.
+                  - cell [ref=f29e823]:
+                    - paragraph [ref=f29e825]: An ecommerce toolkit that helps you sell anything. Beautifully.
+                    - generic [ref=f29e826]:
+                      - text: Version 10.3.7 | By
+                      - link "Automattic" [ref=f29e827] [cursor=pointer]:
+                        - /url: https://woocommerce.com
+                      - text: "|"
+                      - link "More information about WooCommerce" [ref=f29e828] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woocommerce&TB_iframe=true&width=600&height=550
+                        - text: View details
+                      - text: "|"
+                      - link "View WooCommerce documentation" [ref=f29e829] [cursor=pointer]:
+                        - /url: https://woocommerce.com/documentation/plugins/woocommerce/
+                        - text: Docs
+                      - text: "|"
+                      - link "View WooCommerce API docs" [ref=f29e830] [cursor=pointer]:
+                        - /url: https://woocommerce.com/wc-apidocs/
+                        - text: API docs
+                      - text: "|"
+                      - link "Visit community forums" [ref=f29e831] [cursor=pointer]:
+                        - /url: https://wordpress.org/support/plugin/woocommerce/
+                        - text: Community support
+                    - generic [ref=f29e832]:
+                      - paragraph [ref=f29e833]:
+                        - strong [ref=f29e834]: "Required by:"
+                        - text: Custom Order Status for WooCommerce, Google for WooCommerce, Mailchimp for WooCommerce, Pinterest for WooCommerce, Themify - WooCommerce Product Filter
+                      - paragraph [ref=f29e835]: "Note: This plugin cannot be deactivated or deleted until the plugins that require it are deactivated or deleted."
+                  - cell [ref=f29e836]:
+                    - button "Enable auto-updates" [ref=f29e837] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e838]:
+                  - cell [ref=f29e839]:
+                    - paragraph [ref=f29e841]:
+                      - text: There is a new version of WooCommerce available.
+                      - link "View WooCommerce version 11.2.1 details" [ref=f29e842] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=woocommerce&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 11.2.1 details
+                      - text: or
+                      - link "Update WooCommerce now" [ref=f29e843] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=woocommerce%2Fwoocommerce.php&_wpnonce=545eb7d22c
+                        - text: update now
+                      - text: .
+                - row [ref=f29e844]:
+                  - cell [ref=f29e845]:
+                    - checkbox "Select WooCommerce Delivery & Pickup Date Time Pro" [ref=f29e848] [cursor=pointer]
+                  - rowheader "WooCommerce Delivery & Pickup Date Time Pro" [ref=f29e849]:
+                    - strong [ref=f29e850]: WooCommerce Delivery & Pickup Date Time Pro
+                    - generic [ref=f29e851]:
+                      - generic [ref=f29e852]:
+                        - link "Activate WooCommerce Delivery & Pickup Date Time Pro" [ref=f29e853] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=coderockz-woocommerce-delivery-date-time-pro.disabled%2Fcoderockz-woo-delivery.php&plugin_status=all&paged=1&s&_wpnonce=ea1c047db7
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete WooCommerce Delivery & Pickup Date Time Pro" [ref=f29e855] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=coderockz-woocommerce-delivery-date-time-pro.disabled%2Fcoderockz-woo-delivery.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e856]:
+                    - paragraph [ref=f29e858]: WooCommerce Delivery & Pickup Date Time is a WooCommerce plugin extension that gives the facility of selecting delivery/pickup date and time on order checkout page. Moreover, you don't need to worry about the styling because the plugin adjusts with your WordPress theme.
+                    - generic [ref=f29e859]:
+                      - text: Version 1.3.96 | By
+                      - link "CodeRockz" [ref=f29e860] [cursor=pointer]:
+                        - /url: https://coderockz.com
+                      - text: "|"
+                      - link "Visit plugin site for WooCommerce Delivery & Pickup Date Time Pro" [ref=f29e861] [cursor=pointer]:
+                        - /url: https://coderockz.com
+                        - text: Visit plugin site
+                  - cell [ref=f29e862]
+                - row [ref=f29e863]:
+                  - cell [ref=f29e864]:
+                    - checkbox "Select WooCommerce Table Rate Shipping" [ref=f29e867] [cursor=pointer]
+                  - rowheader "WooCommerce Table Rate Shipping" [ref=f29e868]:
+                    - strong [ref=f29e869]: WooCommerce Table Rate Shipping
+                    - generic [ref=f29e870]:
+                      - generic [ref=f29e871]:
+                        - link "Activate WooCommerce Table Rate Shipping" [ref=f29e872] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=woocommerce-table-rate-shipping.disabled%2Fwoocommerce-table-rate-shipping.php&plugin_status=all&paged=1&s&_wpnonce=40a82db110
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete WooCommerce Table Rate Shipping" [ref=f29e874] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=woocommerce-table-rate-shipping.disabled%2Fwoocommerce-table-rate-shipping.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e875]:
+                    - paragraph [ref=f29e877]: WooCommerce custom plugin designed to calculate shipping costs and add one or more rates based on a table of rules
+                    - generic [ref=f29e878]:
+                      - text: Version 4.2.1 | By
+                      - link "Bolder Elements" [ref=f29e879] [cursor=pointer]:
+                        - /url: http://www.bolderelements.net/
+                      - text: "|"
+                      - link "Visit plugin site for WooCommerce Table Rate Shipping" [ref=f29e880] [cursor=pointer]:
+                        - /url: http://bolderelements.net/plugins/table-rate-shipping-woocommerce/
+                        - text: Visit plugin site
+                  - cell [ref=f29e881]
+                - row [ref=f29e882]:
+                  - cell [ref=f29e883]:
+                    - checkbox "Select Wordfence Security" [ref=f29e886] [cursor=pointer]
+                  - rowheader "Wordfence Security" [ref=f29e887]:
+                    - strong [ref=f29e888]: Wordfence Security
+                    - generic [ref=f29e889]:
+                      - generic [ref=f29e890]:
+                        - link "Activate Wordfence Security" [ref=f29e891] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=wordfence.disabled%2Fwordfence.php&plugin_status=all&paged=1&s&_wpnonce=01c0a64290
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete Wordfence Security" [ref=f29e893] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=wordfence.disabled%2Fwordfence.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e894]:
+                    - paragraph [ref=f29e896]: Wordfence Security - Anti-virus, Firewall and Malware Scan
+                    - generic [ref=f29e897]:
+                      - text: Version 8.0.2 | By
+                      - link "Wordfence" [ref=f29e898] [cursor=pointer]:
+                        - /url: https://www.wordfence.com/
+                      - text: "|"
+                      - link "More information about Wordfence Security" [ref=f29e899] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=wordfence&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e900]:
+                    - button "Enable auto-updates" [ref=f29e901] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e902]:
+                  - cell [ref=f29e903]:
+                    - paragraph [ref=f29e905]:
+                      - text: There is a new version of Wordfence Security available.
+                      - link "View Wordfence Security version 9.0.2 details" [ref=f29e906] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=wordfence&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 9.0.2 details
+                      - text: or
+                      - link "Update Wordfence Security now" [ref=f29e907] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=wordfence.disabled%2Fwordfence.php&_wpnonce=0167af5257
+                        - text: update now
+                      - text: .
+                - row [ref=f29e908]:
+                  - cell [ref=f29e909]:
+                    - checkbox "Select WP Migrate Lite" [ref=f29e912] [cursor=pointer]
+                  - rowheader "WP Migrate Lite" [ref=f29e913]:
+                    - strong [ref=f29e914]: WP Migrate Lite
+                    - generic [ref=f29e915]:
+                      - generic [ref=f29e916]:
+                        - link "Activate WP Migrate Lite" [ref=f29e917] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=wp-migrate-db.disabled%2Fwp-migrate-db.php&plugin_status=all&paged=1&s&_wpnonce=3cc93436a2
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete WP Migrate Lite" [ref=f29e919] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=wp-migrate-db.disabled%2Fwp-migrate-db.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e920]:
+                    - paragraph [ref=f29e922]: Migrate your database. Export full sites including media, themes, and plugins. Find and replace content with support for serialized data.
+                    - generic [ref=f29e923]:
+                      - text: Version 2.7.7 | By
+                      - link "WP Engine" [ref=f29e924] [cursor=pointer]:
+                        - /url: https://deliciousbrains.com/wp-migrate-db-pro/?utm_source=plugin-header&utm_medium=plugin&utm_campaign=plugin-author&utm_content=wp-migrate-author
+                      - text: "|"
+                      - link "More information about WP Migrate Lite" [ref=f29e925] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=wp-migrate-db&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e926]:
+                    - button "Enable auto-updates" [ref=f29e927] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e928]:
+                  - cell [ref=f29e929]:
+                    - paragraph [ref=f29e931]:
+                      - text: There is a new version of WP Migrate Lite available.
+                      - link "View WP Migrate Lite version 2.7.12 details" [ref=f29e932] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=wp-migrate-db&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 2.7.12 details
+                      - text: or
+                      - link "Update WP Migrate Lite now" [ref=f29e933] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=wp-migrate-db.disabled%2Fwp-migrate-db.php&_wpnonce=04766bba22
+                        - text: update now
+                      - text: .
+                - row [ref=f29e934]:
+                  - cell [ref=f29e935]:
+                    - checkbox "Select WPS Hide Login" [ref=f29e938] [cursor=pointer]
+                  - rowheader "WPS Hide Login" [ref=f29e939]:
+                    - strong [ref=f29e940]: WPS Hide Login
+                    - generic [ref=f29e941]:
+                      - generic [ref=f29e942]:
+                        - link "Activate WPS Hide Login" [ref=f29e943] [cursor=pointer]:
+                          - /url: plugins.php?action=activate&plugin=wps-hide-login-disabled%2Fwps-hide-login.php&plugin_status=all&paged=1&s&_wpnonce=4139f190aa
+                          - text: Activate
+                        - text: "|"
+                      - link "Delete WPS Hide Login" [ref=f29e945] [cursor=pointer]:
+                        - /url: plugins.php?action=delete-selected&checked%5B0%5D=wps-hide-login-disabled%2Fwps-hide-login.php&plugin_status=all&paged=1&s&_wpnonce=0e1dafcf66
+                        - text: Delete
+                  - cell [ref=f29e946]:
+                    - paragraph [ref=f29e948]: Protect your website by changing the login URL and preventing access to wp-login.php page and wp-admin directory while not logged-in
+                    - generic [ref=f29e949]:
+                      - text: Version 1.9.17.1 | By
+                      - link "WPServeur, NicolasKulka, wpformation" [ref=f29e950] [cursor=pointer]:
+                        - /url: https://wpserveur.net
+                      - text: "|"
+                      - link "More information about WPS Hide Login" [ref=f29e951] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=wps-hide-login&TB_iframe=true&width=600&height=550
+                        - text: View details
+                  - cell [ref=f29e952]:
+                    - button "Enable auto-updates" [ref=f29e953] [cursor=pointer]:  Enable auto-updates
+                - row [ref=f29e954]:
+                  - cell [ref=f29e955]:
+                    - paragraph [ref=f29e957]:
+                      - text: There is a new version of WPS Hide Login available.
+                      - link "View WPS Hide Login version 1.9.19 details" [ref=f29e958] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/plugin-install.php?tab=plugin-information&plugin=wps-hide-login&section=changelog&TB_iframe=true&width=600&height=800
+                        - text: View version 1.9.19 details
+                      - text: or
+                      - link "Update WPS Hide Login now" [ref=f29e959] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/update.php?action=upgrade-plugin&plugin=wps-hide-login-disabled%2Fwps-hide-login.php&_wpnonce=283d45fd06
+                        - text: update now
+                      - text: .
+              - rowgroup [ref=f29e960]:
+                - row [ref=f29e961]:
+                  - cell "Select All" [ref=f29e962]:
+                    - checkbox "Select All" [ref=f29e963] [cursor=pointer]
+                  - columnheader "Plugin" [ref=f29e966]
+                  - columnheader "Description" [ref=f29e967]
+                  - columnheader "Automatic Updates" [ref=f29e968]
+            - generic [ref=f29e969]:
+              - generic [ref=f29e970]:
+                - generic [ref=f29e971]: Select bulk action
+                - combobox "Select bulk action" [ref=f29e972] [cursor=pointer]:
+                  - option "Bulk actions" [selected]
+                  - option "Activate"
+                  - option "Deactivate"
+                  - option "Update"
+                  - option "Delete"
+                  - option "Enable Auto-updates"
+                  - option "Disable Auto-updates"
+                - button "Apply" [ref=f29e973] [cursor=pointer]
+              - generic [ref=f29e974]: 22 items
+  - contentinfo [ref=f29e976]:
+    - paragraph [ref=f29e977]:
+      - generic [ref=f29e979]:
+        - text: Thank you for creating with
+        - link "WordPress" [ref=f29e980] [cursor=pointer]:
+          - /url: https://wordpress.org/
+        - text: .
+    - paragraph [ref=f29e981]: Version 7.1.3

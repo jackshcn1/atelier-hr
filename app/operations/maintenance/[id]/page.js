@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -7,26 +7,21 @@ export default function MaintenanceJobDetailPage() {
   const params = useParams();
   const jobId = params?.id || 'MNT-103';
 
-  // Mock job data for display
-  const mockJob = {
-    id: jobId,
-    asset: 'Chiller FM-300U (KICH00001)',
-    status: 'Pending approval',
-    requestedBy: 'John Doe',
-    date: '2026-10-17',
-    serviceType: 'Faulty or defective repair',
-    priority: 'Urgent',
-    issues: ['Cooling issue', 'Not functioning'],
-    comments: 'Compressor noise loud, not maintaining temperature.',
-    assignedPOC: 'CoolBreeze HVAC Services',
-    auditLog: [
-      { timestamp: '2026-10-17 10:15', user: 'John Doe', action: 'created', details: 'Maintenance request raised for asset KICH00001' },
-      { timestamp: '2026-10-17 10:30', user: 'John Doe', action: 'updated', details: 'Status changed from In-use to Maintenance' },
-    ],
-    quotes: [
-      { vendor: 'CoolBreeze HVAC Services', type: 'Overall job', cost: '₹6,500', delivery: '2 days', status: 'Pending approval' },
-    ],
-  };
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/maintenance/jobs/${jobId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.job) setJob(d.job);
+        setLoading(false);
+      });
+  }, [jobId]);
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading job details...</div>;
+  if (!job) return <div className="min-h-screen flex items-center justify-center">Job not found.</div>;
+
 
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
@@ -36,10 +31,10 @@ export default function MaintenanceJobDetailPage() {
         </div>
 
         <div className="page-head mb-8">
-          <h1 className="font-serif text-3xl text-[#1e1812]">Maintenance Job {mockJob.id}</h1>
+          <h1 className="font-serif text-3xl text-[#1e1812]">Maintenance Job {job.id}</h1>
           <div className="flex items-center gap-4 mt-2">
-            <span className="pill-warn">{mockJob.status}</span>
-            <p className="text-xs text-[#6b635c]">Raised by: {mockJob.requestedBy} on {mockJob.date}</p>
+            <span className="pill-warn">{job.status}</span>
+            <p className="text-xs text-[#6b635c]">Raised by: {job.requested_by} on {job.requested_at ? new Date(job.requested_at).toLocaleDateString() : ''}</p>
           </div>
         </div>
 
@@ -68,31 +63,35 @@ export default function MaintenanceJobDetailPage() {
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
             <h2 className="font-serif text-xl mb-4">Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div><strong className="text-[#6b635c]">Asset:</strong> {mockJob.asset}</div>
-              <div><strong className="text-[#6b635c]">Service Type:</strong> {mockJob.serviceType}</div>
-              <div><strong className="text-[#6b635c]">Priority:</strong> <span className="pill-bad">{mockJob.priority}</span></div>
-              <div><strong className="text-[#6b635c]">Requested By:</strong> {mockJob.requestedBy}</div>
-              <div><strong className="text-[#6b635c]">Issues:</strong> {mockJob.issues.join(', ')}</div>
-              <div><strong className="text-[#6b635c]">Comments:</strong> {mockJob.comments}</div>
+              <div><strong className="text-[#6b635c]">Asset:</strong> {job.asset_serial}</div>
+              <div><strong className="text-[#6b635c]">Service Type:</strong> {job.service_type}</div>
+              <div><strong className="text-[#6b635c]">Priority:</strong> <span className="pill-bad">{job.priority}</span></div>
+              <div><strong className="text-[#6b635c]">Requested By:</strong> {job.requested_by}</div>
+              <div><strong className="text-[#6b635c]">Issues:</strong> {job.issues ? (Array.isArray(job.issues) ? job.issues.join(', ') : JSON.stringify(job.issues)) : 'None'}</div>
+              <div><strong className="text-[#6b635c]">Comments:</strong> {job.comments}</div>
             </div>
           </section>
 
           {/* Maintenance POC */}
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
             <h2 className="font-serif text-xl mb-4">Maintenance POC</h2>
-            <p className="text-sm"><strong>Assigned:</strong> {mockJob.assignedPOC || 'Not yet assigned'}</p>
+            <p className="text-sm"><strong>Assigned:</strong> {job.maintenance_pocs?.name || 'Not yet assigned'}</p>
             <p className="text-xs text-[#6b635c] mt-2">Speciality filter available. Add new POC from directory.</p>
           </section>
 
           {/* Quotes & Estimates */}
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
             <h2 className="font-serif text-xl mb-4">Quotes & Estimates</h2>
-            {mockJob.quotes.map((q, i) => (
-              <div key={i} className="text-sm bg-[#f6f4f2] p-3 rounded mb-2">
-                <div className="font-medium">{q.vendor} — {q.type}</div>
-                <div className="text-[#6b635c]">Cost: {q.cost} | Delivery: {q.delivery} | Status: {q.status}</div>
-              </div>
-            ))}
+            {job.job_quotes && job.job_quotes.length > 0 ? (
+              job.job_quotes.map((q, i) => (
+                <div key={i} className="text-sm bg-[#f6f4f2] p-3 rounded mb-2">
+                  <div className="font-medium">{q.vendor_name} — {q.quote_type}</div>
+                  <div className="text-[#6b635c]">Cost: {q.cost} | Delivery: {q.estimated_delivery} | Status: {q.status}</div>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400 italic">No quotes submitted yet.</p>
+            )}
           </section>
 
           {/* Completion Report */}
@@ -105,12 +104,16 @@ export default function MaintenanceJobDetailPage() {
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
             <h2 className="font-serif text-xl mb-4">Audit Log</h2>
             <div className="space-y-2 text-xs">
-              {mockJob.auditLog.map((entry, idx) => (
-                <div key={idx} className="flex gap-2 border-b border-dashed border-[#ebe8e4] py-1">
-                  <span className="text-[#8b6f4e] whitespace-nowrap">{entry.timestamp}</span>
-                  <span className="text-[#1e1812]">{entry.user} — {entry.details}</span>
-                </div>
-              ))}
+              {job.maintenance_audit_logs && job.maintenance_audit_logs.length > 0 ? (
+                job.maintenance_audit_logs.map((entry, idx) => (
+                  <div key={idx} className="flex gap-2 border-b border-dashed border-[#ebe8e4] py-1">
+                    <span className="text-[#8b6f4e] whitespace-nowrap">{new Date(entry.timestamp).toLocaleString()}</span>
+                    <span className="text-[#1e1812]">{entry.user_name || 'System'} — {entry.details}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-400 italic">No audit records found.</p>
+              )}
             </div>
           </section>
         </div>

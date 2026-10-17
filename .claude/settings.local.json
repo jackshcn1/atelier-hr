@@ -44,7 +44,11 @@
       "WebFetch(domain:esic.gov.in)",
       "WebFetch(domain:www.esic.gov.in)",
       "WebFetch(domain:www.epfindia.gov.in)",
-      "WebFetch(domain:www.epfo.gov.in)"
+      "WebFetch(domain:www.epfo.gov.in)",
+      "WebFetch(domain:www.maintenancemanagementsoftware.org)",
+      "WebFetch(domain:www.maintainx.com)",
+      "WebFetch(domain:www.fiixsoftware.com)",
+      "WebFetch(domain:www.getmaintainx.com)"
     ]
   }
 }

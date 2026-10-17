@@ -1,0 +1,937 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - navigation "Main menu":
+      - link "Skip to main content" [ref=f3e3] [cursor=pointer]:
+        - /url: "#wpbody-content"
+      - link "Skip to toolbar" [ref=f3e4] [cursor=pointer]:
+        - /url: "#wp-toolbar"
+      - list [ref=f3e7]:
+        - listitem [ref=f3e8]:
+          - link "Dashboard" [ref=f3e9] [cursor=pointer]:
+            - /url: index.php
+            - generic [aria-hidden] [ref=f3e10]: 
+          - list [ref=f3e12]:
+            - listitem [ref=f3e13]:
+              - link "Home" [ref=f3e14] [cursor=pointer]:
+                - /url: index.php
+            - listitem [ref=f3e15]:
+              - link "Updates 18" [ref=f3e16] [cursor=pointer]:
+                - /url: update-core.php
+                - text: Updates
+                - generic [ref=f3e17]: "18"
+        - listitem [aria-hidden] [ref=f3e18]
+        - listitem [ref=f3e20]:
+          - link "Posts" [ref=f3e21] [cursor=pointer]:
+            - /url: edit.php
+            - generic [aria-hidden] [ref=f3e22]: 
+          - list [ref=f3e24]:
+            - listitem [ref=f3e25]:
+              - link "All Posts" [ref=f3e26] [cursor=pointer]:
+                - /url: edit.php
+            - listitem [ref=f3e27]:
+              - link "Add Post" [ref=f3e28] [cursor=pointer]:
+                - /url: post-new.php
+            - listitem [ref=f3e29]:
+              - link "Categories" [ref=f3e30] [cursor=pointer]:
+                - /url: edit-tags.php?taxonomy=category
+            - listitem [ref=f3e31]:
+              - link "Tags" [ref=f3e32] [cursor=pointer]:
+                - /url: edit-tags.php?taxonomy=post_tag
+        - listitem [ref=f3e33]:
+          - link "Media" [ref=f3e34] [cursor=pointer]:
+            - /url: upload.php
+            - generic [aria-hidden] [ref=f3e35]: 
+          - list [ref=f3e37]:
+            - listitem [ref=f3e38]:
+              - link "Library" [ref=f3e39] [cursor=pointer]:
+                - /url: upload.php
+            - listitem [ref=f3e40]:
+              - link "Add Media File" [ref=f3e41] [cursor=pointer]:
+                - /url: media-new.php
+        - listitem [ref=f3e42]:
+          - link "Pages" [ref=f3e43] [cursor=pointer]:
+            - /url: edit.php?post_type=page
+            - generic [aria-hidden] [ref=f3e44]: 
+          - list [ref=f3e46]:
+            - listitem [ref=f3e47]:
+              - link "All Pages" [ref=f3e48] [cursor=pointer]:
+                - /url: edit.php?post_type=page
+            - listitem [ref=f3e49]:
+              - link "Add Page" [ref=f3e50] [cursor=pointer]:
+                - /url: post-new.php?post_type=page
+        - listitem [ref=f3e51]:
+          - link "Comments 84 Comments in moderation" [ref=f3e52] [cursor=pointer]:
+            - /url: edit-comments.php
+            - generic [aria-hidden] [ref=f3e53]: 
+            - generic [ref=f3e54]:
+              - text: Comments
+              - generic [ref=f3e55]:
+                - text: "84"
+                - generic [ref=f3e56]: 84 Comments in moderation
+        - listitem [ref=f3e57]:
+          - link "Projects" [ref=f3e58] [cursor=pointer]:
+            - /url: edit.php?post_type=project
+            - generic [aria-hidden] [ref=f3e59]: 
+          - list [ref=f3e61]:
+            - listitem [ref=f3e62]:
+              - link "All Projects" [ref=f3e63] [cursor=pointer]:
+                - /url: edit.php?post_type=project
+            - listitem [ref=f3e64]:
+              - link "Add New Project" [ref=f3e65] [cursor=pointer]:
+                - /url: post-new.php?post_type=project
+            - listitem [ref=f3e66]:
+              - link "Categories" [ref=f3e67] [cursor=pointer]:
+                - /url: edit-tags.php?taxonomy=project_category&post_type=project
+            - listitem [ref=f3e68]:
+              - link "Tags" [ref=f3e69] [cursor=pointer]:
+                - /url: edit-tags.php?taxonomy=project_tag&post_type=project
+        - listitem [ref=f3e70]:
+          - link "PhonePe PG Support" [ref=f3e71] [cursor=pointer]:
+            - /url: admin.php?page=phonepe-support
+            - generic [aria-hidden] [ref=f3e72]: 
+          - list [ref=f3e74]:
+            - listitem [ref=f3e75]:
+              - link "PhonePe PG Support" [ref=f3e76] [cursor=pointer]:
+                - /url: admin.php?page=phonepe-support
+            - listitem [ref=f3e77]:
+              - link "Download Error Logs" [ref=f3e78] [cursor=pointer]:
+                - /url: admin.php?page=phonepe-support-logs
+            - listitem [ref=f3e79]:
+              - link "Compose Error Report" [ref=f3e80] [cursor=pointer]:
+                - /url: admin.php?page=phonepe-support-mail
+        - listitem [aria-hidden] [ref=f3e81]
+        - listitem [ref=f3e83]:
+          - link "WooCommerce" [ref=f3e84] [cursor=pointer]:
+            - /url: admin.php?page=wc-admin
+          - list [ref=f3e87]:
+            - listitem [ref=f3e88]:
+              - link "Home" [ref=f3e89] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin
+            - listitem [ref=f3e90]:
+              - link "Orders 32" [ref=f3e91] [cursor=pointer]:
+                - /url: admin.php?page=wc-orders
+                - text: Orders
+                - generic [ref=f3e92]: "32"
+            - listitem [ref=f3e93]:
+              - link "PhonePe settings" [ref=f3e94] [cursor=pointer]:
+                - /url: admin.php?page=phonepe-settings
+            - listitem [ref=f3e95]:
+              - link "Customers" [ref=f3e96] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/customers
+            - listitem [ref=f3e97]:
+              - link "Reports" [ref=f3e98] [cursor=pointer]:
+                - /url: admin.php?page=wc-reports
+            - listitem [ref=f3e99]:
+              - link "Settings" [ref=f3e100] [cursor=pointer]:
+                - /url: admin.php?page=wc-settings
+            - listitem [ref=f3e101]:
+              - link "Status" [ref=f3e102] [cursor=pointer]:
+                - /url: admin.php?page=wc-status
+            - listitem [ref=f3e103]:
+              - link "Extensions" [ref=f3e104] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/extensions
+        - listitem [ref=f3e105]:
+          - link "Products" [ref=f3e106] [cursor=pointer]:
+            - /url: edit.php?post_type=product
+            - generic [aria-hidden] [ref=f3e107]: 
+          - list [ref=f3e109]:
+            - listitem [ref=f3e110]:
+              - link "All Products" [ref=f3e111] [cursor=pointer]:
+                - /url: edit.php?post_type=product
+            - listitem [ref=f3e112]:
+              - link "Add new product" [ref=f3e113] [cursor=pointer]:
+                - /url: post-new.php?post_type=product
+            - listitem [ref=f3e114]:
+              - link "Brands" [ref=f3e115] [cursor=pointer]:
+                - /url: edit-tags.php?taxonomy=product_brand&post_type=product
+            - listitem [ref=f3e116]:
+              - link "Categories" [ref=f3e117] [cursor=pointer]:
+                - /url: edit-tags.php?taxonomy=product_cat&post_type=product
+            - listitem [ref=f3e118]:
+              - link "Tags" [ref=f3e119] [cursor=pointer]:
+                - /url: edit-tags.php?taxonomy=product_tag&post_type=product
+            - listitem [ref=f3e120]:
+              - link "Attributes" [ref=f3e121] [cursor=pointer]:
+                - /url: edit.php?post_type=product&page=product_attributes
+            - listitem [ref=f3e122]:
+              - link "Reviews" [ref=f3e123] [cursor=pointer]:
+                - /url: edit.php?post_type=product&page=product-reviews
+        - listitem [ref=f3e124]:
+          - link "Payments" [ref=f3e125] [cursor=pointer]:
+            - /url: admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM
+        - listitem [ref=f3e128]:
+          - link "Analytics" [ref=f3e129] [cursor=pointer]:
+            - /url: admin.php?page=wc-admin&path=/analytics/overview
+            - generic [aria-hidden] [ref=f3e130]: 
+          - list [ref=f3e132]:
+            - listitem [ref=f3e133]:
+              - link "Overview" [ref=f3e134] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/overview
+            - listitem [ref=f3e135]:
+              - link "Products" [ref=f3e136] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/products
+            - listitem [ref=f3e137]:
+              - link "Revenue" [ref=f3e138] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/revenue
+            - listitem [ref=f3e139]:
+              - link "Orders" [ref=f3e140] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/orders
+            - listitem [ref=f3e141]:
+              - link "Variations" [ref=f3e142] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/variations
+            - listitem [ref=f3e143]:
+              - link "Categories" [ref=f3e144] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/categories
+            - listitem [ref=f3e145]:
+              - link "Coupons" [ref=f3e146] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/coupons
+            - listitem [ref=f3e147]:
+              - link "Taxes" [ref=f3e148] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/taxes
+            - listitem [ref=f3e149]:
+              - link "Downloads" [ref=f3e150] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/downloads
+            - listitem [ref=f3e151]:
+              - link "Stock" [ref=f3e152] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/stock
+            - listitem [ref=f3e153]:
+              - link "Settings" [ref=f3e154] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/analytics/settings
+        - listitem [ref=f3e155]:
+          - link "Marketing" [ref=f3e156] [cursor=pointer]:
+            - /url: admin.php?page=wc-admin&path=/marketing
+            - generic [aria-hidden] [ref=f3e157]: 
+          - list [ref=f3e159]:
+            - listitem [ref=f3e160]:
+              - link "Overview" [ref=f3e161] [cursor=pointer]:
+                - /url: admin.php?page=wc-admin&path=/marketing
+            - listitem [ref=f3e162]:
+              - link "Coupons" [ref=f3e163] [cursor=pointer]:
+                - /url: edit.php?post_type=shop_coupon
+        - listitem [aria-hidden] [ref=f3e164]
+        - listitem [ref=f3e166]:
+          - link "Appearance" [ref=f3e167] [cursor=pointer]:
+            - /url: themes.php
+            - generic [aria-hidden] [ref=f3e168]: 
+          - list [ref=f3e170]:
+            - listitem [ref=f3e171]:
+              - link "Themes 4" [ref=f3e172] [cursor=pointer]:
+                - /url: themes.php
+                - text: Themes
+                - generic [ref=f3e173]: "4"
+            - listitem [ref=f3e174]:
+              - link "Design" [ref=f3e175] [cursor=pointer]:
+                - /url: site-editor.php
+            - listitem [ref=f3e176]:
+              - link "Customize" [ref=f3e177] [cursor=pointer]:
+                - /url: customize.php?return=%2Fwp-admin%2Fpost.php%3Fpost%3D987510297%26action%3Dedit
+            - listitem [ref=f3e178]:
+              - link "Widgets" [ref=f3e179] [cursor=pointer]:
+                - /url: widgets.php
+            - listitem [ref=f3e180]:
+              - link "Fonts" [ref=f3e181] [cursor=pointer]:
+                - /url: font-library.php
+            - listitem [ref=f3e182]:
+              - link "Menus" [ref=f3e183] [cursor=pointer]:
+                - /url: nav-menus.php
+            - listitem [ref=f3e184]:
+              - link "Background" [ref=f3e185] [cursor=pointer]:
+                - /url: customize.php?return=%2Fwp-admin%2Fpost.php%3Fpost%3D987510297%26action%3Dedit&autofocus%5Bcontrol%5D=background_image
+            - listitem
+            - listitem [ref=f3e186]:
+              - link "Theme File Editor" [ref=f3e187] [cursor=pointer]:
+                - /url: theme-editor.php
+        - listitem [ref=f3e188]:
+          - link "Plugins 14" [ref=f3e189] [cursor=pointer]:
+            - /url: plugins.php
+            - generic [aria-hidden] [ref=f3e190]: 
+            - generic [ref=f3e191]:
+              - text: Plugins
+              - generic [ref=f3e192]: "14"
+          - list [ref=f3e193]:
+            - listitem [ref=f3e194]:
+              - link "Installed Plugins" [ref=f3e195] [cursor=pointer]:
+                - /url: plugins.php
+            - listitem [ref=f3e196]:
+              - link "Add Plugin" [ref=f3e197] [cursor=pointer]:
+                - /url: plugin-install.php
+            - listitem [ref=f3e198]:
+              - link "Plugin File Editor" [ref=f3e199] [cursor=pointer]:
+                - /url: plugin-editor.php
+        - listitem [ref=f3e200]:
+          - link "Users" [ref=f3e201] [cursor=pointer]:
+            - /url: users.php
+            - generic [aria-hidden] [ref=f3e202]: 
+          - list [ref=f3e204]:
+            - listitem [ref=f3e205]:
+              - link "All Users" [ref=f3e206] [cursor=pointer]:
+                - /url: users.php
+            - listitem [ref=f3e207]:
+              - link "Add User" [ref=f3e208] [cursor=pointer]:
+                - /url: user-new.php
+            - listitem [ref=f3e209]:
+              - link "Profile" [ref=f3e210] [cursor=pointer]:
+                - /url: profile.php
+        - listitem [ref=f3e211]:
+          - link "Tools" [ref=f3e212] [cursor=pointer]:
+            - /url: tools.php
+            - generic [aria-hidden] [ref=f3e213]: 
+          - list [ref=f3e215]:
+            - listitem [ref=f3e216]:
+              - link "Available Tools" [ref=f3e217] [cursor=pointer]:
+                - /url: tools.php
+            - listitem [ref=f3e218]:
+              - link "Import" [ref=f3e219] [cursor=pointer]:
+                - /url: import.php
+            - listitem [ref=f3e220]:
+              - link "Export" [ref=f3e221] [cursor=pointer]:
+                - /url: export.php
+            - listitem [ref=f3e222]:
+              - link "Site Health 2" [ref=f3e223] [cursor=pointer]:
+                - /url: site-health.php
+                - text: Site Health
+                - generic [ref=f3e224]: "2"
+            - listitem [ref=f3e225]:
+              - link "Export Personal Data" [ref=f3e226] [cursor=pointer]:
+                - /url: export-personal-data.php
+            - listitem [ref=f3e227]:
+              - link "Erase Personal Data" [ref=f3e228] [cursor=pointer]:
+                - /url: erase-personal-data.php
+            - listitem [ref=f3e229]:
+              - link "Scheduled Actions" [ref=f3e230] [cursor=pointer]:
+                - /url: tools.php?page=action-scheduler
+        - listitem [ref=f3e231]:
+          - link "Settings" [ref=f3e232] [cursor=pointer]:
+            - /url: options-general.php
+            - generic [aria-hidden] [ref=f3e233]: 
+          - list [ref=f3e235]:
+            - listitem [ref=f3e236]:
+              - link "General" [ref=f3e237] [cursor=pointer]:
+                - /url: options-general.php
+            - listitem [ref=f3e238]:
+              - link "Connectors" [ref=f3e239] [cursor=pointer]:
+                - /url: options-connectors.php
+            - listitem [ref=f3e240]:
+              - link "Writing" [ref=f3e241] [cursor=pointer]:
+                - /url: options-writing.php
+            - listitem [ref=f3e242]:
+              - link "Reading" [ref=f3e243] [cursor=pointer]:
+                - /url: options-reading.php
+            - listitem [ref=f3e244]:
+              - link "Discussion" [ref=f3e245] [cursor=pointer]:
+                - /url: options-discussion.php
+            - listitem [ref=f3e246]:
+              - link "Media" [ref=f3e247] [cursor=pointer]:
+                - /url: options-media.php
+            - listitem [ref=f3e248]:
+              - link "Permalinks" [ref=f3e249] [cursor=pointer]:
+                - /url: options-permalink.php
+            - listitem [ref=f3e250]:
+              - link "Privacy" [ref=f3e251] [cursor=pointer]:
+                - /url: options-privacy.php
+        - listitem [aria-hidden] [ref=f3e252]
+        - listitem [ref=f3e254]:
+          - link "Divi" [ref=f3e255] [cursor=pointer]:
+            - /url: admin.php?page=et_onboarding
+            - generic [aria-hidden] [ref=f3e256]: 
+          - list [ref=f3e258]:
+            - listitem [ref=f3e259]:
+              - link "Dashboard 1" [ref=f3e260] [cursor=pointer]:
+                - /url: admin.php?page=et_onboarding
+                - text: Dashboard
+                - generic [ref=f3e261]: "1"
+            - listitem [ref=f3e262]:
+              - link "Theme Options" [ref=f3e263] [cursor=pointer]:
+                - /url: admin.php?page=et_divi_options
+            - listitem [ref=f3e264]:
+              - link "Theme Builder" [ref=f3e265] [cursor=pointer]:
+                - /url: admin.php?page=et_theme_builder
+            - listitem [ref=f3e266]:
+              - link "Theme Customizer" [ref=f3e267] [cursor=pointer]:
+                - /url: customize.php?et_customizer_option_set=theme
+            - listitem [ref=f3e268]:
+              - link "Role Editor" [ref=f3e269] [cursor=pointer]:
+                - /url: admin.php?page=et_divi_role_editor
+            - listitem [ref=f3e270]:
+              - link "Divi Library" [ref=f3e271] [cursor=pointer]:
+                - /url: edit.php?post_type=et_pb_layout
+            - listitem [ref=f3e272]:
+              - link "Support Center" [ref=f3e273] [cursor=pointer]:
+                - /url: admin.php?page=et_support_center_divi
+        - listitem [ref=f3e274]:
+          - button "Collapse Main menu" [expanded] [ref=f3e275] [cursor=pointer]:
+            - generic [ref=f3e277]: Collapse Menu
+    - generic [ref=f3e278]:
+      - generic [ref=f3e279]:
+        - navigation "Toolbar":
+          - menu:
+            - group [ref=f3e280]:
+              - menuitem "About WordPress" [ref=f3e281] [cursor=pointer]
+            - group [ref=f3e284]:
+              - menuitem "Ambrosia - Staging" [ref=f3e285] [cursor=pointer]
+            - group [ref=f3e286]:
+              - menuitem "Live" [ref=f3e287] [cursor=pointer]
+            - group [ref=f3e288]:
+              - menuitem "18 updates available" [ref=f3e289] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f3e291]: "18"
+            - group [ref=f3e293]:
+              - menuitem "⌘K Open command palette" [ref=f3e294] [cursor=pointer]:
+                - generic [ref=f3e296]:
+                  - text: ⌘K
+                  - generic [ref=f3e297]: Open command palette
+            - group [ref=f3e298]:
+              - menuitem "84 Comments in moderation" [ref=f3e299] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f3e301]: "84"
+            - group [ref=f3e303]:
+              - menuitem "New" [ref=f3e304] [cursor=pointer]
+            - group [ref=f3e307]:
+              - menuitem "View product" [ref=f3e308] [cursor=pointer]
+          - menu [ref=f3e309]:
+            - group [ref=f3e310]:
+              - menuitem "Howdy, amborsia-admin" [ref=f3e311] [cursor=pointer]
+      - heading "Edit Product" [level=1] [ref=f3e315]
+      - main [ref=f3e316]:
+        - generic [ref=f3e317]:
+          - generic [ref=f3e318]:
+            - button "Screen Options" [ref=f3e320] [cursor=pointer]
+            - button "Help" [ref=f3e322] [cursor=pointer]
+          - generic [ref=f3e323]:
+            - heading "Edit product" [level=1] [ref=f3e324]
+            - link "Add new product" [ref=f3e325] [cursor=pointer]:
+              - /url: https://staging.theambrosia.com/wp-admin/post-new.php?post_type=product
+            - generic [ref=f3e326]:
+              - link "Dismiss" [ref=f3e327] [cursor=pointer]:
+                - /url: /wp-admin/post.php?post=987510297&action=edit&wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-wordpress-untested&_wc_notice_nonce=64c813698a
+              - paragraph [ref=f3e328]:
+                - strong [ref=f3e329]: Pinterest for WooCommerce
+                - text: "- 1.4.12 is untested with WordPress 7.1.3."
+            - generic [ref=f3e330]:
+              - link "Dismiss" [ref=f3e331] [cursor=pointer]:
+                - /url: /wp-admin/post.php?post=987510297&action=edit&wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-woocommerce-untested&_wc_notice_nonce=64c813698a
+              - paragraph [ref=f3e332]:
+                - strong [ref=f3e333]: Pinterest for WooCommerce
+                - text: "- version 1.4.12 is untested with WooCommerce 10.3.7."
+            - generic [ref=f3e335]:
+              - generic:
+                - generic [ref=f3e336]:
+                  - generic [ref=f3e337]:
+                    - generic [ref=f3e338]:
+                      - generic: Product name
+                      - textbox "Product name" [ref=f3e339]: Black Forest Cake
+                      - link "Skip to Editor" [ref=f3e340] [cursor=pointer]:
+                        - /url: "#content"
+                    - generic [ref=f3e342]:
+                      - strong [ref=f3e343]: "Permalink:"
+                      - link "https://staging.theambrosia.com/product/black-forest-cake/" [ref=f3e345] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/product/black-forest-cake/
+                      - text: ‎
+                      - button "Edit permalink" [ref=f3e347] [cursor=pointer]: Edit
+                  - link "< Use The Divi Builder" [ref=f3e349] [cursor=pointer]:
+                    - /url: "#"
+                  - generic [ref=f3e351]:
+                    - generic [ref=f3e352]:
+                      - generic [ref=f3e353]:
+                        - button "Add Media" [ref=f3e355] [cursor=pointer]
+                        - generic [ref=f3e357]:
+                          - button "Visual" [ref=f3e358] [cursor=pointer]
+                          - button "Code" [pressed] [ref=f3e359] [cursor=pointer]
+                      - generic [ref=f3e360]:
+                        - generic [ref=f3e361]:
+                          - button "Bold" [ref=f3e362] [cursor=pointer]: b
+                          - button "Italic" [ref=f3e363] [cursor=pointer]: i
+                          - button "Insert link" [ref=f3e364] [cursor=pointer]: link
+                          - button "Blockquote" [ref=f3e365] [cursor=pointer]: b-quote
+                          - button "Deleted text (strikethrough)" [ref=f3e366] [cursor=pointer]: del
+                          - button "Inserted text" [ref=f3e367] [cursor=pointer]: ins
+                          - button "Insert image" [ref=f3e368] [cursor=pointer]: img
+                          - button "Bulleted list" [ref=f3e369] [cursor=pointer]: ul
+                          - button "Numbered list" [ref=f3e370] [cursor=pointer]: ol
+                          - button "List item" [ref=f3e371] [cursor=pointer]: li
+                          - button "Code" [ref=f3e372] [cursor=pointer]: code
+                          - button "Insert Read More tag" [ref=f3e373] [cursor=pointer]: more
+                          - button "close tags" [ref=f3e374] [cursor=pointer]
+                          - button "raw" [ref=f3e375] [cursor=pointer]
+                          - button "one half" [ref=f3e376] [cursor=pointer]
+                          - button "one half last" [ref=f3e377] [cursor=pointer]
+                          - button "one third" [ref=f3e378] [cursor=pointer]
+                          - button "one third last" [ref=f3e379] [cursor=pointer]
+                          - button "one fourth" [ref=f3e380] [cursor=pointer]
+                          - button "one fourth last" [ref=f3e381] [cursor=pointer]
+                          - button "two third" [ref=f3e382] [cursor=pointer]
+                          - button "two third last" [ref=f3e383] [cursor=pointer]
+                          - button "three fourth" [ref=f3e384] [cursor=pointer]
+                          - button "three fourth last" [ref=f3e385] [cursor=pointer]
+                          - button "three fourth last" [ref=f3e386] [cursor=pointer]
+                          - button "box" [ref=f3e387] [cursor=pointer]
+                          - button "tooltip" [ref=f3e388] [cursor=pointer]
+                          - button "learn_more" [ref=f3e389] [cursor=pointer]
+                          - button "slider" [ref=f3e390] [cursor=pointer]
+                          - button "slide" [ref=f3e391] [cursor=pointer]
+                          - button "button" [ref=f3e392] [cursor=pointer]
+                          - button "digg" [ref=f3e393] [cursor=pointer]
+                          - button "stumble" [ref=f3e394] [cursor=pointer]
+                          - button "facebook" [ref=f3e395] [cursor=pointer]
+                          - button "x" [ref=f3e396] [cursor=pointer]
+                          - button "retweet" [ref=f3e397] [cursor=pointer]
+                          - button "feedburner" [ref=f3e398] [cursor=pointer]
+                          - button "protected" [ref=f3e399] [cursor=pointer]
+                          - button "Distraction-free writing mode" [ref=f3e400] [cursor=pointer]
+                        - textbox [ref=f3e401]
+                    - text: "Word count: 0 Last edited on October 15, 2026 at 12:14 pm"
+                - generic [ref=f3e403]:
+                  - region "Divi Page Settings" [ref=f3e404]:
+                    - generic [ref=f3e405]:
+                      - heading "Divi Page Settings" [level=2] [ref=f3e406]
+                      - generic [ref=f3e407]:
+                        - button "Move up" [disabled] [ref=f3e409]
+                        - button "Move down" [ref=f3e413] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e417] [cursor=pointer]
+                    - paragraph [ref=f3e422]:
+                      - generic [ref=f3e423]: "Hide Nav Before Scroll:"
+                      - combobox "Hide Nav Before Scroll:" [ref=f3e424] [cursor=pointer]:
+                        - option "Default" [selected]
+                        - option "Off"
+                        - option "On"
+                  - region "Publish" [ref=f3e425]:
+                    - generic [ref=f3e426]:
+                      - heading "Publish" [level=2] [ref=f3e427]
+                      - generic [ref=f3e428]:
+                        - button "Move up" [ref=f3e430] [cursor=pointer]
+                        - button "Move down" [ref=f3e434] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e438] [cursor=pointer]
+                    - generic [ref=f3e442]:
+                      - generic [ref=f3e443]:
+                        - link "Preview Changes (opens in a new tab)" [ref=f3e445] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/black-forest-cake/?preview=true
+                          - text: Preview Changes
+                          - generic [ref=f3e446]: (opens in a new tab)
+                        - generic [ref=f3e447]:
+                          - generic [ref=f3e448]:
+                            - text: "Status: Published"
+                            - button "Edit status" [ref=f3e449] [cursor=pointer]: Edit
+                          - generic [ref=f3e451]:
+                            - text: "Visibility: Public"
+                            - button "Edit visibility" [ref=f3e452] [cursor=pointer]: Edit
+                          - generic [ref=f3e454]:
+                            - generic [ref=f3e455]: "Published on: Oct 14, 2026 at 14:45"
+                            - button "Edit date and time" [ref=f3e456] [cursor=pointer]: Edit
+                          - generic [ref=f3e458]:
+                            - text: "Catalog visibility:"
+                            - strong [ref=f3e459]: Shop and search results
+                            - link "Edit" [ref=f3e460] [cursor=pointer]:
+                              - /url: "#catalog-visibility"
+                      - generic [ref=f3e461]:
+                        - link "Copy to a new draft" [ref=f3e463] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987510297&_wpnonce=e6011150d5
+                        - link "Move to Trash" [ref=f3e465] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987510297&action=trash&_wpnonce=2abb55835a
+                        - button "Update" [ref=f3e467] [cursor=pointer]
+                  - region "Product image" [ref=f3e468]:
+                    - generic [ref=f3e469]:
+                      - heading "Product image" [level=2] [ref=f3e470]
+                      - generic [ref=f3e471]:
+                        - button "Move up" [ref=f3e473] [cursor=pointer]
+                        - button "Move down" [ref=f3e477] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e481] [cursor=pointer]
+                    - paragraph [ref=f3e485]:
+                      - button "Set product image" [ref=f3e486] [cursor=pointer]
+                  - region "Product gallery" [ref=f3e487]:
+                    - generic [ref=f3e488]:
+                      - heading "Product gallery" [level=2] [ref=f3e489]
+                      - generic [ref=f3e490]:
+                        - button "Move up" [ref=f3e492] [cursor=pointer]
+                        - button "Move down" [ref=f3e496] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e500] [cursor=pointer]
+                    - generic [ref=f3e503]:
+                      - generic:
+                        - list
+                      - paragraph [ref=f3e504]:
+                        - link "Add product gallery images" [ref=f3e505] [cursor=pointer]:
+                          - /url: "#"
+                  - region "Product categories" [ref=f3e506]:
+                    - generic [ref=f3e507]:
+                      - heading "Product categories" [level=2] [ref=f3e508]
+                      - generic [ref=f3e509]:
+                        - button "Move up" [ref=f3e511] [cursor=pointer]
+                        - button "Move down" [ref=f3e515] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e519] [cursor=pointer]
+                    - generic [ref=f3e523]:
+                      - tablist [ref=f3e524]:
+                        - listitem [ref=f3e525]:
+                          - tab "All categories" [selected] [ref=f3e526] [cursor=pointer]
+                        - listitem [ref=f3e527]:
+                          - tab "Most Used" [ref=f3e528] [cursor=pointer]
+                      - tabpanel [ref=f3e529]:
+                        - list [ref=f3e530]:
+                          - listitem [ref=f3e531]:
+                            - generic [ref=f3e532]:
+                              - checkbox "Uncategorized" [checked] [ref=f3e533] [cursor=pointer]
+                              - text: Uncategorized
+                          - listitem [ref=f3e534]:
+                            - generic [ref=f3e535]:
+                              - checkbox "Burger" [ref=f3e536] [cursor=pointer]
+                              - text: Burger
+                            - list [ref=f3e537]:
+                              - listitem [ref=f3e538]:
+                                - generic [ref=f3e539]:
+                                  - checkbox "Non Veg" [ref=f3e540] [cursor=pointer]
+                                  - text: Non Veg
+                              - listitem [ref=f3e541]:
+                                - generic [ref=f3e542]:
+                                  - checkbox "Veg" [ref=f3e543] [cursor=pointer]
+                                  - text: Veg
+                          - listitem [ref=f3e544]:
+                            - generic [ref=f3e545]:
+                              - checkbox "Cakes" [ref=f3e546] [cursor=pointer]
+                              - text: Cakes
+                            - list [ref=f3e547]:
+                              - listitem [ref=f3e548]:
+                                - generic [ref=f3e549]:
+                                  - checkbox "Cheesecakes" [ref=f3e550] [cursor=pointer]
+                                  - text: Cheesecakes
+                              - listitem [ref=f3e551]:
+                                - generic [ref=f3e552]:
+                                  - checkbox "Chocoholics" [ref=f3e553] [cursor=pointer]
+                                  - text: Chocoholics
+                              - listitem [ref=f3e554]:
+                                - generic [ref=f3e555]:
+                                  - checkbox "Fresh Cream Cakes" [ref=f3e556] [cursor=pointer]
+                                  - text: Fresh Cream Cakes
+                              - listitem [ref=f3e557]:
+                                - generic [ref=f3e558]:
+                                  - checkbox "Fruit Flavoured Cakes" [ref=f3e559] [cursor=pointer]
+                                  - text: Fruit Flavoured Cakes
+                              - listitem [ref=f3e560]:
+                                - generic [ref=f3e561]:
+                                  - checkbox "Mother's Day Specials" [ref=f3e562] [cursor=pointer]
+                                  - text: Mother's Day Specials
+                              - listitem [ref=f3e563]:
+                                - generic [ref=f3e564]:
+                                  - checkbox "Plain Cakes" [ref=f3e565] [cursor=pointer]
+                                  - text: Plain Cakes
+                          - listitem [ref=f3e566]:
+                            - generic [ref=f3e567]:
+                              - checkbox "Chocolate Bouquet" [ref=f3e568] [cursor=pointer]
+                              - text: Chocolate Bouquet
+                          - listitem [ref=f3e569]:
+                            - generic [ref=f3e570]:
+                              - checkbox "Christmas Specials" [ref=f3e571] [cursor=pointer]
+                              - text: Christmas Specials
+                          - listitem [ref=f3e572]:
+                            - generic [ref=f3e573]:
+                              - checkbox "Flowers" [ref=f3e574] [cursor=pointer]
+                              - text: Flowers
+                          - listitem [ref=f3e575]:
+                            - generic [ref=f3e576]:
+                              - checkbox "Food Menu" [ref=f3e577] [cursor=pointer]
+                              - text: Food Menu
+                            - list [ref=f3e578]:
+                              - listitem [ref=f3e579]:
+                                - generic [ref=f3e580]:
+                                  - checkbox "Appetizer" [ref=f3e581] [cursor=pointer]
+                                  - text: Appetizer
+                              - listitem [ref=f3e582]:
+                                - generic [ref=f3e583]:
+                                  - checkbox "Arabic" [ref=f3e584] [cursor=pointer]
+                                  - text: Arabic
+                              - listitem [ref=f3e585]:
+                                - generic [ref=f3e586]:
+                                  - checkbox "Burgers" [ref=f3e587] [cursor=pointer]
+                                  - text: Burgers
+                              - listitem [ref=f3e588]:
+                                - generic [ref=f3e589]:
+                                  - checkbox "Chinese" [ref=f3e590] [cursor=pointer]
+                                  - text: Chinese
+                              - listitem [ref=f3e591]:
+                                - generic [ref=f3e592]:
+                                  - checkbox "Grills" [ref=f3e593] [cursor=pointer]
+                                  - text: Grills
+                              - listitem [ref=f3e594]:
+                                - generic [ref=f3e595]:
+                                  - checkbox "Indian" [ref=f3e596] [cursor=pointer]
+                                  - text: Indian
+                              - listitem [ref=f3e597]:
+                                - generic [ref=f3e598]:
+                                  - checkbox "Indian Breads" [ref=f3e599] [cursor=pointer]
+                                  - text: Indian Breads
+                              - listitem [ref=f3e600]:
+                                - generic [ref=f3e601]:
+                                  - checkbox "Kothu Parotta" [ref=f3e602] [cursor=pointer]
+                                  - text: Kothu Parotta
+                              - listitem [ref=f3e603]:
+                                - generic [ref=f3e604]:
+                                  - checkbox "Pastas" [ref=f3e605] [cursor=pointer]
+                                  - text: Pastas
+                              - listitem [ref=f3e606]:
+                                - generic [ref=f3e607]:
+                                  - checkbox "Pizza" [ref=f3e608] [cursor=pointer]
+                                  - text: Pizza
+                                - list [ref=f3e609]:
+                                  - listitem [ref=f3e610]:
+                                    - generic [ref=f3e611]:
+                                      - checkbox "Non Veg Pizza" [ref=f3e612] [cursor=pointer]
+                                      - text: Non Veg Pizza
+                                  - listitem [ref=f3e613]:
+                                    - generic [ref=f3e614]:
+                                      - checkbox "Veg Pizza" [ref=f3e615] [cursor=pointer]
+                                      - text: Veg Pizza
+                              - listitem [ref=f3e616]:
+                                - generic [ref=f3e617]:
+                                  - checkbox "Salads" [ref=f3e618] [cursor=pointer]
+                                  - text: Salads
+                              - listitem [ref=f3e619]:
+                                - generic [ref=f3e620]:
+                                  - checkbox "Sandwiches" [ref=f3e621] [cursor=pointer]
+                                  - text: Sandwiches
+                                - list [ref=f3e622]:
+                                  - listitem [ref=f3e623]:
+                                    - generic [ref=f3e624]:
+                                      - checkbox "Non Veg Sandwiches" [ref=f3e625] [cursor=pointer]
+                                      - text: Non Veg Sandwiches
+                                  - listitem [ref=f3e626]:
+                                    - generic [ref=f3e627]:
+                                      - checkbox "Veg Sandwich" [ref=f3e628] [cursor=pointer]
+                                      - text: Veg Sandwich
+                              - listitem [ref=f3e629]:
+                                - generic [ref=f3e630]:
+                                  - checkbox "Soups" [ref=f3e631] [cursor=pointer]
+                                  - text: Soups
+                          - listitem [ref=f3e632]:
+                            - generic [ref=f3e633]:
+                              - checkbox "Packed Goodies" [ref=f3e634] [cursor=pointer]
+                              - text: Packed Goodies
+                            - list [ref=f3e635]:
+                              - listitem [ref=f3e636]:
+                                - generic [ref=f3e637]:
+                                  - checkbox "Chocolates & Nuts" [ref=f3e638] [cursor=pointer]
+                                  - text: Chocolates & Nuts
+                              - listitem [ref=f3e639]:
+                                - generic [ref=f3e640]:
+                                  - checkbox "Cookies" [ref=f3e641] [cursor=pointer]
+                                  - text: Cookies
+                              - listitem [ref=f3e642]:
+                                - generic [ref=f3e643]:
+                                  - checkbox "Halwas" [ref=f3e644] [cursor=pointer]
+                                  - text: Halwas
+                              - listitem [ref=f3e645]:
+                                - generic [ref=f3e646]:
+                                  - checkbox "Indian Sweets" [ref=f3e647] [cursor=pointer]
+                                  - text: Indian Sweets
+                              - listitem [ref=f3e648]:
+                                - generic [ref=f3e649]:
+                                  - checkbox "Muffins" [ref=f3e650] [cursor=pointer]
+                                  - text: Muffins
+                              - listitem [ref=f3e651]:
+                                - generic [ref=f3e652]:
+                                  - checkbox "Savouries" [ref=f3e653] [cursor=pointer]
+                                  - text: Savouries
+                          - listitem [ref=f3e654]:
+                            - generic [ref=f3e655]:
+                              - checkbox "Personalized Gifts" [ref=f3e656] [cursor=pointer]
+                              - text: Personalized Gifts
+                            - list [ref=f3e657]:
+                              - listitem [ref=f3e658]:
+                                - generic [ref=f3e659]:
+                                  - checkbox "Cake Photoprint" [ref=f3e660] [cursor=pointer]
+                                  - text: Cake Photoprint
+                          - listitem [ref=f3e661]:
+                            - generic [ref=f3e662]:
+                              - checkbox "Rose Bunch" [ref=f3e663] [cursor=pointer]
+                              - text: Rose Bunch
+                          - listitem [ref=f3e664]:
+                            - generic [ref=f3e665]:
+                              - checkbox "Salads" [ref=f3e666] [cursor=pointer]
+                              - text: Salads
+                            - list [ref=f3e667]:
+                              - listitem [ref=f3e668]:
+                                - generic [ref=f3e669]:
+                                  - checkbox "Non Veg" [ref=f3e670] [cursor=pointer]
+                                  - text: Non Veg
+                              - listitem [ref=f3e671]:
+                                - generic [ref=f3e672]:
+                                  - checkbox "Veg" [ref=f3e673] [cursor=pointer]
+                                  - text: Veg
+                          - listitem [ref=f3e674]:
+                            - generic [ref=f3e675]:
+                              - checkbox "Starters" [ref=f3e676] [cursor=pointer]
+                              - text: Starters
+                            - list [ref=f3e677]:
+                              - listitem [ref=f3e678]:
+                                - generic [ref=f3e679]:
+                                  - checkbox "Non Veg" [ref=f3e680] [cursor=pointer]
+                                  - text: Non Veg
+                              - listitem [ref=f3e681]:
+                                - generic [ref=f3e682]:
+                                  - checkbox "Veg" [ref=f3e683] [cursor=pointer]
+                                  - text: Veg
+                          - listitem [ref=f3e684]:
+                            - generic [ref=f3e685]:
+                              - checkbox "Valentine's Day Special" [ref=f3e686] [cursor=pointer]
+                              - text: Valentine's Day Special
+                      - link "+ Add new category" [ref=f3e688] [cursor=pointer]:
+                        - /url: "#product_cat-add"
+                  - region "Product tags" [ref=f3e689]:
+                    - generic [ref=f3e690]:
+                      - heading "Product tags" [level=2] [ref=f3e691]
+                      - generic [ref=f3e692]:
+                        - button "Move up" [ref=f3e694] [cursor=pointer]
+                        - button "Move down" [ref=f3e698] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e702] [cursor=pointer]
+                    - generic [ref=f3e705]:
+                      - generic [ref=f3e706]:
+                        - generic [ref=f3e707]:
+                          - generic [ref=f3e708]:
+                            - generic [ref=f3e709]: Add new tag
+                            - combobox "Add new tag" [ref=f3e710]
+                            - button "Add" [ref=f3e711] [cursor=pointer]
+                          - paragraph [ref=f3e712]: Separate tags with commas
+                        - list
+                      - paragraph [ref=f3e713]:
+                        - button "Choose from the most used tags" [ref=f3e714] [cursor=pointer]
+                  - region "Brands" [ref=f3e715]:
+                    - generic [ref=f3e716]:
+                      - heading "Brands" [level=2] [ref=f3e717]
+                      - generic [ref=f3e718]:
+                        - button "Move up" [ref=f3e720] [cursor=pointer]
+                        - button "Move down" [ref=f3e724] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e728] [cursor=pointer]
+                    - generic [ref=f3e732]:
+                      - tablist [ref=f3e733]:
+                        - listitem [ref=f3e734]:
+                          - tab "All Brands" [selected] [ref=f3e735] [cursor=pointer]
+                        - listitem [ref=f3e736]:
+                          - tab "Most Used" [ref=f3e737] [cursor=pointer]
+                      - tabpanel [ref=f3e738]:
+                        - list
+                      - link "+ Add New Brand" [ref=f3e740] [cursor=pointer]:
+                        - /url: "#product_brand-add"
+                - generic [ref=f3e742]:
+                  - region "Product data" [ref=f3e743]:
+                    - generic [ref=f3e744]:
+                      - heading "Product data" [level=2] [ref=f3e745]
+                      - generic [ref=f3e746]:
+                        - button "Move up" [ref=f3e748] [cursor=pointer]
+                        - button "Move down" [ref=f3e752] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e756] [cursor=pointer]
+                    - generic [ref=f3e760]:
+                      - list [ref=f3e761]:
+                        - listitem [ref=f3e762]:
+                          - link "General" [ref=f3e763] [cursor=pointer]:
+                            - /url: "#general_product_data"
+                        - listitem [ref=f3e764]:
+                          - link "Inventory" [ref=f3e765] [cursor=pointer]:
+                            - /url: "#inventory_product_data"
+                        - listitem [ref=f3e766]:
+                          - link "Shipping" [ref=f3e767] [cursor=pointer]:
+                            - /url: "#shipping_product_data"
+                        - listitem [ref=f3e768]:
+                          - link "Linked Products" [ref=f3e769] [cursor=pointer]:
+                            - /url: "#linked_product_data"
+                        - listitem [ref=f3e770]:
+                          - link "Attributes" [ref=f3e771] [cursor=pointer]:
+                            - /url: "#product_attributes"
+                        - listitem [ref=f3e772]:
+                          - link "Variations" [ref=f3e773] [cursor=pointer]:
+                            - /url: "#variable_product_options"
+                        - listitem [ref=f3e774]:
+                          - link "Advanced" [ref=f3e775] [cursor=pointer]:
+                            - /url: "#advanced_product_data"
+                        - listitem [ref=f3e776]:
+                          - link "Get more options" [ref=f3e777] [cursor=pointer]:
+                            - /url: "#marketplace_suggestions"
+                      - generic [ref=f3e778]:
+                        - generic [ref=f3e779]:
+                          - paragraph [ref=f3e780]:
+                            - text: Product URL
+                            - textbox "Product URL" [ref=f3e781]:
+                              - /placeholder: https://
+                            - text: Enter the external URL to the product.
+                          - paragraph [ref=f3e782]:
+                            - text: Button text
+                            - textbox "Button text" [ref=f3e783]:
+                              - /placeholder: Buy product
+                            - text: This text will be shown on the button linking to the external product.
+                        - generic [ref=f3e784]:
+                          - paragraph [ref=f3e785]:
+                            - text: Tax status
+                            - generic "Define whether or not the entire product is taxable, or just the cost of shipping it."
+                            - combobox "Tax status" [ref=f3e786] [cursor=pointer]:
+                              - option "Taxable" [selected]
+                              - option "Shipping only"
+                              - option "None"
+                          - paragraph [ref=f3e787]:
+                            - text: Tax class
+                            - generic "Choose a tax class for this product. Tax classes are used to apply different tax rates specific to certain types of product."
+                            - combobox "Tax class" [ref=f3e788] [cursor=pointer]:
+                              - option "Standard" [selected]
+                              - option "GST 12%"
+                              - option "GST 18%"
+                              - option "GST 5%"
+                  - region "Product short description" [ref=f3e789]:
+                    - generic [ref=f3e790]:
+                      - heading "Product short description" [level=2] [ref=f3e791]
+                      - generic [ref=f3e792]:
+                        - button "Move up" [ref=f3e794] [cursor=pointer]
+                        - button "Move down" [ref=f3e798] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e802] [cursor=pointer]
+                    - generic [ref=f3e806]:
+                      - generic [ref=f3e807]:
+                        - button "Add Media" [ref=f3e809] [cursor=pointer]
+                        - generic [ref=f3e811]:
+                          - button "Visual" [ref=f3e812] [cursor=pointer]
+                          - button "Code" [pressed] [ref=f3e813] [cursor=pointer]
+                      - generic [ref=f3e814]:
+                        - generic [ref=f3e815]:
+                          - button "Bold" [ref=f3e816] [cursor=pointer]: b
+                          - button "Italic" [ref=f3e817] [cursor=pointer]: i
+                          - button "Insert link" [ref=f3e818] [cursor=pointer]: link
+                          - button "raw" [ref=f3e819] [cursor=pointer]
+                          - button "one half" [ref=f3e820] [cursor=pointer]
+                          - button "one half last" [ref=f3e821] [cursor=pointer]
+                          - button "one third" [ref=f3e822] [cursor=pointer]
+                          - button "one third last" [ref=f3e823] [cursor=pointer]
+                          - button "one fourth" [ref=f3e824] [cursor=pointer]
+                          - button "one fourth last" [ref=f3e825] [cursor=pointer]
+                          - button "two third" [ref=f3e826] [cursor=pointer]
+                          - button "two third last" [ref=f3e827] [cursor=pointer]
+                          - button "three fourth" [ref=f3e828] [cursor=pointer]
+                          - button "three fourth last" [ref=f3e829] [cursor=pointer]
+                          - button "three fourth last" [ref=f3e830] [cursor=pointer]
+                          - button "box" [ref=f3e831] [cursor=pointer]
+                          - button "tooltip" [ref=f3e832] [cursor=pointer]
+                          - button "learn_more" [ref=f3e833] [cursor=pointer]
+                          - button "slider" [ref=f3e834] [cursor=pointer]
+                          - button "slide" [ref=f3e835] [cursor=pointer]
+                          - button "button" [ref=f3e836] [cursor=pointer]
+                          - button "digg" [ref=f3e837] [cursor=pointer]
+                          - button "stumble" [ref=f3e838] [cursor=pointer]
+                          - button "facebook" [ref=f3e839] [cursor=pointer]
+                          - button "x" [ref=f3e840] [cursor=pointer]
+                          - button "retweet" [ref=f3e841] [cursor=pointer]
+                          - button "feedburner" [ref=f3e842] [cursor=pointer]
+                          - button "protected" [ref=f3e843] [cursor=pointer]
+                        - textbox [ref=f3e844]
+                  - region "Reviews" [ref=f3e845]:
+                    - generic [ref=f3e846]:
+                      - heading "Reviews" [level=2] [ref=f3e847]
+                      - generic [ref=f3e848]:
+                        - button "Move up" [ref=f3e850] [cursor=pointer]
+                        - button "Move down" [ref=f3e854] [cursor=pointer]
+                        - button "Show or hide panel" [expanded] [ref=f3e858] [cursor=pointer]
+                    - generic [ref=f3e861]:
+                      - paragraph [ref=f3e862]:
+                        - button "Add Comment" [ref=f3e863] [cursor=pointer]
+                      - paragraph [ref=f3e864]: No comments yet.
+    - contentinfo [ref=f3e866]:
+      - paragraph [ref=f3e867]:
+        - generic [ref=f3e868]:
+          - text: If you like
+          - strong [ref=f3e869]: WooCommerce
+          - text: please leave us a
+          - link "five star" [ref=f3e870] [cursor=pointer]:
+            - /url: https://wordpress.org/support/plugin/woocommerce/reviews?rate=5#new-post
+            - text: ★★★★★
+          - text: rating. A huge thanks in advance!
+      - paragraph [ref=f3e871]: Version 10.3.7
+    - generic [ref=f3e872]: M
+  - status [ref=f3e875]

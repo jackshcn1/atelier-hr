@@ -1,0 +1,202 @@
+- generic [active] [ref=f28e1]:
+  - generic [ref=f28e3]:
+    - banner [ref=f28e4]:
+      - generic [ref=f28e5]: Place an order for desserts for local pick-up
+      - generic [ref=f28e6]:
+        - generic [ref=f28e7]:
+          - navigation [ref=f28e8]:
+            - list [ref=f28e9]:
+              - listitem [ref=f28e10]:
+                - link "Home" [ref=f28e11] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/
+              - listitem [ref=f28e12]:
+                - link "About Us" [ref=f28e13] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/about-us/
+              - listitem [ref=f28e14]:
+                - link "Products" [ref=f28e15] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/shop/
+              - listitem [ref=f28e16]:
+                - link "Contact Us" [ref=f28e17] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/contact-us/
+          - text: a
+        - link [ref=f28e19] [cursor=pointer]:
+          - /url: https://staging.theambrosia.com/
+          - img "Ambrosia - Staging" [ref=f28e20]
+        - generic [ref=f28e21]:
+          - link [ref=f28e22] [cursor=pointer]:
+            - /url: https://www.facebook.com/theambrosiabakehouse
+            - img "facebook" [ref=f28e23]
+          - link [ref=f28e24] [cursor=pointer]:
+            - /url: https://www.instagram.com/theambrosiabakehouse/?hl=en
+            - img "instagram" [ref=f28e25]
+          - link [ref=f28e26] [cursor=pointer]:
+            - /url: https://in.linkedin.com/company/the-ambrosia
+            - img "linkedin" [ref=f28e27]
+          - link [ref=f28e28] [cursor=pointer]:
+            - /url: mailto:info@theambrosia.com
+            - img "mail" [ref=f28e29]
+          - link [ref=f28e31] [cursor=pointer]:
+            - /url: "#"
+            - img "search" [ref=f28e32]
+          - link [ref=f28e33] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/cart
+            - img "cart" [ref=f28e34]
+      - generic [ref=f28e36]:
+        - search [ref=f28e37]:
+          - searchbox "Search for:" [ref=f28e38]
+        - generic [ref=f28e39] [cursor=pointer]: M
+    - generic [ref=f28e40]:
+      - generic [ref=f28e43]:
+        - generic [ref=f28e44]:
+          - navigation "Breadcrumb" [ref=f28e49]:
+            - link "Home" [ref=f28e50] [cursor=pointer]:
+              - /url: https://staging.theambrosia.com
+            - text: /
+            - link "Uncategorized" [ref=f28e51] [cursor=pointer]:
+              - /url: https://staging.theambrosia.com/product-category/uncategorized/
+            - text: / Black Forest Cake
+          - generic [ref=f28e52]:
+            - generic [ref=f28e56]:
+              - button "View full-screen image gallery" [ref=f28e57] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f28e58]: 🔍
+              - img "Awaiting product image" [ref=f28e61]
+            - generic [ref=f28e62]:
+              - heading "Black Forest Cake" [level=3] [ref=f28e65]
+              - paragraph [ref=f28e68]:
+                - generic [ref=f28e70]: ₹480.00
+                - text: –
+                - generic [ref=f28e72]: ₹2,400.00
+                - generic [ref=f28e73]: "Price range: ₹480.00 through ₹2,400.00"
+              - generic [ref=f28e76]:
+                - text: Weight
+                - combobox "Weight" [ref=f28e78]:
+                  - option "Choose an option" [selected]
+                  - option "1kg"
+                  - option "1.5kg"
+                  - option "2kg"
+                  - option "3kg"
+                  - option "4kg"
+                  - option "5kg"
+                - alert [ref=f28e79]
+                - generic [ref=f28e80]:
+                  - alert
+                  - generic [ref=f28e81]:
+                    - generic [ref=f28e82]:
+                      - generic [ref=f28e83]: Black Forest Cake quantity
+                      - spinbutton "Product quantity" [ref=f28e84]: "1"
+                    - button "Add to cart 5" [ref=f28e85] [cursor=pointer]
+          - generic [ref=f28e88]:
+            - list [ref=f28e89]:
+              - listitem [ref=f28e90] [cursor=pointer]:
+                - link "Additional information" [ref=f28e91]:
+                  - /url: "#tab-additional_information"
+              - listitem [ref=f28e92] [cursor=pointer]:
+                - link "Reviews (0)" [ref=f28e93]:
+                  - /url: "#tab-reviews"
+            - generic [ref=f28e96]:
+              - heading "Additional information" [level=2] [ref=f28e97]
+              - table "Product Details" [ref=f28e98]:
+                - rowgroup [ref=f28e99]:
+                  - row [ref=f28e100]:
+                    - rowheader "Weight" [ref=f28e101]
+                    - cell [ref=f28e102]:
+                      - paragraph [ref=f28e103]: 1kg, 1.5kg, 2kg, 3kg, 4kg, 5kg
+        - generic [ref=f28e109]:
+          - heading "Related products" [level=2] [ref=f28e110]
+          - list [ref=f28e111]:
+            - listitem [ref=f28e112]:
+              - 'link "Placeholder  White Forest Price range: ₹480.00 through ₹2,400.00" [ref=f28e113] [cursor=pointer]':
+                - /url: https://staging.theambrosia.com/product/white-forest/
+                - generic [ref=f28e114]:
+                  - img "Placeholder" [ref=f28e115]
+                  - generic: 
+                - heading "White Forest" [level=2] [ref=f28e116]
+                - generic [ref=f28e117]:
+                  - generic [ref=f28e119]: ₹480.00
+                  - text: –
+                  - generic [ref=f28e121]: ₹2,400.00
+                  - generic [ref=f28e122]: "Price range: ₹480.00 through ₹2,400.00"
+            - listitem [ref=f28e123]:
+              - 'link "Placeholder  Chocolate Truffle Cake Price range: ₹1,050.00 through ₹5,250.00" [ref=f28e124] [cursor=pointer]':
+                - /url: https://staging.theambrosia.com/product/chocolate-truffle-cake/
+                - generic [ref=f28e125]:
+                  - img "Placeholder" [ref=f28e126]
+                  - generic: 
+                - heading "Chocolate Truffle Cake" [level=2] [ref=f28e127]
+                - generic [ref=f28e128]:
+                  - generic [ref=f28e130]: ₹1,050.00
+                  - text: –
+                  - generic [ref=f28e132]: ₹5,250.00
+                  - generic [ref=f28e133]: "Price range: ₹1,050.00 through ₹5,250.00"
+            - listitem [ref=f28e134]:
+              - 'link "Placeholder  Fresh Cream Chocolate Price range: ₹770.00 through ₹3,850.00" [ref=f28e135] [cursor=pointer]':
+                - /url: https://staging.theambrosia.com/product/fresh-cream-chocolate/
+                - generic [ref=f28e136]:
+                  - img "Placeholder" [ref=f28e137]
+                  - generic: 
+                - heading "Fresh Cream Chocolate" [level=2] [ref=f28e138]
+                - generic [ref=f28e139]:
+                  - generic [ref=f28e141]: ₹770.00
+                  - text: –
+                  - generic [ref=f28e143]: ₹3,850.00
+                  - generic [ref=f28e144]: "Price range: ₹770.00 through ₹3,850.00"
+      - contentinfo [ref=f28e145]:
+        - generic [ref=f28e147]:
+          - generic [ref=f28e148]:
+            - generic [ref=f28e149]:
+              - img "AmbrosiaLogo 2" [ref=f28e152]
+              - paragraph [ref=f28e155]: Ambrosia, with over 24 years of baking heritage, offers fresh, healthy food made in-house at our central kitchen. With 3 outlets and 2 pickup counters, we ensure quality food without additives, serving customers with care.
+              - generic [ref=f28e160]:
+                - heading "Email" [level=4] [ref=f28e161]
+                - generic [ref=f28e162]: support@theambrosia.com
+              - generic [ref=f28e167]:
+                - heading "Call Us" [level=4] [ref=f28e168]
+                - generic [ref=f28e169]: 305 8520 103
+            - generic [ref=f28e170]: "[contact-form-7 id=\"f12c350\" title=\"footer form\"]"
+          - list [ref=f28e177]:
+            - listitem [ref=f28e178]:
+              - link "Quality Policy" [ref=f28e179] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f28e180]:
+              - link "Refund Policy" [ref=f28e181] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f28e182]:
+              - link "Privacy Policy" [ref=f28e183] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f28e184]:
+              - link "Terms & Conditions" [ref=f28e185] [cursor=pointer]:
+                - /url: ""
+          - paragraph [ref=f28e191]:
+            - text: © 2024 Copyright theambrosia .Powered by
+            - link "Bytelabz" [ref=f28e192] [cursor=pointer]:
+              - /url: https://bytelabz.com/
+  - generic [ref=f28e193]:
+    - navigation "Toolbar":
+      - menu:
+        - group [ref=f28e194]:
+          - menuitem "About WordPress" [ref=f28e195] [cursor=pointer]
+        - group [ref=f28e198]:
+          - menuitem "Ambrosia - Staging" [ref=f28e199] [cursor=pointer]
+        - group [ref=f28e200]:
+          - menuitem "Live" [ref=f28e201] [cursor=pointer]
+        - group [ref=f28e202]:
+          - menuitem "18 updates available" [ref=f28e203] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f28e205]: "18"
+        - group [ref=f28e207]:
+          - menuitem "84 Comments in moderation" [ref=f28e208] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f28e210]: "84"
+        - group [ref=f28e212]:
+          - menuitem "New" [ref=f28e213] [cursor=pointer]
+        - group [ref=f28e216]:
+          - menuitem "Edit product" [ref=f28e217] [cursor=pointer]
+        - group [ref=f28e218]:
+          - menuitem " Enable Visual Builder" [ref=f28e219] [cursor=pointer]
+      - menu [ref=f28e220]:
+        - group [ref=f28e221]:
+          - menuitem "Howdy, amborsia-admin" [ref=f28e222] [cursor=pointer]
+        - group [ref=f28e223]:
+          - menuitem "Search" [ref=f28e224]:
+            - generic [ref=f28e225]:
+              - textbox "Search" [ref=f28e226] [cursor=pointer]
+              - generic [ref=f28e227]: Search
+  - status [ref=f28e228]
