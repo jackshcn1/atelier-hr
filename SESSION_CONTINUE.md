@@ -1,0 +1,1 @@
+Session context saved — marketing module (Phase 1 complete, Phase 2 pending Meta creds), assets master view + multi-serial + detail page + audit log structure deployed to https://atelier-hr-inky.vercel.app, DB migration 004 applied partially (policy conflict on odt_read). Next: Phase 2 Instagram API when marketing team provides credentials.
