@@ -87,6 +87,9 @@ export default function MaintenanceJobDetailPage() {
                 <div key={i} className="text-sm bg-[#f6f4f2] p-3 rounded mb-2">
                   <div className="font-medium">{q.vendor_name} — {q.quote_type}</div>
                   <div className="text-[#6b635c]">Cost: {q.cost} | Delivery: {q.estimated_delivery} | Status: {q.status}</div>
+                  {q.is_approved && (
+                    <div className="text-xs text-green-600 mt-1">✓ Approved by Super Admin</div>
+                  )}
                 </div>
               ))
             ) : (

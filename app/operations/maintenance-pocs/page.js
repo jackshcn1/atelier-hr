@@ -64,7 +64,8 @@ export default function MaintenancePOCsPage() {
     reference: '',
     notes: '',
     rating: 5,
-    attachments: ''
+    attachments: '',
+    newSpeciality: ''
   });
 
   useEffect(() => {
@@ -144,6 +145,13 @@ export default function MaintenancePOCsPage() {
                   <select className="field text-sm w-full bg-white" value={form.speciality} onChange={e => setForm({...form, speciality: e.target.value})}>
                     {SPECIALITY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  <input
+                    type="text"
+                    placeholder="Add new speciality (e.g., HVAC Tech)"
+                    className="field text-sm w-full mt-2 bg-[#f9fafb] text-[#9ca3af] italic"
+                    value={form.newSpeciality}
+                    onChange={e => setForm({...form, newSpeciality: e.target.value})}
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -168,6 +176,16 @@ export default function MaintenancePOCsPage() {
                     <option value={2}>2 Stars - Below Average</option>
                     <option value={1}>1 Star - Poor</option>
                   </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[#6b635c] mb-1 block">New Speciality (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Enter new speciality, e.g., HVAC Tech"
+                    className="field text-sm w-full bg-[#f9fafb] text-[#9ca3af] italic"
+                    value={form.newSpeciality}
+                    onChange={e => setForm({...form, newSpeciality: e.target.value})}
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-[#6b635c] mb-1 block">Notes & Comments</label>
