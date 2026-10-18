@@ -1,0 +1,40 @@
+- generic [active] [ref=f8e1]:
+  - navigation [ref=f8e2]:
+    - link "Atelier" [ref=f8e4] [cursor=pointer]:
+      - /url: /
+  - main [ref=f8e5]:
+    - main [ref=f8e6]:
+      - generic [ref=f8e7]:
+        - generic [ref=f8e8]:
+          - link "← Home" [ref=f8e9] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f8e10]: Operations / Assets
+        - generic [ref=f8e11]:
+          - heading "Assets" [level=1] [ref=f8e12]
+          - paragraph [ref=f8e13]: Complete restaurant asset inventory — master entry form, category groups, expand for details
+        - generic [ref=f8e14]:
+          - button "+ Add Asset" [ref=f8e15] [cursor=pointer]
+          - button "Expand All" [ref=f8e16] [cursor=pointer]
+        - generic [ref=f8e17]:
+          - 'button "Chiller Category: Kitchen Equipment · Units: 3 Kitchen Expand" [ref=f8e19] [cursor=pointer]':
+            - generic [ref=f8e20]:
+              - heading "Chiller" [level=3] [ref=f8e21]
+              - paragraph [ref=f8e22]:
+                - text: "Category: Kitchen Equipment · Units: 3"
+                - generic [ref=f8e23]: Kitchen
+            - generic [ref=f8e25]: Expand
+          - 'button "Chair Category: Furniture · Units: 60 Restaurant Expand" [ref=f8e27] [cursor=pointer]':
+            - generic [ref=f8e28]:
+              - heading "Chair" [level=3] [ref=f8e29]
+              - paragraph [ref=f8e30]:
+                - text: "Category: Furniture · Units: 60"
+                - generic [ref=f8e31]: Restaurant
+            - generic [ref=f8e33]: Expand
+          - 'button "Staff Uniform Category: Uniform · Units: 20 Employee Expand" [ref=f8e35] [cursor=pointer]':
+            - generic [ref=f8e36]:
+              - heading "Staff Uniform" [level=3] [ref=f8e37]
+              - paragraph [ref=f8e38]:
+                - text: "Category: Uniform · Units: 20"
+                - generic [ref=f8e39]: Employee
+            - generic [ref=f8e41]: Expand
+  - alert [ref=f8e42]

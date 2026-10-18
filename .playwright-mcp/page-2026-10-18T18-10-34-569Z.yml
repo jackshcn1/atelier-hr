@@ -1,0 +1,28 @@
+- generic [active] [ref=f7e1]:
+  - navigation [ref=f7e2]:
+    - link "Atelier" [ref=f7e4] [cursor=pointer]:
+      - /url: /
+  - main [ref=f7e5]:
+    - main [ref=f7e6]:
+      - generic [ref=f7e7]:
+        - generic [ref=f7e8]:
+          - link "← Home" [ref=f7e9] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f7e10]: Operations / Maintenance
+        - generic [ref=f7e11]:
+          - heading "Maintenance & Work Orders" [level=1] [ref=f7e13]
+          - link "View POC Directory →" [ref=f7e14] [cursor=pointer]:
+            - /url: /operations/maintenance-pocs
+        - combobox [ref=f7e16]:
+          - option "All Statuses" [selected]
+          - option "Pending approval"
+          - option "Completed"
+        - table [ref=f7e17]:
+          - rowgroup [ref=f7e18]:
+            - row [ref=f7e19]:
+              - columnheader "Job ID" [ref=f7e20]
+              - columnheader "Asset" [ref=f7e21]
+              - columnheader "Completion Type" [ref=f7e22]
+              - columnheader "Status" [ref=f7e23]
+          - rowgroup
+  - alert [ref=f7e24]

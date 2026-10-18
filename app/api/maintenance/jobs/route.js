@@ -14,8 +14,9 @@ export async function GET(request) {
 export async function POST(req) {
   const { id, asset_serial, service_type, priority, status, issues, comments, requested_by } = await req.json();
   const supabase = createClient();
+  const jobId = id || 'MNT-' + Date.now();
   const { data, error } = await supabase.from('maintenance_jobs').insert({
-    id, asset_serial, service_type, priority: priority || 'normal', status: status || 'pending_approval', issues, comments, requested_by, requested_at: new Date().toISOString()
+    id: jobId, asset_serial, service_type, priority: priority || 'normal', status: status || 'pending_approval', issues, comments, requested_by, requested_at: new Date().toISOString()
   }).select().single();
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ job: data }, { status: 201 });

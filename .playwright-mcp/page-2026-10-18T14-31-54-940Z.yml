@@ -1,0 +1,64 @@
+- generic [active] [ref=f4e1]:
+  - navigation [ref=f4e2]:
+    - link "Atelier" [ref=f4e4] [cursor=pointer]:
+      - /url: /
+  - main [ref=f4e5]:
+    - main [ref=f4e6]:
+      - generic [ref=f4e7]:
+        - generic [ref=f4e8]:
+          - link "← Home" [ref=f4e9] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f4e10]: Operations / Maintenance
+        - generic [ref=f4e11]:
+          - generic [ref=f4e12]:
+            - heading "Maintenance & Work Orders" [level=1] [ref=f4e13]
+            - paragraph [ref=f4e14]: Track equipment upkeep, service requests, POC mapping, quotes, and approvals
+          - link "View POC Directory →" [ref=f4e15] [cursor=pointer]:
+            - /url: /operations/maintenance-pocs
+        - generic [ref=f4e16]:
+          - generic [ref=f4e17]:
+            - heading "⚠️ Approval Action Required" [level=3] [ref=f4e18]
+            - paragraph [ref=f4e19]: There are 1 maintenance request(s) waiting for super-admin approval.
+          - generic [ref=f4e21]:
+            - generic [ref=f4e22]: MNT-101
+            - link "Open Job →" [ref=f4e23] [cursor=pointer]:
+              - /url: /operations/maintenance/MNT-101
+            - button "Approve" [ref=f4e24] [cursor=pointer]
+        - generic [ref=f4e26]:
+          - heading "Active Maintenance Jobs" [level=3] [ref=f4e27]
+          - table [ref=f4e28]:
+            - rowgroup [ref=f4e29]:
+              - row [ref=f4e30]:
+                - columnheader "Job ID" [ref=f4e31]
+                - columnheader "Asset" [ref=f4e32]
+                - columnheader "Service Type" [ref=f4e33]
+                - columnheader "Priority" [ref=f4e34]
+                - columnheader "Status" [ref=f4e35]
+                - columnheader "Requested By" [ref=f4e36]
+                - columnheader "Action" [ref=f4e37]
+            - rowgroup [ref=f4e38]:
+              - row [ref=f4e39]:
+                - cell [ref=f4e40]:
+                  - link "MNT-101" [ref=f4e41] [cursor=pointer]:
+                    - /url: /operations/maintenance/MNT-101
+                - cell "Chiller FM-300U (KICH00001)" [ref=f4e42]
+                - cell "Faulty or defective repair" [ref=f4e43]
+                - cell "Urgent" [ref=f4e44]
+                - cell "Pending approval" [ref=f4e46]
+                - cell "John Doe (2026-10-17)" [ref=f4e48]
+                - cell [ref=f4e49]:
+                  - link "View Job →" [ref=f4e50] [cursor=pointer]:
+                    - /url: /operations/maintenance/MNT-101
+              - row [ref=f4e51]:
+                - cell [ref=f4e52]:
+                  - link "MNT-102" [ref=f4e53] [cursor=pointer]:
+                    - /url: /operations/maintenance/MNT-102
+                - cell "Printer HP LaserJet (AST-003)" [ref=f4e54]
+                - cell "Routine Service" [ref=f4e55]
+                - cell "Normal" [ref=f4e56]
+                - cell "Approved to proceed" [ref=f4e58]
+                - cell "Sarah Miller (2026-10-16)" [ref=f4e60]
+                - cell [ref=f4e61]:
+                  - link "View Job →" [ref=f4e62] [cursor=pointer]:
+                    - /url: /operations/maintenance/MNT-102
+  - alert [ref=f4e63]

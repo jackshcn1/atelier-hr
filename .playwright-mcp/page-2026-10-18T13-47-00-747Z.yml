@@ -1,0 +1,188 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]: Place an order for desserts for local pick-up
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - navigation [ref=e8]:
+            - list [ref=e9]:
+              - listitem [ref=e10]:
+                - link "Home" [ref=e11] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/
+              - listitem [ref=e12]:
+                - link "About Us" [ref=e13] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/about-us/
+              - listitem [ref=e14]:
+                - link "Products" [ref=e15] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/shop/
+              - listitem [ref=e16]:
+                - link "Contact Us" [ref=e17] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/contact-us/
+          - text: a
+        - link [ref=e19] [cursor=pointer]:
+          - /url: https://staging.theambrosia.com/
+          - img "Ambrosia - Staging" [ref=e20]
+        - generic [ref=e21]:
+          - link [ref=e22] [cursor=pointer]:
+            - /url: https://www.facebook.com/theambrosiabakehouse
+            - img "facebook" [ref=e23]
+          - link [ref=e24] [cursor=pointer]:
+            - /url: https://www.instagram.com/theambrosiabakehouse/?hl=en
+            - img "instagram" [ref=e25]
+          - link [ref=e26] [cursor=pointer]:
+            - /url: https://in.linkedin.com/company/the-ambrosia
+            - img "linkedin" [ref=e27]
+          - link [ref=e28] [cursor=pointer]:
+            - /url: mailto:info@theambrosia.com
+            - img "mail" [ref=e29]
+          - link [ref=e31] [cursor=pointer]:
+            - /url: "#"
+            - img "search" [ref=e32]
+          - link [ref=e33] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/cart
+            - img "cart" [ref=e34]
+      - generic [ref=e36]:
+        - search [ref=e37]:
+          - searchbox "Search for:" [ref=e38]
+        - generic [ref=e39] [cursor=pointer]: M
+    - generic [ref=e40]:
+      - article [ref=e42]:
+        - generic [ref=e45]:
+          - generic [ref=e47]:
+            - generic [ref=e54]:
+              - 'heading "Ambrosia: Fresh, Healthy Baking Excellence" [level=1] [ref=e55]'
+              - paragraph [ref=e56]: Ambrosia delivers fresh, healthy, and chemical-free baked goods, crafted with love in our central kitchen for over 24 years.
+              - generic [ref=e57]:
+                - link "Shop Now" [ref=e58] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/shop/
+                - link "Know More" [ref=e60] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/about-us/
+            - generic:
+              - link "4" [ref=e62] [cursor=pointer]:
+                - /url: "#"
+              - link "5" [ref=e63] [cursor=pointer]:
+                - /url: "#"
+            - generic [ref=e64]:
+              - link "1" [ref=e65] [cursor=pointer]:
+                - /url: "#"
+              - link "2" [ref=e66] [cursor=pointer]:
+                - /url: "#"
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - paragraph [ref=e72]: About Us
+              - 'heading "Ambrosia: A Tradition of Fresh, Healthy Baking" [level=2] [ref=e75]'
+              - generic [ref=e76]: Ambrosia has been delighting customers and foodies alike with a heritage of baking for over 24 years. Ambrosia has 3 outlets and 2 easy pickup counters. Our USP is that we focus on fresh and healthy food. Every jaw-dropping recipe is made in our very own central kitchen. We follow such a format to ensure our respected customers get quality food, without the addition of any chemicals or additives.
+              - link "Know More" [ref=e80] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/about-us/
+              - img "image (51)" [ref=e84]
+            - img "image (50)" [ref=e88]
+          - generic [ref=e91]:
+            - paragraph [ref=e94]: Choose by category
+            - heading "Bakery Treats Delivered Fresh" [level=2] [ref=e97]
+            - text: "[dnwoo_cat_carousel include_categories=”all” dnwoo_cat_carousel_image_height=”245px” show_product_count=”off” display_stack=”on” dnwoo_cat_carousel_autoplay_show_hide=”off” dnwoo_cat_carousel_breakpoint=”5″ dnwoo_cat_carousel_grab=”on” dnwoo_cat_carousel_pause_on_hover=”on” dnwoo_cat_carousel_keyboard_enable=”off” dnwoo_cat_carousel_mousewheel_enable=”off” dnwoo_cat_carousel_pagination_type=”none” dnwoo_cat_carousel_arrow_navigation=”on” dnwoo_cat_carousel_arrow_color=”#000000″ dnwoo_cat_carousel_arrow_background_color=”rgba(255,255,255,0.8)” dnwoo_cat_carousel_content_wrapper_margin=”||||false|false” dnwoo_cat_carousel_content_wrapper_padding=”||||false|false” dnwoo_cat_carousel_product_name_margin=”||||false|false” content_bg_color=”RGBA(255,255,255,0)” module_id=”delivered-category” _builder_version=”4.27.0″ _module_preset=”default” background_color=”RGBA(255,255,255,0)” custom_margin=”||||false|false” hover_enabled=”0″ global_colors_info=”{}” dnwoo_cat_carousel_image_height__hover_enabled=”off|desktop” dnwoo_cat_carousel_arrow_size=”24″ border_radii_arrow=”on|190px|190px|190px|190px” dnwoo_cat_carousel_arrow_padding=”30px|30px|30px|30px|true|true” sticky_enabled=”0″][/dnwoo_cat_carousel]"
+          - generic [ref=e98]:
+            - generic [ref=e100]:
+              - generic [ref=e101]: Delicious cakes for every occasion
+              - heading "Best Selling Products" [level=2] [ref=e105]
+            - generic [ref=e106]: "[dnwoo_grid next_woo_carousel_layouts=”eight” hide_out_of_stock=”off” products_number=”6″ orderby=”none” dnwoo_image_height=”328px” show_wish_list_icon=”off” show_add_compare_icon=”off” show_add_to_cart=”off” show_category=”off” show_rating=”off” show_product_topbar=”off” show_featured_product=”off” show_badge=”none” sale_badge_bg_color=”#557c83″ content_bg_color=”#FFFFFF” addcompareiconbg_bg_color=”#FFFFFF” dnwoo_grid_carousel_number_tablet=”2″ dnwoo_grid_carousel_number_phone=”1″ dnwoo_grid_carousel_number_last_edited=”on|phone” _builder_version=”4.27.0″ _module_preset=”default” header_font=”Noto Serif||||||||” header_font_size=”24px” sale_badge_font_size=”14px” compare_text_color=”#000000″ global_colors_info=”{}” viewcart_bg_color__hover_enabled=”on|desktop” viewcart_bg_color__hover=”#557c83″ viewcart_bg_enable_color__hover=”on” addcompareiconbg_bg_color__hover_enabled=”on|hover” compare_text_color__hover_enabled=”on|hover” compare_text_color__hover=”#FFFFFF” addcompareiconbg_bg_color__hover=”#557c83″ addcompareiconbg_bg_enable_color__hover=”on” quickview_bg_color__hover_enabled=”on|desktop” quickview_bg_color__hover=”#557c83″ quickview_bg_enable_color__hover=”on”][/dnwoo_grid]"
+          - generic [ref=e111]:
+            - generic [ref=e112]: About Us
+            - 'heading "Ambrosia: A Tradition of Fresh, Healthy Baking" [level=2] [ref=e116]'
+            - generic [ref=e117]: The fondant plum cake has never lost its appeal. Its rich, moist texture and perfect balance of plums and spices make it a timeless classic, always in style for festive occasions and special moments.
+          - generic [ref=e121]:
+            - generic [ref=e122]: Much Chocolate
+            - heading "What Exactly Constitutes Too Much Chocolate?" [level=2] [ref=e126]
+            - generic [ref=e127]: “Too much chocolate” is subjective, often referring to an overwhelming amount that dominates a dish. It can result in cloying, overly rich flavors, masking other tastes, and leaving little room for balance or variety.
+          - generic [ref=e131]:
+            - generic [ref=e137]:
+              - heading "Wide Variety" [level=4] [ref=e138]
+              - generic [ref=e139]: A diverse selection offering something for every taste and preference.
+            - generic [ref=e145]:
+              - heading "TVM, We are Everywhere" [level=4] [ref=e146]
+              - paragraph [ref=e148]: TVM, we are everywhere, reaching all corners of the city.
+            - generic [ref=e154]:
+              - heading "25 Years of Baking Culture" [level=4] [ref=e155]
+              - paragraph [ref=e157]: Celebrating 25 years of rich baking culture, tradition, and innovation.
+            - generic [ref=e163]:
+              - heading "Fast Delivery" [level=4] [ref=e164]
+              - paragraph [ref=e166]: Quick and efficient delivery, ensuring your order arrives promptly.
+          - generic [ref=e169]:
+            - generic [ref=e170]: Explore Our
+            - heading "View Our Gallery" [level=2] [ref=e174]
+            - generic [ref=e176]:
+              - link "" [ref=e179] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/11/image-54.jpg
+              - link "" [ref=e183] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/11/image-55.jpg
+              - link "" [ref=e187] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/11/image-56.jpg
+              - link "" [ref=e191] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/11/image-57.jpg
+              - link "" [ref=e195] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/12/Chocolate-Truffle.png
+              - link "" [ref=e199] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/12/Milky-Oreo-Blast.png
+              - link "" [ref=e203] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/12/Blackforest.png
+              - link "" [ref=e207] [cursor=pointer]:
+                - /url: https://staging.theambrosia.com/wp-content/uploads/2024/12/Nutty-Bubble-Cake.png
+      - contentinfo [ref=e209]:
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - generic [ref=e213]:
+              - img "AmbrosiaLogo 2" [ref=e216]
+              - paragraph [ref=e219]: Ambrosia, with over 24 years of baking heritage, offers fresh, healthy food made in-house at our central kitchen. With 3 outlets and 2 pickup counters, we ensure quality food without additives, serving customers with care.
+              - generic [ref=e224]:
+                - heading "Email" [level=4] [ref=e225]
+                - generic [ref=e226]: support@theambrosia.com
+              - generic [ref=e231]:
+                - heading "Call Us" [level=4] [ref=e232]
+                - generic [ref=e233]: 305 8520 103
+            - generic [ref=e234]: "[contact-form-7 id=\"f12c350\" title=\"footer form\"]"
+          - list [ref=e241]:
+            - listitem [ref=e242]:
+              - link "Quality Policy" [ref=e243] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=e244]:
+              - link "Refund Policy" [ref=e245] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=e246]:
+              - link "Privacy Policy" [ref=e247] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=e248]:
+              - link "Terms & Conditions" [ref=e249] [cursor=pointer]:
+                - /url: ""
+          - paragraph [ref=e255]:
+            - text: © 2024 Copyright theambrosia .Powered by
+            - link "Bytelabz" [ref=e256] [cursor=pointer]:
+              - /url: https://bytelabz.com/
+  - generic [ref=e257]:
+    - navigation "Toolbar":
+      - menu:
+        - group [ref=e258]:
+          - menuitem "About WordPress" [ref=e259] [cursor=pointer]
+        - group [ref=e262]:
+          - menuitem "Ambrosia - Staging" [ref=e263] [cursor=pointer]
+        - group [ref=e264]:
+          - menuitem "Live" [ref=e265] [cursor=pointer]
+        - group [ref=e266]:
+          - menuitem "18 updates available" [ref=e267] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e269]: "18"
+        - group [ref=e271]:
+          - menuitem "84 Comments in moderation" [ref=e272] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e274]: "84"
+        - group [ref=e276]:
+          - menuitem "New" [ref=e277] [cursor=pointer]
+        - group [ref=e280]:
+          - menuitem "Edit Page" [ref=e281] [cursor=pointer]
+        - group [ref=e282]:
+          - menuitem " Enable Visual Builder" [ref=e283] [cursor=pointer]
+      - menu [ref=e284]:
+        - group [ref=e285]:
+          - menuitem "Howdy, amborsia-admin" [ref=e286] [cursor=pointer]
+        - group [ref=e287]:
+          - menuitem "Search" [ref=e288]:
+            - generic [ref=e289]:
+              - textbox "Search" [ref=e290] [cursor=pointer]
+              - generic [ref=e291]: Search
+  - status [ref=e292]
