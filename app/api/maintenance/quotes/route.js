@@ -3,7 +3,7 @@ import { createClient } from '../../../../lib/supabaseClient';
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const jobIdFilter = searchParams.get('job_id');
-  const supabase visiting = createClient();
+  const supabase = createClient();
   let query = supabase.from('job_quotes').select('*');
   if (jobIdFilter) query = query.eq('job_id', jobIdFilter);
   const { data, error } = await query;
