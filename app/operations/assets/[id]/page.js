@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabaseClient';
+import { createClient } from '../../../lib/supabaseClient';
 
 // Mock API simulation - replace with real API calls in production
 const mockAssetData = {
