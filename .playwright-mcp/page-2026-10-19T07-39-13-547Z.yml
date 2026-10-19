@@ -1,0 +1,173 @@
+- generic [active] [ref=f10e1]:
+  - generic [ref=f10e3]:
+    - banner [ref=f10e4]:
+      - generic [ref=f10e5]: Place an order for desserts for local pick-up
+      - generic [ref=f10e6]:
+        - generic [ref=f10e7]:
+          - navigation [ref=f10e8]:
+            - list [ref=f10e9]:
+              - listitem [ref=f10e10]:
+                - link "Home" [ref=f10e11] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/
+              - listitem [ref=f10e12]:
+                - link "About Us" [ref=f10e13] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/about-us/
+              - listitem [ref=f10e14]:
+                - link "Products" [ref=f10e15] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/shop/
+              - listitem [ref=f10e16]:
+                - link "Contact Us" [ref=f10e17] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/contact-us/
+          - text: a
+        - link [ref=f10e19] [cursor=pointer]:
+          - /url: https://staging.theambrosia.com/
+          - img "Ambrosia - Staging" [ref=f10e20]
+        - generic [ref=f10e21]:
+          - link [ref=f10e22] [cursor=pointer]:
+            - /url: https://www.facebook.com/theambrosiabakehouse
+            - img "facebook" [ref=f10e23]
+          - link [ref=f10e24] [cursor=pointer]:
+            - /url: https://www.instagram.com/theambrosiabakehouse/?hl=en
+            - img "instagram" [ref=f10e25]
+          - link [ref=f10e26] [cursor=pointer]:
+            - /url: https://in.linkedin.com/company/the-ambrosia
+            - img "linkedin" [ref=f10e27]
+          - link [ref=f10e28] [cursor=pointer]:
+            - /url: mailto:info@theambrosia.com
+            - img "mail" [ref=f10e29]
+          - link [ref=f10e31] [cursor=pointer]:
+            - /url: "#"
+            - img "search" [ref=f10e32]
+          - link [ref=f10e33] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/cart
+            - img "cart" [ref=f10e34]
+      - generic [ref=f10e36]:
+        - search [ref=f10e37]:
+          - searchbox "Search for:" [ref=f10e38]
+        - generic [ref=f10e39] [cursor=pointer]: M
+    - generic [ref=f10e40]:
+      - generic [ref=f10e43]:
+        - generic [ref=f10e44]:
+          - navigation "Breadcrumb" [ref=f10e49]:
+            - link "Home" [ref=f10e50] [cursor=pointer]:
+              - /url: https://staging.theambrosia.com
+            - text: /
+            - link "Uncategorized" [ref=f10e51] [cursor=pointer]:
+              - /url: https://staging.theambrosia.com/product-category/uncategorized/
+            - text: / Mango Delight Cake
+          - generic [ref=f10e52]:
+            - generic [ref=f10e56]:
+              - button "View full-screen image gallery" [ref=f10e57] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f10e58]: 🔍
+              - img "Awaiting product image" [ref=f10e61]
+            - generic [ref=f10e62]:
+              - heading "Mango Delight Cake" [level=3] [ref=f10e65]
+              - paragraph [ref=f10e68]:
+                - generic [ref=f10e70]: ₹850.00
+                - text: –
+                - generic [ref=f10e72]: ₹4,250.00
+                - generic [ref=f10e73]: "Price range: ₹850.00 through ₹4,250.00"
+              - generic [ref=f10e76]:
+                - text: Weight
+                - combobox "Weight" [ref=f10e78]:
+                  - option "Choose an option" [selected]
+                  - option "1kg"
+                  - option "1.5kg"
+                  - option "2kg"
+                  - option "3kg"
+                  - option "4kg"
+                  - option "5kg"
+                - alert [ref=f10e79]
+                - generic [ref=f10e80]:
+                  - alert
+                  - generic [ref=f10e81]:
+                    - generic [ref=f10e82]:
+                      - generic [ref=f10e83]: Mango Delight Cake quantity
+                      - spinbutton "Product quantity" [ref=f10e84]: "1"
+                    - button "Add to cart 5" [ref=f10e85] [cursor=pointer]
+          - generic [ref=f10e88]:
+            - list [ref=f10e89]:
+              - listitem [ref=f10e90] [cursor=pointer]:
+                - link "Additional information" [ref=f10e91]:
+                  - /url: "#tab-additional_information"
+              - listitem [ref=f10e92] [cursor=pointer]:
+                - link "Reviews (0)" [ref=f10e93]:
+                  - /url: "#tab-reviews"
+            - generic [ref=f10e96]:
+              - heading "Additional information" [level=2] [ref=f10e97]
+              - table "Product Details" [ref=f10e98]:
+                - rowgroup [ref=f10e99]:
+                  - row [ref=f10e100]:
+                    - rowheader "Weight" [ref=f10e101]
+                    - cell [ref=f10e102]:
+                      - paragraph [ref=f10e103]: 1kg, 1.5kg, 2kg, 3kg, 4kg, 5kg
+        - generic [ref=f10e109]:
+          - heading "Related products" [level=2] [ref=f10e110]
+          - list [ref=f10e111]:
+            - listitem [ref=f10e112]:
+              - 'link "Placeholder  BISCOFF BUTTERSCOTCH CAKE Price range: ₹1,050.00 through ₹5,250.00" [ref=f10e113] [cursor=pointer]':
+                - /url: https://staging.theambrosia.com/product/biscoff-butterscotch-cake/
+                - generic [ref=f10e114]:
+                  - img "Placeholder" [ref=f10e115]
+                  - generic: 
+                - heading "BISCOFF BUTTERSCOTCH CAKE" [level=2] [ref=f10e116]
+                - generic [ref=f10e117]:
+                  - generic [ref=f10e119]: ₹1,050.00
+                  - text: –
+                  - generic [ref=f10e121]: ₹5,250.00
+                  - generic [ref=f10e122]: "Price range: ₹1,050.00 through ₹5,250.00"
+            - listitem [ref=f10e123]:
+              - 'link "Placeholder  Double Chocolate Cake Price range: ₹1,340.00 through ₹6,700.00" [ref=f10e124] [cursor=pointer]':
+                - /url: https://staging.theambrosia.com/product/double-chocolate-cake/
+                - generic [ref=f10e125]:
+                  - img "Placeholder" [ref=f10e126]
+                  - generic: 
+                - heading "Double Chocolate Cake" [level=2] [ref=f10e127]
+                - generic [ref=f10e128]:
+                  - generic [ref=f10e130]: ₹1,340.00
+                  - text: –
+                  - generic [ref=f10e132]: ₹6,700.00
+                  - generic [ref=f10e133]: "Price range: ₹1,340.00 through ₹6,700.00"
+            - listitem [ref=f10e134]:
+              - 'link "Placeholder  Photoprint Price range: ₹650.00 through ₹3,250.00" [ref=f10e135] [cursor=pointer]':
+                - /url: https://staging.theambrosia.com/product/photoprint/
+                - generic [ref=f10e136]:
+                  - img "Placeholder" [ref=f10e137]
+                  - generic: 
+                - heading "Photoprint" [level=2] [ref=f10e138]
+                - generic [ref=f10e139]:
+                  - generic [ref=f10e141]: ₹650.00
+                  - text: –
+                  - generic [ref=f10e143]: ₹3,250.00
+                  - generic [ref=f10e144]: "Price range: ₹650.00 through ₹3,250.00"
+      - contentinfo [ref=f10e145]:
+        - generic [ref=f10e147]:
+          - generic [ref=f10e148]:
+            - generic [ref=f10e149]:
+              - img "AmbrosiaLogo 2" [ref=f10e152]
+              - paragraph [ref=f10e155]: Ambrosia, with over 24 years of baking heritage, offers fresh, healthy food made in-house at our central kitchen. With 3 outlets and 2 pickup counters, we ensure quality food without additives, serving customers with care.
+              - generic [ref=f10e160]:
+                - heading "Email" [level=4] [ref=f10e161]
+                - generic [ref=f10e162]: support@theambrosia.com
+              - generic [ref=f10e167]:
+                - heading "Call Us" [level=4] [ref=f10e168]
+                - generic [ref=f10e169]: 305 8520 103
+            - generic [ref=f10e170]: "[contact-form-7 id=\"f12c350\" title=\"footer form\"]"
+          - list [ref=f10e177]:
+            - listitem [ref=f10e178]:
+              - link "Quality Policy" [ref=f10e179] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f10e180]:
+              - link "Refund Policy" [ref=f10e181] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f10e182]:
+              - link "Privacy Policy" [ref=f10e183] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f10e184]:
+              - link "Terms & Conditions" [ref=f10e185] [cursor=pointer]:
+                - /url: ""
+          - paragraph [ref=f10e191]:
+            - text: © 2024 Copyright theambrosia .Powered by
+            - link "Bytelabz" [ref=f10e192] [cursor=pointer]:
+              - /url: https://bytelabz.com/
+  - status [ref=f10e193]
