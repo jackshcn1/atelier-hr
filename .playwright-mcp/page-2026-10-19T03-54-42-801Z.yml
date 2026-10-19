@@ -1,0 +1,20 @@
+- generic [ref=f1e1]:
+  - main [ref=f1e2]:
+    - generic [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - heading "ATELIER HR" [level=1] [ref=f1e6]
+        - paragraph [ref=f1e7]: Admin & Management Portal
+      - generic [ref=f1e8]:
+        - button "👤 Employee (OTP)" [ref=f1e9] [cursor=pointer]
+        - button "🔑 Admin Login" [active] [ref=f1e10] [cursor=pointer]
+      - generic [ref=f1e19]:
+        - generic [ref=f1e20]:
+          - generic [ref=f1e21]: Admin Email
+          - textbox "admin@atelier.com" [ref=f1e22]
+        - generic [ref=f1e23]:
+          - generic [ref=f1e24]:
+            - generic [ref=f1e25]: Password
+            - button "Forgot password?" [ref=f1e26] [cursor=pointer]
+          - textbox "••••••••" [ref=f1e27]
+        - button "Log In as Admin →" [ref=f1e28] [cursor=pointer]
+  - alert [ref=f1e18]

@@ -1,0 +1,8 @@
+- generic [active] [ref=f2e1]:
+  - navigation [ref=f2e2]:
+    - link "Atelier" [ref=f2e4] [cursor=pointer]:
+      - /url: /
+  - main [ref=f2e5]:
+    - main [ref=f2e6]:
+      - generic [ref=f2e7]: Loading asset details...
+  - alert [ref=f2e9]

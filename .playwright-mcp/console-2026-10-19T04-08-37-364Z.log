@@ -1,0 +1,3 @@
+[  714127ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://atelier-hr-inky.vercel.app/api/maintenance/jobs:0
+[  714128ms] [ERROR] Error creating maintenance job: Error: Authentication required.
+    at D (https://atelier-hr-inky.vercel.app/_next/static/chunks/app/operations/assets/%5Bid%5D/page-a54828407b746f25.js:1:4811) @ https://atelier-hr-inky.vercel.app/_next/static/chunks/7023-c4a0c696939de2db.js:0

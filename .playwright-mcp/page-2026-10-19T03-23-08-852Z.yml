@@ -1,0 +1,16 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - heading "ATELIER HR" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Employee Payslip & Self-Service Portal
+      - generic [ref=e8]:
+        - button "👤 Employee (OTP)" [ref=e9] [cursor=pointer]
+        - button "🔑 Admin Login" [ref=e10] [cursor=pointer]
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: Registered Email Address
+          - textbox "name@example.com" [ref=e15]
+          - generic [ref=e16]: Enter the email registered on your Atelier employee profile.
+        - button "Send Login Code (OTP) →" [ref=e17] [cursor=pointer]
+  - alert [ref=e18]
