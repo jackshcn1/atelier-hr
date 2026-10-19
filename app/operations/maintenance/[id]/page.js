@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { createClient } from '../../../lib/supabaseClient';
 
 export default function MaintenanceJobDetailPage() {
   const params = useParams();
@@ -11,12 +12,21 @@ export default function MaintenanceJobDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/maintenance/jobs/${jobId}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.job) setJob(d.job);
-        setLoading(false);
-      });
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch(`/api/maintenance/jobs/${jobId}`, {
+        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.job) setJob(d.job);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Fetch job error:', err);
+          setLoading(false);
+        });
+    });
   }, [jobId]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading job details...</div>;
