@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { createClient } from '../../../lib/supabaseClient';
 
 // Mock API simulation - replace with real API calls in production
 const mockAssetData = {
@@ -246,9 +247,16 @@ export default function AssetDetailPage() {
     }
 
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Authentication required.');
+
       const res = await fetch('/api/maintenance/jobs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
           asset_serial: assetId,
           service_type: maintenanceForm.serviceType,
@@ -265,7 +273,10 @@ export default function AssetDetailPage() {
       const userName = 'Current User';
       const auditRes = await fetch('/api/maintenance/audit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
           job_id: data.job?.id,
           user_name: userName,
