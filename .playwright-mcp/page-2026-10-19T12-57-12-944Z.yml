@@ -1,0 +1,910 @@
+- generic [ref=f28e2]:
+  - navigation "Main menu":
+    - link "Skip to main content" [ref=f28e3] [cursor=pointer]:
+      - /url: "#wpbody-content"
+    - link "Skip to toolbar" [ref=f28e4] [cursor=pointer]:
+      - /url: "#wp-toolbar"
+    - list [ref=f28e7]:
+      - listitem [ref=f28e8]:
+        - link "Dashboard" [ref=f28e9] [cursor=pointer]:
+          - /url: index.php
+          - generic [aria-hidden] [ref=f28e10]: 
+        - list [ref=f28e12]:
+          - listitem [ref=f28e13]:
+            - link "Home" [ref=f28e14] [cursor=pointer]:
+              - /url: index.php
+          - listitem [ref=f28e15]:
+            - link "Updates 17" [ref=f28e16] [cursor=pointer]:
+              - /url: update-core.php
+              - text: Updates
+              - generic [ref=f28e17]: "17"
+      - listitem [aria-hidden] [ref=f28e18]
+      - listitem [ref=f28e20]:
+        - link "Posts" [ref=f28e21] [cursor=pointer]:
+          - /url: edit.php
+          - generic [aria-hidden] [ref=f28e22]: 
+        - list [ref=f28e24]:
+          - listitem [ref=f28e25]:
+            - link "All Posts" [ref=f28e26] [cursor=pointer]:
+              - /url: edit.php
+          - listitem [ref=f28e27]:
+            - link "Add Post" [ref=f28e28] [cursor=pointer]:
+              - /url: post-new.php
+          - listitem [ref=f28e29]:
+            - link "Categories" [ref=f28e30] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=category
+          - listitem [ref=f28e31]:
+            - link "Tags" [ref=f28e32] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=post_tag
+      - listitem [ref=f28e33]:
+        - link "Media" [ref=f28e34] [cursor=pointer]:
+          - /url: upload.php
+          - generic [aria-hidden] [ref=f28e35]: 
+        - list [ref=f28e37]:
+          - listitem [ref=f28e38]:
+            - link "Library" [ref=f28e39] [cursor=pointer]:
+              - /url: upload.php
+          - listitem [ref=f28e40]:
+            - link "Add Media File" [ref=f28e41] [cursor=pointer]:
+              - /url: media-new.php
+      - listitem [ref=f28e42]:
+        - link "Pages" [ref=f28e43] [cursor=pointer]:
+          - /url: edit.php?post_type=page
+          - generic [aria-hidden] [ref=f28e44]: 
+        - list [ref=f28e46]:
+          - listitem [ref=f28e47]:
+            - link "All Pages" [ref=f28e48] [cursor=pointer]:
+              - /url: edit.php?post_type=page
+          - listitem [ref=f28e49]:
+            - link "Add Page" [ref=f28e50] [cursor=pointer]:
+              - /url: post-new.php?post_type=page
+      - listitem [ref=f28e51]:
+        - link "Comments 84 Comments in moderation" [ref=f28e52] [cursor=pointer]:
+          - /url: edit-comments.php
+          - generic [aria-hidden] [ref=f28e53]: 
+          - generic [ref=f28e54]:
+            - text: Comments
+            - generic [ref=f28e55]:
+              - text: "84"
+              - generic [ref=f28e56]: 84 Comments in moderation
+      - listitem [ref=f28e57]:
+        - link "Projects" [ref=f28e58] [cursor=pointer]:
+          - /url: edit.php?post_type=project
+          - generic [aria-hidden] [ref=f28e59]: 
+        - list [ref=f28e61]:
+          - listitem [ref=f28e62]:
+            - link "All Projects" [ref=f28e63] [cursor=pointer]:
+              - /url: edit.php?post_type=project
+          - listitem [ref=f28e64]:
+            - link "Add New Project" [ref=f28e65] [cursor=pointer]:
+              - /url: post-new.php?post_type=project
+          - listitem [ref=f28e66]:
+            - link "Categories" [ref=f28e67] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_category&post_type=project
+          - listitem [ref=f28e68]:
+            - link "Tags" [ref=f28e69] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_tag&post_type=project
+      - listitem [ref=f28e70]:
+        - link "PhonePe PG Support" [ref=f28e71] [cursor=pointer]:
+          - /url: admin.php?page=phonepe-support
+          - generic [aria-hidden] [ref=f28e72]: 
+        - list [ref=f28e74]:
+          - listitem [ref=f28e75]:
+            - link "PhonePe PG Support" [ref=f28e76] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support
+          - listitem [ref=f28e77]:
+            - link "Download Error Logs" [ref=f28e78] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-logs
+          - listitem [ref=f28e79]:
+            - link "Compose Error Report" [ref=f28e80] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-mail
+      - listitem [aria-hidden] [ref=f28e81]
+      - listitem [ref=f28e83]:
+        - link "WooCommerce" [ref=f28e84] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin
+        - list [ref=f28e87]:
+          - listitem [ref=f28e88]:
+            - link "Home" [ref=f28e89] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin
+          - listitem [ref=f28e90]:
+            - link "Orders 32" [ref=f28e91] [cursor=pointer]:
+              - /url: admin.php?page=wc-orders
+              - text: Orders
+              - generic [ref=f28e92]: "32"
+          - listitem [ref=f28e93]:
+            - link "PhonePe settings" [ref=f28e94] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-settings
+          - listitem [ref=f28e95]:
+            - link "Customers" [ref=f28e96] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/customers
+          - listitem [ref=f28e97]:
+            - link "Reports" [ref=f28e98] [cursor=pointer]:
+              - /url: admin.php?page=wc-reports
+          - listitem [ref=f28e99]:
+            - link "Settings" [ref=f28e100] [cursor=pointer]:
+              - /url: admin.php?page=wc-settings
+          - listitem [ref=f28e101]:
+            - link "Status" [ref=f28e102] [cursor=pointer]:
+              - /url: admin.php?page=wc-status
+          - listitem [ref=f28e103]:
+            - link "Extensions" [ref=f28e104] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/extensions
+      - listitem [ref=f28e105]:
+        - link "Products" [ref=f28e106] [cursor=pointer]:
+          - /url: edit.php?post_type=product
+          - generic [aria-hidden] [ref=f28e107]: 
+        - list [ref=f28e109]:
+          - listitem [ref=f28e110]:
+            - link "All Products" [ref=f28e111] [cursor=pointer]:
+              - /url: edit.php?post_type=product
+          - listitem [ref=f28e112]:
+            - link "Add new product" [ref=f28e113] [cursor=pointer]:
+              - /url: post-new.php?post_type=product
+          - listitem [ref=f28e114]:
+            - link "Brands" [ref=f28e115] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_brand&post_type=product
+          - listitem [ref=f28e116]:
+            - link "Categories" [ref=f28e117] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_cat&post_type=product
+          - listitem [ref=f28e118]:
+            - link "Tags" [ref=f28e119] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_tag&post_type=product
+          - listitem [ref=f28e120]:
+            - link "Attributes" [ref=f28e121] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product_attributes
+          - listitem [ref=f28e122]:
+            - link "Reviews" [ref=f28e123] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product-reviews
+      - listitem [ref=f28e124]:
+        - link "Payments" [ref=f28e125] [cursor=pointer]:
+          - /url: admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM
+      - listitem [ref=f28e128]:
+        - link "Analytics" [ref=f28e129] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - generic [aria-hidden] [ref=f28e130]: 
+        - list [ref=f28e132]:
+          - listitem [ref=f28e133]:
+            - link "Overview" [ref=f28e134] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - listitem [ref=f28e135]:
+            - link "Products" [ref=f28e136] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/products
+          - listitem [ref=f28e137]:
+            - link "Revenue" [ref=f28e138] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/revenue
+          - listitem [ref=f28e139]:
+            - link "Orders" [ref=f28e140] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/orders
+          - listitem [ref=f28e141]:
+            - link "Variations" [ref=f28e142] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/variations
+          - listitem [ref=f28e143]:
+            - link "Categories" [ref=f28e144] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/categories
+          - listitem [ref=f28e145]:
+            - link "Coupons" [ref=f28e146] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/coupons
+          - listitem [ref=f28e147]:
+            - link "Taxes" [ref=f28e148] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/taxes
+          - listitem [ref=f28e149]:
+            - link "Downloads" [ref=f28e150] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/downloads
+          - listitem [ref=f28e151]:
+            - link "Stock" [ref=f28e152] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/stock
+          - listitem [ref=f28e153]:
+            - link "Settings" [ref=f28e154] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/settings
+      - listitem [ref=f28e155]:
+        - link "Marketing" [ref=f28e156] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/marketing
+          - generic [aria-hidden] [ref=f28e157]: 
+        - list [ref=f28e159]:
+          - listitem [ref=f28e160]:
+            - link "Overview" [ref=f28e161] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/marketing
+          - listitem [ref=f28e162]:
+            - link "Coupons" [ref=f28e163] [cursor=pointer]:
+              - /url: edit.php?post_type=shop_coupon
+      - listitem [aria-hidden] [ref=f28e164]
+      - listitem [ref=f28e166]:
+        - link "Appearance" [ref=f28e167] [cursor=pointer]:
+          - /url: themes.php
+          - generic [aria-hidden] [ref=f28e168]: 
+        - list [ref=f28e170]:
+          - listitem [ref=f28e171]:
+            - link "Themes 4" [ref=f28e172] [cursor=pointer]:
+              - /url: themes.php
+              - text: Themes
+              - generic [ref=f28e173]: "4"
+          - listitem [ref=f28e174]:
+            - link "Design" [ref=f28e175] [cursor=pointer]:
+              - /url: site-editor.php
+          - listitem [ref=f28e176]:
+            - link "Customize" [ref=f28e177] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+          - listitem [ref=f28e178]:
+            - link "Widgets" [ref=f28e179] [cursor=pointer]:
+              - /url: widgets.php
+          - listitem [ref=f28e180]:
+            - link "Fonts" [ref=f28e181] [cursor=pointer]:
+              - /url: font-library.php
+          - listitem [ref=f28e182]:
+            - link "Menus" [ref=f28e183] [cursor=pointer]:
+              - /url: nav-menus.php
+          - listitem [ref=f28e184]:
+            - link "Background" [ref=f28e185] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct&autofocus%5Bcontrol%5D=background_image
+          - listitem
+          - listitem [ref=f28e186]:
+            - link "Theme File Editor" [ref=f28e187] [cursor=pointer]:
+              - /url: theme-editor.php
+      - listitem [ref=f28e188]:
+        - link "Plugins 13" [ref=f28e189] [cursor=pointer]:
+          - /url: plugins.php
+          - generic [aria-hidden] [ref=f28e190]: 
+          - generic [ref=f28e191]:
+            - text: Plugins
+            - generic [ref=f28e192]: "13"
+        - list [ref=f28e193]:
+          - listitem [ref=f28e194]:
+            - link "Installed Plugins" [ref=f28e195] [cursor=pointer]:
+              - /url: plugins.php
+          - listitem [ref=f28e196]:
+            - link "Add Plugin" [ref=f28e197] [cursor=pointer]:
+              - /url: plugin-install.php
+          - listitem [ref=f28e198]:
+            - link "Plugin File Editor" [ref=f28e199] [cursor=pointer]:
+              - /url: plugin-editor.php
+      - listitem [ref=f28e200]:
+        - link "Users" [ref=f28e201] [cursor=pointer]:
+          - /url: users.php
+          - generic [aria-hidden] [ref=f28e202]: 
+        - list [ref=f28e204]:
+          - listitem [ref=f28e205]:
+            - link "All Users" [ref=f28e206] [cursor=pointer]:
+              - /url: users.php
+          - listitem [ref=f28e207]:
+            - link "Add User" [ref=f28e208] [cursor=pointer]:
+              - /url: user-new.php
+          - listitem [ref=f28e209]:
+            - link "Profile" [ref=f28e210] [cursor=pointer]:
+              - /url: profile.php
+      - listitem [ref=f28e211]:
+        - link "Tools" [ref=f28e212] [cursor=pointer]:
+          - /url: tools.php
+          - generic [aria-hidden] [ref=f28e213]: 
+        - list [ref=f28e215]:
+          - listitem [ref=f28e216]:
+            - link "Available Tools" [ref=f28e217] [cursor=pointer]:
+              - /url: tools.php
+          - listitem [ref=f28e218]:
+            - link "Import" [ref=f28e219] [cursor=pointer]:
+              - /url: import.php
+          - listitem [ref=f28e220]:
+            - link "Export" [ref=f28e221] [cursor=pointer]:
+              - /url: export.php
+          - listitem [ref=f28e222]:
+            - link "Site Health 1" [ref=f28e223] [cursor=pointer]:
+              - /url: site-health.php
+              - text: Site Health
+              - generic [ref=f28e224]: "1"
+          - listitem [ref=f28e225]:
+            - link "Export Personal Data" [ref=f28e226] [cursor=pointer]:
+              - /url: export-personal-data.php
+          - listitem [ref=f28e227]:
+            - link "Erase Personal Data" [ref=f28e228] [cursor=pointer]:
+              - /url: erase-personal-data.php
+          - listitem [ref=f28e229]:
+            - link "Scheduled Actions" [ref=f28e230] [cursor=pointer]:
+              - /url: tools.php?page=action-scheduler
+      - listitem [ref=f28e231]:
+        - link "Settings" [ref=f28e232] [cursor=pointer]:
+          - /url: options-general.php
+          - generic [aria-hidden] [ref=f28e233]: 
+        - list [ref=f28e235]:
+          - listitem [ref=f28e236]:
+            - link "General" [ref=f28e237] [cursor=pointer]:
+              - /url: options-general.php
+          - listitem [ref=f28e238]:
+            - link "Connectors" [ref=f28e239] [cursor=pointer]:
+              - /url: options-connectors.php
+          - listitem [ref=f28e240]:
+            - link "Writing" [ref=f28e241] [cursor=pointer]:
+              - /url: options-writing.php
+          - listitem [ref=f28e242]:
+            - link "Reading" [ref=f28e243] [cursor=pointer]:
+              - /url: options-reading.php
+          - listitem [ref=f28e244]:
+            - link "Discussion" [ref=f28e245] [cursor=pointer]:
+              - /url: options-discussion.php
+          - listitem [ref=f28e246]:
+            - link "Media" [ref=f28e247] [cursor=pointer]:
+              - /url: options-media.php
+          - listitem [ref=f28e248]:
+            - link "Permalinks" [ref=f28e249] [cursor=pointer]:
+              - /url: options-permalink.php
+          - listitem [ref=f28e250]:
+            - link "Privacy" [ref=f28e251] [cursor=pointer]:
+              - /url: options-privacy.php
+      - listitem [aria-hidden] [ref=f28e252]
+      - listitem [ref=f28e254]:
+        - link "Divi" [ref=f28e255] [cursor=pointer]:
+          - /url: admin.php?page=et_onboarding
+          - generic [aria-hidden] [ref=f28e256]: 
+        - list [ref=f28e258]:
+          - listitem [ref=f28e259]:
+            - link "Dashboard 1" [ref=f28e260] [cursor=pointer]:
+              - /url: admin.php?page=et_onboarding
+              - text: Dashboard
+              - generic [ref=f28e261]: "1"
+          - listitem [ref=f28e262]:
+            - link "Theme Options" [ref=f28e263] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_options
+          - listitem [ref=f28e264]:
+            - link "Theme Builder" [ref=f28e265] [cursor=pointer]:
+              - /url: admin.php?page=et_theme_builder
+          - listitem [ref=f28e266]:
+            - link "Theme Customizer" [ref=f28e267] [cursor=pointer]:
+              - /url: customize.php?et_customizer_option_set=theme
+          - listitem [ref=f28e268]:
+            - link "Role Editor" [ref=f28e269] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_role_editor
+          - listitem [ref=f28e270]:
+            - link "Divi Library" [ref=f28e271] [cursor=pointer]:
+              - /url: edit.php?post_type=et_pb_layout
+          - listitem [ref=f28e272]:
+            - link "Support Center" [ref=f28e273] [cursor=pointer]:
+              - /url: admin.php?page=et_support_center_divi
+      - listitem [ref=f28e274]:
+        - button "Collapse Main menu" [expanded] [ref=f28e275] [cursor=pointer]:
+          - generic [ref=f28e277]: Collapse Menu
+  - generic [ref=f28e278]:
+    - generic [ref=f28e279]:
+      - navigation "Toolbar":
+        - menu:
+          - group [ref=f28e280]:
+            - menuitem "About WordPress" [ref=f28e281] [cursor=pointer]
+          - group [ref=f28e284]:
+            - menuitem "Ambrosia - Staging" [ref=f28e285] [cursor=pointer]
+          - group [ref=f28e286]:
+            - menuitem "Live" [ref=f28e287] [cursor=pointer]
+          - group [ref=f28e288]:
+            - menuitem "17 updates available" [ref=f28e289] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f28e291]: "17"
+          - group [ref=f28e293]:
+            - menuitem "⌘K Open command palette" [ref=f28e294] [cursor=pointer]:
+              - generic [ref=f28e296]:
+                - text: ⌘K
+                - generic [ref=f28e297]: Open command palette
+          - group [ref=f28e298]:
+            - menuitem "84 Comments in moderation" [ref=f28e299] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f28e301]: "84"
+          - group [ref=f28e303]:
+            - menuitem "New" [ref=f28e304] [cursor=pointer]
+        - menu [ref=f28e307]:
+          - group [ref=f28e308]:
+            - menuitem "Howdy, amborsia-admin" [ref=f28e309] [cursor=pointer]
+    - generic [ref=f28e311]:
+      - heading "Edit attribute" [level=1] [ref=f28e312]
+      - generic [ref=f28e313]:
+        - heading "Store Activity" [level=2] [ref=f28e314]
+        - complementary "Store Activity" [ref=f28e315]:
+          - tablist [ref=f28e316]:
+            - tab "Activity unread activity" [ref=f28e317] [cursor=pointer]:
+              - text: Activity
+              - generic [ref=f28e321]: unread activity
+    - main [ref=f28e324]:
+      - generic [ref=f28e325]:
+        - generic [ref=f28e326]:
+          - button "Screen Options" [ref=f28e328] [cursor=pointer]
+          - button "Help" [ref=f28e330] [cursor=pointer]
+        - generic [ref=f28e333]:
+          - heading "Product Weight" [level=1] [ref=f28e334]
+          - generic [ref=f28e335]:
+            - link "Dismiss" [ref=f28e336] [cursor=pointer]:
+              - /url: /wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-wordpress-untested&_wc_notice_nonce=3428c3ab95
+            - paragraph [ref=f28e337]:
+              - strong [ref=f28e338]: Pinterest for WooCommerce
+              - text: "- 1.4.12 is untested with WordPress 7.1.3."
+          - generic [ref=f28e339]:
+            - link "Dismiss" [ref=f28e340] [cursor=pointer]:
+              - /url: /wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-woocommerce-untested&_wc_notice_nonce=3428c3ab95
+            - paragraph [ref=f28e341]:
+              - strong [ref=f28e342]: Pinterest for WooCommerce
+              - text: "- version 1.4.12 is untested with WooCommerce 10.3.7."
+          - paragraph [ref=f28e344]:
+            - generic [ref=f28e345]: "Search Weight:"
+            - searchbox "Search Weight:" [ref=f28e346]
+            - button "Search Weight" [ref=f28e347] [cursor=pointer]
+          - generic [ref=f28e348]:
+            - generic [ref=f28e350]:
+              - paragraph [ref=f28e351]: Attribute terms can be assigned to products and variations.
+              - paragraph [ref=f28e352]: "Note: Deleting a term will remove it from all products and variations to which it has been assigned. Recreating a term will not automatically assign it back to products."
+              - generic [ref=f28e353]:
+                - heading "Add new Weight" [level=2] [ref=f28e354]
+                - generic [ref=f28e355]:
+                  - generic [ref=f28e356]:
+                    - generic [ref=f28e357]: Name
+                    - textbox "Name" [active] [ref=f28e358]
+                    - paragraph [ref=f28e359]: The name is how it appears on your site.
+                  - generic [ref=f28e360]:
+                    - generic [ref=f28e361]: Slug
+                    - textbox "Slug" [ref=f28e362]
+                    - paragraph [ref=f28e363]: The “slug” is the URL-friendly version of the name. It is usually all lowercase and contains only letters, numbers, and hyphens.
+                  - generic [ref=f28e364]:
+                    - generic [ref=f28e365]: Description
+                    - textbox "Description" [ref=f28e366]
+                    - paragraph [ref=f28e367]: The description is not prominent by default; however, some themes may show it.
+                  - paragraph [ref=f28e368]:
+                    - button "Add new Weight" [ref=f28e369] [cursor=pointer]
+            - generic [ref=f28e372]:
+              - generic [ref=f28e373]:
+                - generic [ref=f28e374]:
+                  - generic [ref=f28e375]: Select bulk action
+                  - combobox "Select bulk action" [ref=f28e376] [cursor=pointer]:
+                    - option "Bulk actions" [selected]
+                    - option "Delete"
+                  - button "Apply" [ref=f28e377] [cursor=pointer]
+                - generic [ref=f28e378]: 17 items
+              - heading "Tags list" [level=2] [ref=f28e380]
+              - table [ref=f28e381]:
+                - caption [ref=f28e382]: Table ordered by Name. Ascending.
+                - rowgroup [ref=f28e383]:
+                  - row [ref=f28e384]:
+                    - cell "Select All" [ref=f28e385]:
+                      - checkbox "Select All" [ref=f28e386] [cursor=pointer]
+                    - columnheader [ref=f28e389]:
+                      - link "Name" [ref=f28e390] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=name&order=desc
+                    - columnheader [ref=f28e395]:
+                      - link "Description Sort ascending." [ref=f28e396] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=description&order=asc
+                        - generic [ref=f28e397]: Description
+                        - generic [ref=f28e401]: Sort ascending.
+                    - columnheader [ref=f28e402]:
+                      - link "Slug Sort ascending." [ref=f28e403] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=slug&order=asc
+                        - generic [ref=f28e404]: Slug
+                        - generic [ref=f28e408]: Sort ascending.
+                    - columnheader [ref=f28e409]:
+                      - link "Count Sort ascending." [ref=f28e410] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=count&order=asc
+                        - generic [ref=f28e411]: Count
+                        - generic [ref=f28e415]: Sort ascending.
+                    - cell [ref=f28e416]
+                - rowgroup [ref=f28e417]:
+                  - row [ref=f28e418]:
+                    - cell "Select 1.5kg" [ref=f28e419]:
+                      - checkbox "Select 1.5kg" [ref=f28e420] [cursor=pointer]
+                    - rowheader "1.5kg" [ref=f28e423]:
+                      - strong [ref=f28e424]:
+                        - link "1.5kg" [ref=f28e425] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=203&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e426]:
+                        - generic [ref=f28e427]:
+                          - link "Edit “1.5kg”" [ref=f28e428] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=203&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e429]:
+                          - button "Quick edit “1.5kg” inline" [ref=f28e430] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “1.5kg”" [ref=f28e432] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e433]: —
+                    - cell "1-5kg" [ref=f28e435]
+                    - cell [ref=f28e436]:
+                      - link "0" [ref=f28e437] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=1-5kg&post_type=product
+                    - cell "" [ref=f28e438]
+                  - row [ref=f28e439]:
+                    - cell "Select 100gm" [ref=f28e440]:
+                      - checkbox "Select 100gm" [ref=f28e441] [cursor=pointer]
+                    - rowheader "100gm" [ref=f28e444]:
+                      - strong [ref=f28e445]:
+                        - link "100gm" [ref=f28e446] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=209&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e447]:
+                        - generic [ref=f28e448]:
+                          - link "Edit “100gm”" [ref=f28e449] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=209&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e450]:
+                          - button "Quick edit “100gm” inline" [ref=f28e451] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “100gm”" [ref=f28e453] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e454]: —
+                    - cell "100gm" [ref=f28e456]
+                    - cell [ref=f28e457]:
+                      - link "0" [ref=f28e458] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=100gm&post_type=product
+                    - cell "" [ref=f28e459]
+                  - row [ref=f28e460]:
+                    - cell "Select 1kg" [ref=f28e461]:
+                      - checkbox "Select 1kg" [ref=f28e462] [cursor=pointer]
+                    - rowheader "1kg" [ref=f28e465]:
+                      - strong [ref=f28e466]:
+                        - link "1kg" [ref=f28e467] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=179&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e468]:
+                        - generic [ref=f28e469]:
+                          - link "Edit “1kg”" [ref=f28e470] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=179&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e471]:
+                          - button "Quick edit “1kg” inline" [ref=f28e472] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “1kg”" [ref=f28e474] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e475]: —
+                    - cell "1kg" [ref=f28e477]
+                    - cell [ref=f28e478]:
+                      - link "0" [ref=f28e479] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=1kg&post_type=product
+                    - cell "" [ref=f28e480]
+                  - row [ref=f28e481]:
+                    - cell "Select 1kg|1.5kg|2kg|3kg|4kg|5kg" [ref=f28e482]:
+                      - checkbox "Select 1kg|1.5kg|2kg|3kg|4kg|5kg" [ref=f28e483] [cursor=pointer]
+                    - rowheader "1kg|1.5kg|2kg|3kg|4kg|5kg" [ref=f28e486]:
+                      - strong [ref=f28e487]:
+                        - link "1kg|1.5kg|2kg|3kg|4kg|5kg" [ref=f28e488] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=226&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e489]:
+                        - generic [ref=f28e490]:
+                          - link "Edit “1kg|1.5kg|2kg|3kg|4kg|5kg”" [ref=f28e491] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=226&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e492]:
+                          - button "Quick edit “1kg|1.5kg|2kg|3kg|4kg|5kg” inline" [ref=f28e493] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “1kg|1.5kg|2kg|3kg|4kg|5kg”" [ref=f28e495] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e496]: —
+                    - cell "1kg1-5kg2kg3kg4kg5kg" [ref=f28e498]
+                    - cell [ref=f28e499]:
+                      - link "76" [ref=f28e500] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=1kg1-5kg2kg3kg4kg5kg&post_type=product
+                    - cell "" [ref=f28e501]
+                  - row [ref=f28e502]:
+                    - cell "Select 200gm" [ref=f28e503]:
+                      - checkbox "Select 200gm" [ref=f28e504] [cursor=pointer]
+                    - rowheader "200gm" [ref=f28e507]:
+                      - strong [ref=f28e508]:
+                        - link "200gm" [ref=f28e509] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=208&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e510]:
+                        - generic [ref=f28e511]:
+                          - link "Edit “200gm”" [ref=f28e512] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=208&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e513]:
+                          - button "Quick edit “200gm” inline" [ref=f28e514] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “200gm”" [ref=f28e516] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e517]: —
+                    - cell "200gm" [ref=f28e519]
+                    - cell [ref=f28e520]:
+                      - link "0" [ref=f28e521] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=200gm&post_type=product
+                    - cell "" [ref=f28e522]
+                  - row [ref=f28e523]:
+                    - cell "Select 250gm" [ref=f28e524]:
+                      - checkbox "Select 250gm" [ref=f28e525] [cursor=pointer]
+                    - rowheader "250gm" [ref=f28e528]:
+                      - strong [ref=f28e529]:
+                        - link "250gm" [ref=f28e530] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=205&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e531]:
+                        - generic [ref=f28e532]:
+                          - link "Edit “250gm”" [ref=f28e533] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=205&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e534]:
+                          - button "Quick edit “250gm” inline" [ref=f28e535] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “250gm”" [ref=f28e537] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e538]: —
+                    - cell "250gm" [ref=f28e540]
+                    - cell [ref=f28e541]:
+                      - link "0" [ref=f28e542] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=250gm&post_type=product
+                    - cell "" [ref=f28e543]
+                  - row [ref=f28e544]:
+                    - cell "Select 2kg" [ref=f28e545]:
+                      - checkbox "Select 2kg" [ref=f28e546] [cursor=pointer]
+                    - rowheader "2kg" [ref=f28e549]:
+                      - strong [ref=f28e550]:
+                        - link "2kg" [ref=f28e551] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=180&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e552]:
+                        - generic [ref=f28e553]:
+                          - link "Edit “2kg”" [ref=f28e554] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=180&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e555]:
+                          - button "Quick edit “2kg” inline" [ref=f28e556] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “2kg”" [ref=f28e558] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e559]: —
+                    - cell "2kg" [ref=f28e561]
+                    - cell [ref=f28e562]:
+                      - link "0" [ref=f28e563] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=2kg&post_type=product
+                    - cell "" [ref=f28e564]
+                  - row [ref=f28e565]:
+                    - cell "Select 300gm|500gm" [ref=f28e566]:
+                      - checkbox "Select 300gm|500gm" [ref=f28e567] [cursor=pointer]
+                    - rowheader "300gm|500gm" [ref=f28e570]:
+                      - strong [ref=f28e571]:
+                        - link "300gm|500gm" [ref=f28e572] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=231&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e573]:
+                        - generic [ref=f28e574]:
+                          - link "Edit “300gm|500gm”" [ref=f28e575] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=231&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e576]:
+                          - button "Quick edit “300gm|500gm” inline" [ref=f28e577] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “300gm|500gm”" [ref=f28e579] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e580]: —
+                    - cell "300gm500gm" [ref=f28e582]
+                    - cell [ref=f28e583]:
+                      - link "1" [ref=f28e584] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=300gm500gm&post_type=product
+                    - cell "" [ref=f28e585]
+                  - row [ref=f28e586]:
+                    - cell "Select 300gm|500gm|1kg" [ref=f28e587]:
+                      - checkbox "Select 300gm|500gm|1kg" [ref=f28e588] [cursor=pointer]
+                    - rowheader "300gm|500gm|1kg" [ref=f28e591]:
+                      - strong [ref=f28e592]:
+                        - link "300gm|500gm|1kg" [ref=f28e593] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=230&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e594]:
+                        - generic [ref=f28e595]:
+                          - link "Edit “300gm|500gm|1kg”" [ref=f28e596] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=230&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e597]:
+                          - button "Quick edit “300gm|500gm|1kg” inline" [ref=f28e598] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “300gm|500gm|1kg”" [ref=f28e600] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e601]: —
+                    - cell "300gm500gm1kg" [ref=f28e603]
+                    - cell [ref=f28e604]:
+                      - link "1" [ref=f28e605] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=300gm500gm1kg&post_type=product
+                    - cell "" [ref=f28e606]
+                  - row [ref=f28e607]:
+                    - cell "Select 300gm|600gm" [ref=f28e608]:
+                      - checkbox "Select 300gm|600gm" [ref=f28e609] [cursor=pointer]
+                    - rowheader "300gm|600gm" [ref=f28e612]:
+                      - strong [ref=f28e613]:
+                        - link "300gm|600gm" [ref=f28e614] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=229&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e615]:
+                        - generic [ref=f28e616]:
+                          - link "Edit “300gm|600gm”" [ref=f28e617] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=229&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e618]:
+                          - button "Quick edit “300gm|600gm” inline" [ref=f28e619] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “300gm|600gm”" [ref=f28e621] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e622]: —
+                    - cell "300gm600gm" [ref=f28e624]
+                    - cell [ref=f28e625]:
+                      - link "1" [ref=f28e626] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=300gm600gm&post_type=product
+                    - cell "" [ref=f28e627]
+                  - row [ref=f28e628]:
+                    - cell "Select 350gm" [ref=f28e629]:
+                      - checkbox "Select 350gm" [ref=f28e630] [cursor=pointer]
+                    - rowheader "350gm" [ref=f28e633]:
+                      - strong [ref=f28e634]:
+                        - link "350gm" [ref=f28e635] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=210&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e636]:
+                        - generic [ref=f28e637]:
+                          - link "Edit “350gm”" [ref=f28e638] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=210&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e639]:
+                          - button "Quick edit “350gm” inline" [ref=f28e640] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “350gm”" [ref=f28e642] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e643]: —
+                    - cell "350gm" [ref=f28e645]
+                    - cell [ref=f28e646]:
+                      - link "0" [ref=f28e647] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=350gm&post_type=product
+                    - cell "" [ref=f28e648]
+                  - row [ref=f28e649]:
+                    - cell "Select 350gm|600gm" [ref=f28e650]:
+                      - checkbox "Select 350gm|600gm" [ref=f28e651] [cursor=pointer]
+                    - rowheader "350gm|600gm" [ref=f28e654]:
+                      - strong [ref=f28e655]:
+                        - link "350gm|600gm" [ref=f28e656] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=233&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e657]:
+                        - generic [ref=f28e658]:
+                          - link "Edit “350gm|600gm”" [ref=f28e659] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=233&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e660]:
+                          - button "Quick edit “350gm|600gm” inline" [ref=f28e661] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “350gm|600gm”" [ref=f28e663] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e664]: —
+                    - cell "350gm600gm" [ref=f28e666]
+                    - cell [ref=f28e667]:
+                      - link "1" [ref=f28e668] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=350gm600gm&post_type=product
+                    - cell "" [ref=f28e669]
+                  - row [ref=f28e670]:
+                    - cell "Select 3kg" [ref=f28e671]:
+                      - checkbox "Select 3kg" [ref=f28e672] [cursor=pointer]
+                    - rowheader "3kg" [ref=f28e675]:
+                      - strong [ref=f28e676]:
+                        - link "3kg" [ref=f28e677] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=181&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e678]:
+                        - generic [ref=f28e679]:
+                          - link "Edit “3kg”" [ref=f28e680] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=181&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e681]:
+                          - button "Quick edit “3kg” inline" [ref=f28e682] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “3kg”" [ref=f28e684] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e685]: —
+                    - cell "3kg" [ref=f28e687]
+                    - cell [ref=f28e688]:
+                      - link "0" [ref=f28e689] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=3kg&post_type=product
+                    - cell "" [ref=f28e690]
+                  - row [ref=f28e691]:
+                    - cell "Select 4.5kg" [ref=f28e692]:
+                      - checkbox "Select 4.5kg" [ref=f28e693] [cursor=pointer]
+                    - rowheader "4.5kg" [ref=f28e696]:
+                      - strong [ref=f28e697]:
+                        - link "4.5kg" [ref=f28e698] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=204&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e699]:
+                        - generic [ref=f28e700]:
+                          - link "Edit “4.5kg”" [ref=f28e701] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=204&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e702]:
+                          - button "Quick edit “4.5kg” inline" [ref=f28e703] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “4.5kg”" [ref=f28e705] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e706]: —
+                    - cell "4-5kg" [ref=f28e708]
+                    - cell [ref=f28e709]:
+                      - link "0" [ref=f28e710] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=4-5kg&post_type=product
+                    - cell "" [ref=f28e711]
+                  - row [ref=f28e712]:
+                    - cell "Select 500gm" [ref=f28e713]:
+                      - checkbox "Select 500gm" [ref=f28e714] [cursor=pointer]
+                    - rowheader "500gm" [ref=f28e717]:
+                      - strong [ref=f28e718]:
+                        - link "500gm" [ref=f28e719] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=206&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e720]:
+                        - generic [ref=f28e721]:
+                          - link "Edit “500gm”" [ref=f28e722] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=206&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e723]:
+                          - button "Quick edit “500gm” inline" [ref=f28e724] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “500gm”" [ref=f28e726] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e727]: —
+                    - cell "500gm" [ref=f28e729]
+                    - cell [ref=f28e730]:
+                      - link "0" [ref=f28e731] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=500gm&post_type=product
+                    - cell "" [ref=f28e732]
+                  - row [ref=f28e733]:
+                    - cell "Select 500gm|1kg" [ref=f28e734]:
+                      - checkbox "Select 500gm|1kg" [ref=f28e735] [cursor=pointer]
+                    - rowheader "500gm|1kg" [ref=f28e738]:
+                      - strong [ref=f28e739]:
+                        - link "500gm|1kg" [ref=f28e740] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=232&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e741]:
+                        - generic [ref=f28e742]:
+                          - link "Edit “500gm|1kg”" [ref=f28e743] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=232&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e744]:
+                          - button "Quick edit “500gm|1kg” inline" [ref=f28e745] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “500gm|1kg”" [ref=f28e747] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e748]: —
+                    - cell "500gm1kg" [ref=f28e750]
+                    - cell [ref=f28e751]:
+                      - link "1" [ref=f28e752] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=500gm1kg&post_type=product
+                    - cell "" [ref=f28e753]
+                  - row [ref=f28e754]:
+                    - cell "Select 600gm" [ref=f28e755]:
+                      - checkbox "Select 600gm" [ref=f28e756] [cursor=pointer]
+                    - rowheader "600gm" [ref=f28e759]:
+                      - strong [ref=f28e760]:
+                        - link "600gm" [ref=f28e761] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=207&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                      - generic [ref=f28e762]:
+                        - generic [ref=f28e763]:
+                          - link "Edit “600gm”" [ref=f28e764] [cursor=pointer]:
+                            - /url: https://staging.theambrosia.com/wp-admin/term.php?taxonomy=pa_weight&tag_ID=207&post_type=product&wp_http_referer=%2Fwp-admin%2Fedit-tags.php%3Ftaxonomy%3Dpa_weight%26post_type%3Dproduct
+                            - text: Edit
+                          - text: "|"
+                        - generic [ref=f28e765]:
+                          - button "Quick edit “600gm” inline" [ref=f28e766] [cursor=pointer]: Quick Edit
+                          - text: "|"
+                        - button "Delete “600gm”" [ref=f28e768] [cursor=pointer]: Delete
+                    - cell "No description" [ref=f28e769]: —
+                    - cell "600gm" [ref=f28e771]
+                    - cell [ref=f28e772]:
+                      - link "0" [ref=f28e773] [cursor=pointer]:
+                        - /url: edit.php?taxonomy=pa_weight&term=600gm&post_type=product
+                    - cell "" [ref=f28e774]
+                - rowgroup [ref=f28e775]:
+                  - row [ref=f28e776]:
+                    - cell "Select All" [ref=f28e777]:
+                      - checkbox "Select All" [ref=f28e778] [cursor=pointer]
+                    - columnheader [ref=f28e781]:
+                      - link "Name" [ref=f28e782] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=name&order=desc
+                    - columnheader [ref=f28e787]:
+                      - link "Description Sort ascending." [ref=f28e788] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=description&order=asc
+                        - generic [ref=f28e789]: Description
+                        - generic [ref=f28e793]: Sort ascending.
+                    - columnheader [ref=f28e794]:
+                      - link "Slug Sort ascending." [ref=f28e795] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=slug&order=asc
+                        - generic [ref=f28e796]: Slug
+                        - generic [ref=f28e800]: Sort ascending.
+                    - columnheader [ref=f28e801]:
+                      - link "Count Sort ascending." [ref=f28e802] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit-tags.php?taxonomy=pa_weight&post_type=product&orderby=count&order=asc
+                        - generic [ref=f28e803]: Count
+                        - generic [ref=f28e807]: Sort ascending.
+                    - cell [ref=f28e808]
+              - generic [ref=f28e809]:
+                - generic [ref=f28e810]:
+                  - generic [ref=f28e811]: Select bulk action
+                  - combobox "Select bulk action" [ref=f28e812] [cursor=pointer]:
+                    - option "Bulk actions" [selected]
+                    - option "Delete"
+                  - button "Apply" [ref=f28e813] [cursor=pointer]
+                - generic [ref=f28e814]: 17 items
+  - contentinfo [ref=f28e816]:
+    - paragraph [ref=f28e817]:
+      - generic [ref=f28e818]:
+        - text: If you like
+        - strong [ref=f28e819]: WooCommerce
+        - text: please leave us a
+        - link "five star" [ref=f28e820] [cursor=pointer]:
+          - /url: https://wordpress.org/support/plugin/woocommerce/reviews?rate=5#new-post
+          - text: ★★★★★
+        - text: rating. A huge thanks in advance!
+    - paragraph [ref=f28e821]: Version 10.3.7

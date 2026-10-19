@@ -1,0 +1,1648 @@
+- generic [ref=f25e2]:
+  - navigation "Main menu":
+    - link "Skip to main content" [ref=f25e3] [cursor=pointer]:
+      - /url: "#wpbody-content"
+    - link "Skip to toolbar" [ref=f25e4] [cursor=pointer]:
+      - /url: "#wp-toolbar"
+    - list [ref=f25e7]:
+      - listitem [ref=f25e8]:
+        - link "Dashboard" [ref=f25e9] [cursor=pointer]:
+          - /url: index.php
+          - generic [aria-hidden] [ref=f25e10]: 
+        - list [ref=f25e12]:
+          - listitem [ref=f25e13]:
+            - link "Home" [ref=f25e14] [cursor=pointer]:
+              - /url: index.php
+          - listitem [ref=f25e15]:
+            - link "Updates 17" [ref=f25e16] [cursor=pointer]:
+              - /url: update-core.php
+              - text: Updates
+              - generic [ref=f25e17]: "17"
+      - listitem [aria-hidden] [ref=f25e18]
+      - listitem [ref=f25e20]:
+        - link "Posts" [ref=f25e21] [cursor=pointer]:
+          - /url: edit.php
+          - generic [aria-hidden] [ref=f25e22]: 
+        - list [ref=f25e24]:
+          - listitem [ref=f25e25]:
+            - link "All Posts" [ref=f25e26] [cursor=pointer]:
+              - /url: edit.php
+          - listitem [ref=f25e27]:
+            - link "Add Post" [ref=f25e28] [cursor=pointer]:
+              - /url: post-new.php
+          - listitem [ref=f25e29]:
+            - link "Categories" [ref=f25e30] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=category
+          - listitem [ref=f25e31]:
+            - link "Tags" [ref=f25e32] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=post_tag
+      - listitem [ref=f25e33]:
+        - link "Media" [ref=f25e34] [cursor=pointer]:
+          - /url: upload.php
+          - generic [aria-hidden] [ref=f25e35]: 
+        - list [ref=f25e37]:
+          - listitem [ref=f25e38]:
+            - link "Library" [ref=f25e39] [cursor=pointer]:
+              - /url: upload.php
+          - listitem [ref=f25e40]:
+            - link "Add Media File" [ref=f25e41] [cursor=pointer]:
+              - /url: media-new.php
+      - listitem [ref=f25e42]:
+        - link "Pages" [ref=f25e43] [cursor=pointer]:
+          - /url: edit.php?post_type=page
+          - generic [aria-hidden] [ref=f25e44]: 
+        - list [ref=f25e46]:
+          - listitem [ref=f25e47]:
+            - link "All Pages" [ref=f25e48] [cursor=pointer]:
+              - /url: edit.php?post_type=page
+          - listitem [ref=f25e49]:
+            - link "Add Page" [ref=f25e50] [cursor=pointer]:
+              - /url: post-new.php?post_type=page
+      - listitem [ref=f25e51]:
+        - link "Comments 84 Comments in moderation" [ref=f25e52] [cursor=pointer]:
+          - /url: edit-comments.php
+          - generic [aria-hidden] [ref=f25e53]: 
+          - generic [ref=f25e54]:
+            - text: Comments
+            - generic [ref=f25e55]:
+              - text: "84"
+              - generic [ref=f25e56]: 84 Comments in moderation
+      - listitem [ref=f25e57]:
+        - link "Projects" [ref=f25e58] [cursor=pointer]:
+          - /url: edit.php?post_type=project
+          - generic [aria-hidden] [ref=f25e59]: 
+        - list [ref=f25e61]:
+          - listitem [ref=f25e62]:
+            - link "All Projects" [ref=f25e63] [cursor=pointer]:
+              - /url: edit.php?post_type=project
+          - listitem [ref=f25e64]:
+            - link "Add New Project" [ref=f25e65] [cursor=pointer]:
+              - /url: post-new.php?post_type=project
+          - listitem [ref=f25e66]:
+            - link "Categories" [ref=f25e67] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_category&post_type=project
+          - listitem [ref=f25e68]:
+            - link "Tags" [ref=f25e69] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_tag&post_type=project
+      - listitem [ref=f25e70]:
+        - link "PhonePe PG Support" [ref=f25e71] [cursor=pointer]:
+          - /url: admin.php?page=phonepe-support
+          - generic [aria-hidden] [ref=f25e72]: 
+        - list [ref=f25e74]:
+          - listitem [ref=f25e75]:
+            - link "PhonePe PG Support" [ref=f25e76] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support
+          - listitem [ref=f25e77]:
+            - link "Download Error Logs" [ref=f25e78] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-logs
+          - listitem [ref=f25e79]:
+            - link "Compose Error Report" [ref=f25e80] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-mail
+      - listitem [aria-hidden] [ref=f25e81]
+      - listitem [ref=f25e83]:
+        - link "WooCommerce" [ref=f25e84] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin
+        - list [ref=f25e87]:
+          - listitem [ref=f25e88]:
+            - link "Home" [ref=f25e89] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin
+          - listitem [ref=f25e90]:
+            - link "Orders 32" [ref=f25e91] [cursor=pointer]:
+              - /url: admin.php?page=wc-orders
+              - text: Orders
+              - generic [ref=f25e92]: "32"
+          - listitem [ref=f25e93]:
+            - link "PhonePe settings" [ref=f25e94] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-settings
+          - listitem [ref=f25e95]:
+            - link "Customers" [ref=f25e96] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/customers
+          - listitem [ref=f25e97]:
+            - link "Reports" [ref=f25e98] [cursor=pointer]:
+              - /url: admin.php?page=wc-reports
+          - listitem [ref=f25e99]:
+            - link "Settings" [ref=f25e100] [cursor=pointer]:
+              - /url: admin.php?page=wc-settings
+          - listitem [ref=f25e101]:
+            - link "Status" [ref=f25e102] [cursor=pointer]:
+              - /url: admin.php?page=wc-status
+          - listitem [ref=f25e103]:
+            - link "Extensions" [ref=f25e104] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/extensions
+      - listitem [ref=f25e105]:
+        - link "Products" [ref=f25e106] [cursor=pointer]:
+          - /url: edit.php?post_type=product
+          - generic [aria-hidden] [ref=f25e107]: 
+        - list [ref=f25e109]:
+          - listitem [ref=f25e110]:
+            - link "All Products" [ref=f25e111] [cursor=pointer]:
+              - /url: edit.php?post_type=product
+          - listitem [ref=f25e112]:
+            - link "Add new product" [ref=f25e113] [cursor=pointer]:
+              - /url: post-new.php?post_type=product
+          - listitem [ref=f25e114]:
+            - link "Brands" [ref=f25e115] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_brand&post_type=product
+          - listitem [ref=f25e116]:
+            - link "Categories" [ref=f25e117] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_cat&post_type=product
+          - listitem [ref=f25e118]:
+            - link "Tags" [ref=f25e119] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_tag&post_type=product
+          - listitem [ref=f25e120]:
+            - link "Attributes" [ref=f25e121] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product_attributes
+          - listitem [ref=f25e122]:
+            - link "Reviews" [ref=f25e123] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product-reviews
+      - listitem [ref=f25e124]:
+        - link "Payments" [ref=f25e125] [cursor=pointer]:
+          - /url: admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM
+      - listitem [ref=f25e128]:
+        - link "Analytics" [ref=f25e129] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - generic [aria-hidden] [ref=f25e130]: 
+        - list [ref=f25e132]:
+          - listitem [ref=f25e133]:
+            - link "Overview" [ref=f25e134] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - listitem [ref=f25e135]:
+            - link "Products" [ref=f25e136] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/products
+          - listitem [ref=f25e137]:
+            - link "Revenue" [ref=f25e138] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/revenue
+          - listitem [ref=f25e139]:
+            - link "Orders" [ref=f25e140] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/orders
+          - listitem [ref=f25e141]:
+            - link "Variations" [ref=f25e142] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/variations
+          - listitem [ref=f25e143]:
+            - link "Categories" [ref=f25e144] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/categories
+          - listitem [ref=f25e145]:
+            - link "Coupons" [ref=f25e146] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/coupons
+          - listitem [ref=f25e147]:
+            - link "Taxes" [ref=f25e148] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/taxes
+          - listitem [ref=f25e149]:
+            - link "Downloads" [ref=f25e150] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/downloads
+          - listitem [ref=f25e151]:
+            - link "Stock" [ref=f25e152] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/stock
+          - listitem [ref=f25e153]:
+            - link "Settings" [ref=f25e154] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/settings
+      - listitem [ref=f25e155]:
+        - link "Marketing" [ref=f25e156] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/marketing
+          - generic [aria-hidden] [ref=f25e157]: 
+        - list [ref=f25e159]:
+          - listitem [ref=f25e160]:
+            - link "Overview" [ref=f25e161] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/marketing
+          - listitem [ref=f25e162]:
+            - link "Coupons" [ref=f25e163] [cursor=pointer]:
+              - /url: edit.php?post_type=shop_coupon
+      - listitem [aria-hidden] [ref=f25e164]
+      - listitem [ref=f25e166]:
+        - link "Appearance" [ref=f25e167] [cursor=pointer]:
+          - /url: themes.php
+          - generic [aria-hidden] [ref=f25e168]: 
+        - list [ref=f25e170]:
+          - listitem [ref=f25e171]:
+            - link "Themes 4" [ref=f25e172] [cursor=pointer]:
+              - /url: themes.php
+              - text: Themes
+              - generic [ref=f25e173]: "4"
+          - listitem [ref=f25e174]:
+            - link "Design" [ref=f25e175] [cursor=pointer]:
+              - /url: site-editor.php
+          - listitem [ref=f25e176]:
+            - link "Customize" [ref=f25e177] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fedit.php%3Fpost_type%3Dproduct
+          - listitem [ref=f25e178]:
+            - link "Widgets" [ref=f25e179] [cursor=pointer]:
+              - /url: widgets.php
+          - listitem [ref=f25e180]:
+            - link "Fonts" [ref=f25e181] [cursor=pointer]:
+              - /url: font-library.php
+          - listitem [ref=f25e182]:
+            - link "Menus" [ref=f25e183] [cursor=pointer]:
+              - /url: nav-menus.php
+          - listitem [ref=f25e184]:
+            - link "Background" [ref=f25e185] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fedit.php%3Fpost_type%3Dproduct&autofocus%5Bcontrol%5D=background_image
+          - listitem
+          - listitem [ref=f25e186]:
+            - link "Theme File Editor" [ref=f25e187] [cursor=pointer]:
+              - /url: theme-editor.php
+      - listitem [ref=f25e188]:
+        - link "Plugins 13" [ref=f25e189] [cursor=pointer]:
+          - /url: plugins.php
+          - generic [aria-hidden] [ref=f25e190]: 
+          - generic [ref=f25e191]:
+            - text: Plugins
+            - generic [ref=f25e192]: "13"
+        - list [ref=f25e193]:
+          - listitem [ref=f25e194]:
+            - link "Installed Plugins" [ref=f25e195] [cursor=pointer]:
+              - /url: plugins.php
+          - listitem [ref=f25e196]:
+            - link "Add Plugin" [ref=f25e197] [cursor=pointer]:
+              - /url: plugin-install.php
+          - listitem [ref=f25e198]:
+            - link "Plugin File Editor" [ref=f25e199] [cursor=pointer]:
+              - /url: plugin-editor.php
+      - listitem [ref=f25e200]:
+        - link "Users" [ref=f25e201] [cursor=pointer]:
+          - /url: users.php
+          - generic [aria-hidden] [ref=f25e202]: 
+        - list [ref=f25e204]:
+          - listitem [ref=f25e205]:
+            - link "All Users" [ref=f25e206] [cursor=pointer]:
+              - /url: users.php
+          - listitem [ref=f25e207]:
+            - link "Add User" [ref=f25e208] [cursor=pointer]:
+              - /url: user-new.php
+          - listitem [ref=f25e209]:
+            - link "Profile" [ref=f25e210] [cursor=pointer]:
+              - /url: profile.php
+      - listitem [ref=f25e211]:
+        - link "Tools" [ref=f25e212] [cursor=pointer]:
+          - /url: tools.php
+          - generic [aria-hidden] [ref=f25e213]: 
+        - list [ref=f25e215]:
+          - listitem [ref=f25e216]:
+            - link "Available Tools" [ref=f25e217] [cursor=pointer]:
+              - /url: tools.php
+          - listitem [ref=f25e218]:
+            - link "Import" [ref=f25e219] [cursor=pointer]:
+              - /url: import.php
+          - listitem [ref=f25e220]:
+            - link "Export" [ref=f25e221] [cursor=pointer]:
+              - /url: export.php
+          - listitem [ref=f25e222]:
+            - link "Site Health 1" [ref=f25e223] [cursor=pointer]:
+              - /url: site-health.php
+              - text: Site Health
+              - generic [ref=f25e224]: "1"
+          - listitem [ref=f25e225]:
+            - link "Export Personal Data" [ref=f25e226] [cursor=pointer]:
+              - /url: export-personal-data.php
+          - listitem [ref=f25e227]:
+            - link "Erase Personal Data" [ref=f25e228] [cursor=pointer]:
+              - /url: erase-personal-data.php
+          - listitem [ref=f25e229]:
+            - link "Scheduled Actions" [ref=f25e230] [cursor=pointer]:
+              - /url: tools.php?page=action-scheduler
+      - listitem [ref=f25e231]:
+        - link "Settings" [ref=f25e232] [cursor=pointer]:
+          - /url: options-general.php
+          - generic [aria-hidden] [ref=f25e233]: 
+        - list [ref=f25e235]:
+          - listitem [ref=f25e236]:
+            - link "General" [ref=f25e237] [cursor=pointer]:
+              - /url: options-general.php
+          - listitem [ref=f25e238]:
+            - link "Connectors" [ref=f25e239] [cursor=pointer]:
+              - /url: options-connectors.php
+          - listitem [ref=f25e240]:
+            - link "Writing" [ref=f25e241] [cursor=pointer]:
+              - /url: options-writing.php
+          - listitem [ref=f25e242]:
+            - link "Reading" [ref=f25e243] [cursor=pointer]:
+              - /url: options-reading.php
+          - listitem [ref=f25e244]:
+            - link "Discussion" [ref=f25e245] [cursor=pointer]:
+              - /url: options-discussion.php
+          - listitem [ref=f25e246]:
+            - link "Media" [ref=f25e247] [cursor=pointer]:
+              - /url: options-media.php
+          - listitem [ref=f25e248]:
+            - link "Permalinks" [ref=f25e249] [cursor=pointer]:
+              - /url: options-permalink.php
+          - listitem [ref=f25e250]:
+            - link "Privacy" [ref=f25e251] [cursor=pointer]:
+              - /url: options-privacy.php
+      - listitem [aria-hidden] [ref=f25e252]
+      - listitem [ref=f25e254]:
+        - link "Divi" [ref=f25e255] [cursor=pointer]:
+          - /url: admin.php?page=et_onboarding
+          - generic [aria-hidden] [ref=f25e256]: 
+        - list [ref=f25e258]:
+          - listitem [ref=f25e259]:
+            - link "Dashboard 1" [ref=f25e260] [cursor=pointer]:
+              - /url: admin.php?page=et_onboarding
+              - text: Dashboard
+              - generic [ref=f25e261]: "1"
+          - listitem [ref=f25e262]:
+            - link "Theme Options" [ref=f25e263] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_options
+          - listitem [ref=f25e264]:
+            - link "Theme Builder" [ref=f25e265] [cursor=pointer]:
+              - /url: admin.php?page=et_theme_builder
+          - listitem [ref=f25e266]:
+            - link "Theme Customizer" [ref=f25e267] [cursor=pointer]:
+              - /url: customize.php?et_customizer_option_set=theme
+          - listitem [ref=f25e268]:
+            - link "Role Editor" [ref=f25e269] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_role_editor
+          - listitem [ref=f25e270]:
+            - link "Divi Library" [ref=f25e271] [cursor=pointer]:
+              - /url: edit.php?post_type=et_pb_layout
+          - listitem [ref=f25e272]:
+            - link "Support Center" [ref=f25e273] [cursor=pointer]:
+              - /url: admin.php?page=et_support_center_divi
+      - listitem [ref=f25e274]:
+        - button "Collapse Main menu" [expanded] [ref=f25e275] [cursor=pointer]:
+          - generic [ref=f25e277]: Collapse Menu
+  - generic [ref=f25e278]:
+    - generic [ref=f25e279]:
+      - navigation "Toolbar":
+        - menu:
+          - group [ref=f25e280]:
+            - menuitem "About WordPress" [ref=f25e281] [cursor=pointer]
+          - group [ref=f25e284]:
+            - menuitem "Ambrosia - Staging" [ref=f25e285] [cursor=pointer]
+          - group [ref=f25e286]:
+            - menuitem "Live" [ref=f25e287] [cursor=pointer]
+          - group [ref=f25e288]:
+            - menuitem "17 updates available" [ref=f25e289] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f25e291]: "17"
+          - group [ref=f25e293]:
+            - menuitem "⌘K Open command palette" [ref=f25e294] [cursor=pointer]:
+              - generic [ref=f25e296]:
+                - text: ⌘K
+                - generic [ref=f25e297]: Open command palette
+          - group [ref=f25e298]:
+            - menuitem "84 Comments in moderation" [ref=f25e299] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f25e301]: "84"
+          - group [ref=f25e303]:
+            - menuitem "New" [ref=f25e304] [cursor=pointer]
+          - group [ref=f25e307]:
+            - menuitem "View products" [ref=f25e308] [cursor=pointer]
+        - menu [ref=f25e309]:
+          - group [ref=f25e310]:
+            - menuitem "Howdy, amborsia-admin" [ref=f25e311] [cursor=pointer]
+    - generic [ref=f25e313]:
+      - heading "Products" [level=1] [ref=f25e314]
+      - generic [ref=f25e315]:
+        - heading "Store Activity" [level=2] [ref=f25e316]
+        - complementary "Store Activity" [ref=f25e317]:
+          - tablist [ref=f25e318]:
+            - tab "Activity" [ref=f25e319] [cursor=pointer]
+    - main [ref=f25e325]:
+      - generic [ref=f25e326]:
+        - generic [ref=f25e327]:
+          - button "Screen Options" [ref=f25e329] [cursor=pointer]
+          - button "Help" [ref=f25e331] [cursor=pointer]
+        - generic [ref=f25e334]:
+          - heading "Products" [level=1] [ref=f25e335]
+          - link "Add new product" [ref=f25e336] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/wp-admin/post-new.php?post_type=product
+          - link "Import" [ref=f25e337] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&page=product_importer
+          - link "Export" [ref=f25e338] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&page=product_exporter
+          - generic [ref=f25e339]:
+            - link "Dismiss" [ref=f25e340] [cursor=pointer]:
+              - /url: /wp-admin/edit.php?post_type=product&wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-wordpress-untested&_wc_notice_nonce=3428c3ab95
+            - paragraph [ref=f25e341]:
+              - strong [ref=f25e342]: Pinterest for WooCommerce
+              - text: "- 1.4.12 is untested with WordPress 7.1.3."
+          - generic [ref=f25e343]:
+            - link "Dismiss" [ref=f25e344] [cursor=pointer]:
+              - /url: /wp-admin/edit.php?post_type=product&wc-hide-notice=pinterest-for-woocommerce%2Fpinterest-for-woocommerce.php-woocommerce-untested&_wc_notice_nonce=3428c3ab95
+            - paragraph [ref=f25e345]:
+              - strong [ref=f25e346]: Pinterest for WooCommerce
+              - text: "- version 1.4.12 is untested with WooCommerce 10.3.7."
+          - heading "Filter products" [level=2] [ref=f25e347]
+          - list [ref=f25e348]:
+            - listitem [ref=f25e349]:
+              - link "All (487)" [ref=f25e350] [cursor=pointer]:
+                - /url: edit.php?post_type=product
+              - text: "|"
+            - listitem [ref=f25e351]:
+              - link "Published (487)" [ref=f25e352] [cursor=pointer]:
+                - /url: edit.php?post_status=publish&post_type=product
+              - text: "|"
+            - listitem [ref=f25e353]:
+              - link "Trash (481)" [ref=f25e354] [cursor=pointer]:
+                - /url: edit.php?post_status=trash&post_type=product
+              - text: "|"
+            - listitem [ref=f25e355]:
+              - link "Sorting" [ref=f25e356] [cursor=pointer]:
+                - /url: /wp-admin/edit.php?post_type=product&orderby=menu_order+title&order=ASC
+          - generic [ref=f25e357]:
+            - paragraph [ref=f25e358]:
+              - generic [ref=f25e359]: "Search products:"
+              - searchbox "Search products:" [ref=f25e360]
+              - button "Search products" [ref=f25e361] [cursor=pointer]
+            - generic [ref=f25e362]:
+              - generic [ref=f25e363]:
+                - generic [ref=f25e364]: Select bulk action
+                - combobox "Select bulk action" [ref=f25e365] [cursor=pointer]:
+                  - option "Bulk actions" [selected]
+                  - option "Bulk edit"
+                  - option "Move to Trash"
+                - button "Apply" [ref=f25e366] [cursor=pointer]
+              - generic [ref=f25e367]:
+                - combobox [ref=f25e368] [cursor=pointer]:
+                  - option "Select a category" [selected]
+                  - option "Appetizer (16)"
+                  - option "Arabic (2)"
+                  - option "Beverages (32)"
+                  - option "Birthday Accessories (6)"
+                  - option "Birthday Cakes (76)"
+                  - option "Burger (0)"
+                  - option "Non Veg (0)"
+                  - option "Veg (0)"
+                  - option "Burgers (7)"
+                  - option "Cakes (0)"
+                  - option "Cheesecakes (0)"
+                  - option "Chocoholics (0)"
+                  - option "Fresh Cream Cakes (0)"
+                  - option "Fruit Flavoured Cakes (0)"
+                  - option "Mother’s Day Specials (0)"
+                  - option "Plain Cakes (0)"
+                  - option "Chinese (22)"
+                  - option "Chocolate Bouquet (0)"
+                  - option "Christmas Specials (0)"
+                  - option "Combos (24)"
+                  - option "Cookies (33)"
+                  - option "Dessert & Pastries (62)"
+                  - option "Dryfruits & Nuts (3)"
+                  - option "Flowers (0)"
+                  - option "Food Menu (0)"
+                  - option "Appetizer (0)"
+                  - option "Arabic (0)"
+                  - option "Burgers (0)"
+                  - option "Chinese (0)"
+                  - option "Grills (0)"
+                  - option "Indian (0)"
+                  - option "Indian Breads (0)"
+                  - option "Kothu Parotta (0)"
+                  - option "Pastas (0)"
+                  - option "Pizza (0)"
+                  - option "Non Veg Pizza (0)"
+                  - option "Veg Pizza (0)"
+                  - option "Salads (0)"
+                  - option "Sandwiches (0)"
+                  - option "Non Veg Sandwiches (0)"
+                  - option "Veg Sandwich (0)"
+                  - option "Soups (0)"
+                  - option "Indian (17)"
+                  - option "Indian Breads (4)"
+                  - option "Indian Sweets (29)"
+                  - option "Kothu Parotta (5)"
+                  - option "Packed Goodies (0)"
+                  - option "Chocolates & Nuts (0)"
+                  - option "Cookies (0)"
+                  - option "Halwas (0)"
+                  - option "Indian Sweets (0)"
+                  - option "Muffins (0)"
+                  - option "Savouries (0)"
+                  - option "Pastas (6)"
+                  - option "Personalized Gifts (0)"
+                  - option "Cake Photoprint (0)"
+                  - option "Pizza (27)"
+                  - option "Plain Cakes (39)"
+                  - option "Rose Bunch (0)"
+                  - option "Salads (5)"
+                  - option "Non Veg (0)"
+                  - option "Veg (0)"
+                  - option "Sandwiches (6)"
+                  - option "Savouries & Rusks (55)"
+                  - option "Soups (11)"
+                  - option "Starters (0)"
+                  - option "Non Veg (0)"
+                  - option "Veg (0)"
+                  - option "Uncategorized (0)"
+                  - option "Valentine’s Day Special (0)"
+                - combobox [ref=f25e369] [cursor=pointer]:
+                  - option "Filter by product type" [selected]
+                  - option "Simple product"
+                  - option "→ Downloadable"
+                  - option "→ Virtual"
+                  - option "Grouped product"
+                  - option "External/Affiliate product"
+                  - option "Variable product"
+                - combobox [ref=f25e370] [cursor=pointer]:
+                  - option "Filter by stock status" [selected]
+                  - option "In stock"
+                  - option "Out of stock"
+                  - option "On backorder"
+                - combobox [ref=f25e371] [cursor=pointer]:
+                  - option "Filter by brand" [selected]
+                - button "Filter" [ref=f25e372] [cursor=pointer]
+              - heading "Products navigation" [level=2] [ref=f25e373]
+              - generic [ref=f25e374]:
+                - text: 487 items
+                - generic [ref=f25e375]:
+                  - generic [aria-hidden] [ref=f25e376]: «
+                  - generic [aria-hidden] [ref=f25e377]: ‹
+                  - generic [ref=f25e378]:
+                    - generic [ref=f25e379]: Current Page
+                    - textbox "Current Page" [ref=f25e380]: "1"
+                    - generic [ref=f25e381]: of 25
+                  - link "Next page" [ref=f25e382] [cursor=pointer]:
+                    - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&paged=2
+                    - text: ›
+                  - link "Last page" [ref=f25e384] [cursor=pointer]:
+                    - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&paged=25
+                    - text: »
+            - heading "Products list" [level=2] [ref=f25e386]
+            - table [ref=f25e387]:
+              - rowgroup [ref=f25e388]:
+                - row [ref=f25e389]:
+                  - cell "Select All" [ref=f25e390]:
+                    - checkbox "Select All" [ref=f25e391] [cursor=pointer]
+                  - columnheader " Image" [ref=f25e394]
+                  - columnheader [ref=f25e396]:
+                    - link "Name Sort ascending." [ref=f25e397] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=title&order=asc
+                      - generic [ref=f25e398]: Name
+                      - generic [ref=f25e402]: Sort ascending.
+                  - columnheader [ref=f25e403]:
+                    - link "SKU Sort ascending." [ref=f25e404] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=sku&order=asc
+                      - generic [ref=f25e405]: SKU
+                      - generic [ref=f25e409]: Sort ascending.
+                  - columnheader "Stock" [ref=f25e410]
+                  - columnheader [ref=f25e411]:
+                    - link "Price Sort ascending." [ref=f25e412] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=price&order=asc
+                      - generic [ref=f25e413]: Price
+                      - generic [ref=f25e417]: Sort ascending.
+                  - columnheader "Categories" [ref=f25e418]
+                  - columnheader "Tags" [ref=f25e419]
+                  - columnheader "Brands" [ref=f25e420]
+                  - columnheader " Featured" [ref=f25e421]
+                  - columnheader [ref=f25e423]:
+                    - link "Date" [ref=f25e424] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=date&order=asc
+              - rowgroup [ref=f25e429]:
+                - row [ref=f25e430]:
+                  - cell "Select Choco Nutella Torte Pastry" [ref=f25e431]:
+                    - checkbox "Select Choco Nutella Torte Pastry" [ref=f25e432] [cursor=pointer]
+                  - cell [ref=f25e435]:
+                    - link [ref=f25e436] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512522&action=edit
+                      - img "Placeholder" [ref=f25e437]
+                  - rowheader "Choco Nutella Torte Pastry" [ref=f25e438]:
+                    - strong [ref=f25e439]:
+                      - link "Choco Nutella Torte Pastry" [ref=f25e440] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512522&action=edit
+                    - generic [ref=f25e441]:
+                      - text: "ID: 987512522 |"
+                      - generic [ref=f25e442]:
+                        - link "Edit “Choco Nutella Torte Pastry”" [ref=f25e443] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512522&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e444]:
+                        - button "Quick edit “Choco Nutella Torte Pastry” inline" [ref=f25e445] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e446]:
+                        - link "Move “Choco Nutella Torte Pastry” to the Trash" [ref=f25e447] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512522&action=trash&_wpnonce=3dfadb987d
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e448]:
+                        - link "View “Choco Nutella Torte Pastry”" [ref=f25e449] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/choco-nutella-torte-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e451] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512522&_wpnonce=52f58f414f
+                        - text: Duplicate
+                  - cell "BK-1313725214" [ref=f25e452]
+                  - cell [ref=f25e453]:
+                    - mark [ref=f25e454]: In stock
+                  - cell "₹170.00" [ref=f25e455]
+                  - cell [ref=f25e457]:
+                    - link "Dessert & Pastries" [ref=f25e458] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e459]:
+                    - link "egg" [ref=f25e460] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e461]: —
+                  - cell [ref=f25e463]:
+                    - link "Toggle featured" [ref=f25e464] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512522&_wpnonce=b095267698
+                      - generic [ref=f25e465]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e466]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e467]:
+                  - cell "Select bombay halwa 500 g" [ref=f25e468]:
+                    - checkbox "Select bombay halwa 500 g" [ref=f25e469] [cursor=pointer]
+                  - cell [ref=f25e472]:
+                    - link [ref=f25e473] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512531&action=edit
+                      - img "Placeholder" [ref=f25e474]
+                  - rowheader "bombay halwa 500 g" [ref=f25e475]:
+                    - strong [ref=f25e476]:
+                      - link "bombay halwa 500 g" [ref=f25e477] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512531&action=edit
+                    - generic [ref=f25e478]:
+                      - text: "ID: 987512531 |"
+                      - generic [ref=f25e479]:
+                        - link "Edit “bombay halwa 500 g”" [ref=f25e480] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512531&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e481]:
+                        - button "Quick edit “bombay halwa 500 g” inline" [ref=f25e482] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e483]:
+                        - link "Move “bombay halwa 500 g” to the Trash" [ref=f25e484] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512531&action=trash&_wpnonce=ec9eed5fdf
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e485]:
+                        - link "View “bombay halwa 500 g”" [ref=f25e486] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/bombay-halwa-500-g/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e488] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512531&_wpnonce=f87a17b9ac
+                        - text: Duplicate
+                  - cell "BK-1316967668" [ref=f25e489]
+                  - cell [ref=f25e490]:
+                    - mark [ref=f25e491]: In stock
+                  - cell "₹300.00" [ref=f25e492]
+                  - cell [ref=f25e494]:
+                    - link "Indian Sweets" [ref=f25e495] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=indian-sweets-2&post_type=product
+                  - cell [ref=f25e496]:
+                    - link "veg" [ref=f25e497] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=veg&post_type=product
+                  - cell "No brands" [ref=f25e498]: —
+                  - cell [ref=f25e500]:
+                    - link "Toggle featured" [ref=f25e501] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512531&_wpnonce=b095267698
+                      - generic [ref=f25e502]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e503]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e504]:
+                  - cell "Select pineapple halwa 500 g" [ref=f25e505]:
+                    - checkbox "Select pineapple halwa 500 g" [ref=f25e506] [cursor=pointer]
+                  - cell [ref=f25e509]:
+                    - link [ref=f25e510] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512530&action=edit
+                      - img "Placeholder" [ref=f25e511]
+                  - rowheader "pineapple halwa 500 g" [ref=f25e512]:
+                    - strong [ref=f25e513]:
+                      - link "pineapple halwa 500 g" [ref=f25e514] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512530&action=edit
+                    - generic [ref=f25e515]:
+                      - text: "ID: 987512530 |"
+                      - generic [ref=f25e516]:
+                        - link "Edit “pineapple halwa 500 g”" [ref=f25e517] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512530&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e518]:
+                        - button "Quick edit “pineapple halwa 500 g” inline" [ref=f25e519] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e520]:
+                        - link "Move “pineapple halwa 500 g” to the Trash" [ref=f25e521] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512530&action=trash&_wpnonce=89b20188e9
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e522]:
+                        - link "View “pineapple halwa 500 g”" [ref=f25e523] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/pineapple-halwa-500-g/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e525] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512530&_wpnonce=8d201c638e
+                        - text: Duplicate
+                  - cell "BK-1316967667" [ref=f25e526]
+                  - cell [ref=f25e527]:
+                    - mark [ref=f25e528]: In stock
+                  - cell "₹300.00" [ref=f25e529]
+                  - cell [ref=f25e531]:
+                    - link "Indian Sweets" [ref=f25e532] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=indian-sweets-2&post_type=product
+                  - cell [ref=f25e533]:
+                    - link "veg" [ref=f25e534] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=veg&post_type=product
+                  - cell "No brands" [ref=f25e535]: —
+                  - cell [ref=f25e537]:
+                    - link "Toggle featured" [ref=f25e538] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512530&_wpnonce=b095267698
+                      - generic [ref=f25e539]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e540]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e541]:
+                  - cell "Select Unniyappam" [ref=f25e542]:
+                    - checkbox "Select Unniyappam" [ref=f25e543] [cursor=pointer]
+                  - cell [ref=f25e546]:
+                    - link [ref=f25e547] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512529&action=edit
+                      - img "Placeholder" [ref=f25e548]
+                  - rowheader "Unniyappam" [ref=f25e549]:
+                    - strong [ref=f25e550]:
+                      - link "Unniyappam" [ref=f25e551] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512529&action=edit
+                    - generic [ref=f25e552]:
+                      - text: "ID: 987512529 |"
+                      - generic [ref=f25e553]:
+                        - link "Edit “Unniyappam”" [ref=f25e554] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512529&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e555]:
+                        - button "Quick edit “Unniyappam” inline" [ref=f25e556] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e557]:
+                        - link "Move “Unniyappam” to the Trash" [ref=f25e558] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512529&action=trash&_wpnonce=fd406cdba1
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e559]:
+                        - link "View “Unniyappam”" [ref=f25e560] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/unniyappam/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e562] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512529&_wpnonce=3e63aac3ae
+                        - text: Duplicate
+                  - cell "BK-1316625203" [ref=f25e563]
+                  - cell [ref=f25e564]:
+                    - mark [ref=f25e565]: In stock
+                  - cell "₹20.00" [ref=f25e566]
+                  - cell [ref=f25e568]:
+                    - link "Savouries & Rusks" [ref=f25e569] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=savouries-rusks&post_type=product
+                  - cell [ref=f25e570]:
+                    - link "egg" [ref=f25e571] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e572]: —
+                  - cell [ref=f25e574]:
+                    - link "Toggle featured" [ref=f25e575] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512529&_wpnonce=b095267698
+                      - generic [ref=f25e576]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e577]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e578]:
+                  - cell "Select Tender Coconut Mousse" [ref=f25e579]:
+                    - checkbox "Select Tender Coconut Mousse" [ref=f25e580] [cursor=pointer]
+                  - cell [ref=f25e583]:
+                    - link [ref=f25e584] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512525&action=edit
+                      - img "Placeholder" [ref=f25e585]
+                  - rowheader "Tender Coconut Mousse" [ref=f25e586]:
+                    - strong [ref=f25e587]:
+                      - link "Tender Coconut Mousse" [ref=f25e588] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512525&action=edit
+                    - generic [ref=f25e589]:
+                      - text: "ID: 987512525 |"
+                      - generic [ref=f25e590]:
+                        - link "Edit “Tender Coconut Mousse”" [ref=f25e591] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512525&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e592]:
+                        - button "Quick edit “Tender Coconut Mousse” inline" [ref=f25e593] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e594]:
+                        - link "Move “Tender Coconut Mousse” to the Trash" [ref=f25e595] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512525&action=trash&_wpnonce=d8de5b730a
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e596]:
+                        - link "View “Tender Coconut Mousse”" [ref=f25e597] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/tender-coconut-mousse/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e599] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512525&_wpnonce=6680740c33
+                        - text: Duplicate
+                  - cell "BK-1313939239" [ref=f25e600]
+                  - cell [ref=f25e601]:
+                    - mark [ref=f25e602]: In stock
+                  - cell "₹140.00" [ref=f25e603]
+                  - cell [ref=f25e605]:
+                    - link "Dessert & Pastries" [ref=f25e606] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e607]:
+                    - link "egg" [ref=f25e608] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e609]: —
+                  - cell [ref=f25e611]:
+                    - link "Toggle featured" [ref=f25e612] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512525&_wpnonce=b095267698
+                      - generic [ref=f25e613]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e614]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e615]:
+                  - cell "Select Tender Coconut Pudding Tray" [ref=f25e616]:
+                    - checkbox "Select Tender Coconut Pudding Tray" [ref=f25e617] [cursor=pointer]
+                  - cell [ref=f25e620]:
+                    - link [ref=f25e621] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512524&action=edit
+                      - img "Placeholder" [ref=f25e622]
+                  - rowheader "Tender Coconut Pudding Tray" [ref=f25e623]:
+                    - strong [ref=f25e624]:
+                      - link "Tender Coconut Pudding Tray" [ref=f25e625] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512524&action=edit
+                    - generic [ref=f25e626]:
+                      - text: "ID: 987512524 |"
+                      - generic [ref=f25e627]:
+                        - link "Edit “Tender Coconut Pudding Tray”" [ref=f25e628] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512524&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e629]:
+                        - button "Quick edit “Tender Coconut Pudding Tray” inline" [ref=f25e630] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e631]:
+                        - link "Move “Tender Coconut Pudding Tray” to the Trash" [ref=f25e632] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512524&action=trash&_wpnonce=14b24e1813
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e633]:
+                        - link "View “Tender Coconut Pudding Tray”" [ref=f25e634] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/tender-coconut-pudding-tray/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e636] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512524&_wpnonce=3c8d4659e4
+                        - text: Duplicate
+                  - cell "BK-1313862078" [ref=f25e637]
+                  - cell [ref=f25e638]:
+                    - mark [ref=f25e639]: In stock
+                  - cell "₹1,500.00" [ref=f25e640]
+                  - cell [ref=f25e642]:
+                    - link "Dessert & Pastries" [ref=f25e643] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e644]:
+                    - link "egg" [ref=f25e645] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e646]: —
+                  - cell [ref=f25e648]:
+                    - link "Toggle featured" [ref=f25e649] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512524&_wpnonce=b095267698
+                      - generic [ref=f25e650]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e651]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e652]:
+                  - cell "Select White Chocolate Blueberry Torte Pastry" [ref=f25e653]:
+                    - checkbox "Select White Chocolate Blueberry Torte Pastry" [ref=f25e654] [cursor=pointer]
+                  - cell [ref=f25e657]:
+                    - link [ref=f25e658] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512521&action=edit
+                      - img "Placeholder" [ref=f25e659]
+                  - rowheader "White Chocolate Blueberry Torte Pastry" [ref=f25e660]:
+                    - strong [ref=f25e661]:
+                      - link "White Chocolate Blueberry Torte Pastry" [ref=f25e662] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512521&action=edit
+                    - generic [ref=f25e663]:
+                      - text: "ID: 987512521 |"
+                      - generic [ref=f25e664]:
+                        - link "Edit “White Chocolate Blueberry Torte Pastry”" [ref=f25e665] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512521&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e666]:
+                        - button "Quick edit “White Chocolate Blueberry Torte Pastry” inline" [ref=f25e667] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e668]:
+                        - link "Move “White Chocolate Blueberry Torte Pastry” to the Trash" [ref=f25e669] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512521&action=trash&_wpnonce=29c0ad9a5b
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e670]:
+                        - link "View “White Chocolate Blueberry Torte Pastry”" [ref=f25e671] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/white-chocolate-blueberry-torte-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e673] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512521&_wpnonce=e7b626bffe
+                        - text: Duplicate
+                  - cell "BK-1313725213" [ref=f25e674]
+                  - cell [ref=f25e675]:
+                    - mark [ref=f25e676]: In stock
+                  - cell "₹150.00" [ref=f25e677]
+                  - cell [ref=f25e679]:
+                    - link "Dessert & Pastries" [ref=f25e680] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e681]:
+                    - link "egg" [ref=f25e682] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e683]: —
+                  - cell [ref=f25e685]:
+                    - link "Toggle featured" [ref=f25e686] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512521&_wpnonce=b095267698
+                      - generic [ref=f25e687]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e688]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e689]:
+                  - cell "Select Ghee Biscuit 250 Gm" [ref=f25e690]:
+                    - checkbox "Select Ghee Biscuit 250 Gm" [ref=f25e691] [cursor=pointer]
+                  - cell [ref=f25e694]:
+                    - link [ref=f25e695] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512526&action=edit
+                      - img "Placeholder" [ref=f25e696]
+                  - rowheader "Ghee Biscuit 250 Gm" [ref=f25e697]:
+                    - strong [ref=f25e698]:
+                      - link "Ghee Biscuit 250 Gm" [ref=f25e699] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512526&action=edit
+                    - generic [ref=f25e700]:
+                      - text: "ID: 987512526 |"
+                      - generic [ref=f25e701]:
+                        - link "Edit “Ghee Biscuit 250 Gm”" [ref=f25e702] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512526&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e703]:
+                        - button "Quick edit “Ghee Biscuit 250 Gm” inline" [ref=f25e704] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e705]:
+                        - link "Move “Ghee Biscuit 250 Gm” to the Trash" [ref=f25e706] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512526&action=trash&_wpnonce=44cba18cec
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e707]:
+                        - link "View “Ghee Biscuit 250 Gm”" [ref=f25e708] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/ghee-biscuit-250-gm/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e710] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512526&_wpnonce=3f99ad5641
+                        - text: Duplicate
+                  - cell "BK-1314397737" [ref=f25e711]
+                  - cell [ref=f25e712]:
+                    - mark [ref=f25e713]: In stock
+                  - cell "₹175.00" [ref=f25e714]
+                  - cell [ref=f25e716]:
+                    - link "Cookies" [ref=f25e717] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=cookies-2&post_type=product
+                  - cell [ref=f25e718]:
+                    - link "veg" [ref=f25e719] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=veg&post_type=product
+                  - cell "No brands" [ref=f25e720]: —
+                  - cell [ref=f25e722]:
+                    - link "Toggle featured" [ref=f25e723] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512526&_wpnonce=b095267698
+                      - generic [ref=f25e724]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e725]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e726]:
+                  - cell "Select American Cheese Frosting Pastry" [ref=f25e727]:
+                    - checkbox "Select American Cheese Frosting Pastry" [ref=f25e728] [cursor=pointer]
+                  - cell [ref=f25e731]:
+                    - link [ref=f25e732] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512523&action=edit
+                      - img "Placeholder" [ref=f25e733]
+                  - rowheader "American Cheese Frosting Pastry" [ref=f25e734]:
+                    - strong [ref=f25e735]:
+                      - link "American Cheese Frosting Pastry" [ref=f25e736] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512523&action=edit
+                    - generic [ref=f25e737]:
+                      - text: "ID: 987512523 |"
+                      - generic [ref=f25e738]:
+                        - link "Edit “American Cheese Frosting Pastry”" [ref=f25e739] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512523&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e740]:
+                        - button "Quick edit “American Cheese Frosting Pastry” inline" [ref=f25e741] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e742]:
+                        - link "Move “American Cheese Frosting Pastry” to the Trash" [ref=f25e743] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512523&action=trash&_wpnonce=99cc61a087
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e744]:
+                        - link "View “American Cheese Frosting Pastry”" [ref=f25e745] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/american-cheese-frosting-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e747] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512523&_wpnonce=60f2c3c3e4
+                        - text: Duplicate
+                  - cell "BK-1313739888" [ref=f25e748]
+                  - cell [ref=f25e749]:
+                    - mark [ref=f25e750]: In stock
+                  - cell "₹160.00" [ref=f25e751]
+                  - cell [ref=f25e753]:
+                    - link "Dessert & Pastries" [ref=f25e754] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e755]:
+                    - link "egg" [ref=f25e756] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e757]: —
+                  - cell [ref=f25e759]:
+                    - link "Toggle featured" [ref=f25e760] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512523&_wpnonce=b095267698
+                      - generic [ref=f25e761]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e762]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e763]:
+                  - cell "Select Almond Fudge Pastry" [ref=f25e764]:
+                    - checkbox "Select Almond Fudge Pastry" [ref=f25e765] [cursor=pointer]
+                  - cell [ref=f25e768]:
+                    - link [ref=f25e769] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512520&action=edit
+                      - img "Placeholder" [ref=f25e770]
+                  - rowheader "Almond Fudge Pastry" [ref=f25e771]:
+                    - strong [ref=f25e772]:
+                      - link "Almond Fudge Pastry" [ref=f25e773] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512520&action=edit
+                    - generic [ref=f25e774]:
+                      - text: "ID: 987512520 |"
+                      - generic [ref=f25e775]:
+                        - link "Edit “Almond Fudge Pastry”" [ref=f25e776] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512520&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e777]:
+                        - button "Quick edit “Almond Fudge Pastry” inline" [ref=f25e778] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e779]:
+                        - link "Move “Almond Fudge Pastry” to the Trash" [ref=f25e780] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512520&action=trash&_wpnonce=af574b42d8
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e781]:
+                        - link "View “Almond Fudge Pastry”" [ref=f25e782] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/almond-fudge-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e784] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512520&_wpnonce=cd72cff3aa
+                        - text: Duplicate
+                  - cell "BK-1313098625" [ref=f25e785]
+                  - cell [ref=f25e786]:
+                    - mark [ref=f25e787]: In stock
+                  - cell "₹140.00" [ref=f25e788]
+                  - cell [ref=f25e790]:
+                    - link "Dessert & Pastries" [ref=f25e791] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e792]:
+                    - link "egg" [ref=f25e793] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e794]: —
+                  - cell [ref=f25e796]:
+                    - link "Toggle featured" [ref=f25e797] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512520&_wpnonce=b095267698
+                      - generic [ref=f25e798]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e799]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e800]:
+                  - cell "Select Meringue Strawberry 90 G" [ref=f25e801]:
+                    - checkbox "Select Meringue Strawberry 90 G" [ref=f25e802] [cursor=pointer]
+                  - cell [ref=f25e805]:
+                    - link [ref=f25e806] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512527&action=edit
+                      - img "Placeholder" [ref=f25e807]
+                  - rowheader "Meringue Strawberry 90 G" [ref=f25e808]:
+                    - strong [ref=f25e809]:
+                      - link "Meringue Strawberry 90 G" [ref=f25e810] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512527&action=edit
+                    - generic [ref=f25e811]:
+                      - text: "ID: 987512527 |"
+                      - generic [ref=f25e812]:
+                        - link "Edit “Meringue Strawberry 90 G”" [ref=f25e813] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512527&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e814]:
+                        - button "Quick edit “Meringue Strawberry 90 G” inline" [ref=f25e815] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e816]:
+                        - link "Move “Meringue Strawberry 90 G” to the Trash" [ref=f25e817] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512527&action=trash&_wpnonce=bea133cb89
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e818]:
+                        - link "View “Meringue Strawberry 90 G”" [ref=f25e819] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/meringue-strawberry-90-g/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e821] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512527&_wpnonce=c57d220b3c
+                        - text: Duplicate
+                  - cell "BK-1314486854" [ref=f25e822]
+                  - cell [ref=f25e823]:
+                    - mark [ref=f25e824]: In stock
+                  - cell "₹120.00" [ref=f25e825]
+                  - cell [ref=f25e827]:
+                    - link "Savouries & Rusks" [ref=f25e828] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=savouries-rusks&post_type=product
+                  - cell [ref=f25e829]:
+                    - link "egg" [ref=f25e830] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e831]: —
+                  - cell [ref=f25e833]:
+                    - link "Toggle featured" [ref=f25e834] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512527&_wpnonce=b095267698
+                      - generic [ref=f25e835]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e836]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e837]:
+                  - cell "Select indian sweet" [ref=f25e838]:
+                    - checkbox "Select indian sweet" [ref=f25e839] [cursor=pointer]
+                  - cell [ref=f25e842]:
+                    - link [ref=f25e843] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512528&action=edit
+                      - img "Placeholder" [ref=f25e844]
+                  - rowheader "indian sweet" [ref=f25e845]:
+                    - strong [ref=f25e846]:
+                      - link "indian sweet" [ref=f25e847] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512528&action=edit
+                    - generic [ref=f25e848]:
+                      - text: "ID: 987512528 |"
+                      - generic [ref=f25e849]:
+                        - link "Edit “indian sweet”" [ref=f25e850] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512528&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e851]:
+                        - button "Quick edit “indian sweet” inline" [ref=f25e852] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e853]:
+                        - link "Move “indian sweet” to the Trash" [ref=f25e854] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512528&action=trash&_wpnonce=64c0d27b09
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e855]:
+                        - link "View “indian sweet”" [ref=f25e856] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/indian-sweet/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e858] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512528&_wpnonce=b04e9abb45
+                        - text: Duplicate
+                  - cell "BK-1314762118" [ref=f25e859]
+                  - cell [ref=f25e860]:
+                    - mark [ref=f25e861]: In stock
+                  - cell "₹35.00" [ref=f25e862]
+                  - cell [ref=f25e864]:
+                    - link "Indian Sweets" [ref=f25e865] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=indian-sweets-2&post_type=product
+                  - cell [ref=f25e866]:
+                    - link "veg" [ref=f25e867] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=veg&post_type=product
+                  - cell "No brands" [ref=f25e868]: —
+                  - cell [ref=f25e870]:
+                    - link "Toggle featured" [ref=f25e871] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512528&_wpnonce=b095267698
+                      - generic [ref=f25e872]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e873]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e874]:
+                  - cell "Select Rich Chocolate Pastry" [ref=f25e875]:
+                    - checkbox "Select Rich Chocolate Pastry" [ref=f25e876] [cursor=pointer]
+                  - cell [ref=f25e879]:
+                    - link [ref=f25e880] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512512&action=edit
+                      - img "Placeholder" [ref=f25e881]
+                  - rowheader "Rich Chocolate Pastry" [ref=f25e882]:
+                    - strong [ref=f25e883]:
+                      - link "Rich Chocolate Pastry" [ref=f25e884] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512512&action=edit
+                    - generic [ref=f25e885]:
+                      - text: "ID: 987512512 |"
+                      - generic [ref=f25e886]:
+                        - link "Edit “Rich Chocolate Pastry”" [ref=f25e887] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512512&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e888]:
+                        - button "Quick edit “Rich Chocolate Pastry” inline" [ref=f25e889] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e890]:
+                        - link "Move “Rich Chocolate Pastry” to the Trash" [ref=f25e891] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512512&action=trash&_wpnonce=fb06059bc7
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e892]:
+                        - link "View “Rich Chocolate Pastry”" [ref=f25e893] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/rich-chocolate-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e895] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512512&_wpnonce=3faf7b1765
+                        - text: Duplicate
+                  - cell "BK-1311835437" [ref=f25e896]
+                  - cell [ref=f25e897]:
+                    - mark [ref=f25e898]: In stock
+                  - cell "₹180.00" [ref=f25e899]
+                  - cell [ref=f25e901]:
+                    - link "Dessert & Pastries" [ref=f25e902] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e903]:
+                    - link "egg" [ref=f25e904] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e905]: —
+                  - cell [ref=f25e907]:
+                    - link "Toggle featured" [ref=f25e908] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512512&_wpnonce=b095267698
+                      - generic [ref=f25e909]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e910]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e911]:
+                  - cell "Select red crunch pastry" [ref=f25e912]:
+                    - checkbox "Select red crunch pastry" [ref=f25e913] [cursor=pointer]
+                  - cell [ref=f25e916]:
+                    - link [ref=f25e917] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512518&action=edit
+                      - img "Placeholder" [ref=f25e918]
+                  - rowheader "red crunch pastry" [ref=f25e919]:
+                    - strong [ref=f25e920]:
+                      - link "red crunch pastry" [ref=f25e921] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512518&action=edit
+                    - generic [ref=f25e922]:
+                      - text: "ID: 987512518 |"
+                      - generic [ref=f25e923]:
+                        - link "Edit “red crunch pastry”" [ref=f25e924] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512518&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e925]:
+                        - button "Quick edit “red crunch pastry” inline" [ref=f25e926] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e927]:
+                        - link "Move “red crunch pastry” to the Trash" [ref=f25e928] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512518&action=trash&_wpnonce=68e330535b
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e929]:
+                        - link "View “red crunch pastry”" [ref=f25e930] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/red-crunch-pastry-2/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e932] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512518&_wpnonce=12d6ebfd8f
+                        - text: Duplicate
+                  - cell "BK-1312947729" [ref=f25e933]
+                  - cell [ref=f25e934]:
+                    - mark [ref=f25e935]: In stock
+                  - cell "₹150.00" [ref=f25e936]
+                  - cell [ref=f25e938]:
+                    - link "Dessert & Pastries" [ref=f25e939] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e940]:
+                    - link "egg" [ref=f25e941] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e942]: —
+                  - cell [ref=f25e944]:
+                    - link "Toggle featured" [ref=f25e945] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512518&_wpnonce=b095267698
+                      - generic [ref=f25e946]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e947]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e948]:
+                  - cell "Select Brownie Caramel Mousse" [ref=f25e949]:
+                    - checkbox "Select Brownie Caramel Mousse" [ref=f25e950] [cursor=pointer]
+                  - cell [ref=f25e953]:
+                    - link [ref=f25e954] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512508&action=edit
+                      - img "Placeholder" [ref=f25e955]
+                  - rowheader "Brownie Caramel Mousse" [ref=f25e956]:
+                    - strong [ref=f25e957]:
+                      - link "Brownie Caramel Mousse" [ref=f25e958] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512508&action=edit
+                    - generic [ref=f25e959]:
+                      - text: "ID: 987512508 |"
+                      - generic [ref=f25e960]:
+                        - link "Edit “Brownie Caramel Mousse”" [ref=f25e961] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512508&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e962]:
+                        - button "Quick edit “Brownie Caramel Mousse” inline" [ref=f25e963] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e964]:
+                        - link "Move “Brownie Caramel Mousse” to the Trash" [ref=f25e965] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512508&action=trash&_wpnonce=0b3f768816
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e966]:
+                        - link "View “Brownie Caramel Mousse”" [ref=f25e967] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/brownie-caramel-mousse/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e969] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512508&_wpnonce=20110fde0f
+                        - text: Duplicate
+                  - cell "BK-1309378355" [ref=f25e970]
+                  - cell [ref=f25e971]:
+                    - mark [ref=f25e972]: In stock
+                  - cell "₹130.00" [ref=f25e973]
+                  - cell [ref=f25e975]:
+                    - link "Dessert & Pastries" [ref=f25e976] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e977]:
+                    - link "egg" [ref=f25e978] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e979]: —
+                  - cell [ref=f25e981]:
+                    - link "Toggle featured" [ref=f25e982] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512508&_wpnonce=b095267698
+                      - generic [ref=f25e983]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e984]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e985]:
+                  - cell "Select Chocolate Devine Pastry" [ref=f25e986]:
+                    - checkbox "Select Chocolate Devine Pastry" [ref=f25e987] [cursor=pointer]
+                  - cell [ref=f25e990]:
+                    - link [ref=f25e991] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512511&action=edit
+                      - img "Placeholder" [ref=f25e992]
+                  - rowheader "Chocolate Devine Pastry" [ref=f25e993]:
+                    - strong [ref=f25e994]:
+                      - link "Chocolate Devine Pastry" [ref=f25e995] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512511&action=edit
+                    - generic [ref=f25e996]:
+                      - text: "ID: 987512511 |"
+                      - generic [ref=f25e997]:
+                        - link "Edit “Chocolate Devine Pastry”" [ref=f25e998] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512511&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e999]:
+                        - button "Quick edit “Chocolate Devine Pastry” inline" [ref=f25e1000] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e1001]:
+                        - link "Move “Chocolate Devine Pastry” to the Trash" [ref=f25e1002] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512511&action=trash&_wpnonce=786b18a5ff
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e1003]:
+                        - link "View “Chocolate Devine Pastry”" [ref=f25e1004] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/chocolate-devine-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e1006] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512511&_wpnonce=d045d98303
+                        - text: Duplicate
+                  - cell "BK-1311835436" [ref=f25e1007]
+                  - cell [ref=f25e1008]:
+                    - mark [ref=f25e1009]: In stock
+                  - cell "₹160.00" [ref=f25e1010]
+                  - cell [ref=f25e1012]:
+                    - link "Dessert & Pastries" [ref=f25e1013] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e1014]:
+                    - link "egg" [ref=f25e1015] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e1016]: —
+                  - cell [ref=f25e1018]:
+                    - link "Toggle featured" [ref=f25e1019] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512511&_wpnonce=b095267698
+                      - generic [ref=f25e1020]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e1021]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e1022]:
+                  - cell "Select Mango Blueberry Minion" [ref=f25e1023]:
+                    - checkbox "Select Mango Blueberry Minion" [ref=f25e1024] [cursor=pointer]
+                  - cell [ref=f25e1027]:
+                    - link [ref=f25e1028] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512517&action=edit
+                      - img "Placeholder" [ref=f25e1029]
+                  - rowheader "Mango Blueberry Minion" [ref=f25e1030]:
+                    - strong [ref=f25e1031]:
+                      - link "Mango Blueberry Minion" [ref=f25e1032] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512517&action=edit
+                    - generic [ref=f25e1033]:
+                      - text: "ID: 987512517 |"
+                      - generic [ref=f25e1034]:
+                        - link "Edit “Mango Blueberry Minion”" [ref=f25e1035] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512517&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e1036]:
+                        - button "Quick edit “Mango Blueberry Minion” inline" [ref=f25e1037] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e1038]:
+                        - link "Move “Mango Blueberry Minion” to the Trash" [ref=f25e1039] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512517&action=trash&_wpnonce=a06644b3af
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e1040]:
+                        - link "View “Mango Blueberry Minion”" [ref=f25e1041] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/mango-blueberry-minion/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e1043] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512517&_wpnonce=043b45f27c
+                        - text: Duplicate
+                  - cell "BK-1312790528" [ref=f25e1044]
+                  - cell [ref=f25e1045]:
+                    - mark [ref=f25e1046]: In stock
+                  - cell "₹260.00" [ref=f25e1047]
+                  - cell [ref=f25e1049]:
+                    - link "Dessert & Pastries" [ref=f25e1050] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e1051]:
+                    - link "egg" [ref=f25e1052] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e1053]: —
+                  - cell [ref=f25e1055]:
+                    - link "Toggle featured" [ref=f25e1056] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512517&_wpnonce=b095267698
+                      - generic [ref=f25e1057]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e1058]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e1059]:
+                  - cell "Select Belgium Chocolate Pastry" [ref=f25e1060]:
+                    - checkbox "Select Belgium Chocolate Pastry" [ref=f25e1061] [cursor=pointer]
+                  - cell [ref=f25e1064]:
+                    - link [ref=f25e1065] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512513&action=edit
+                      - img "Placeholder" [ref=f25e1066]
+                  - rowheader "Belgium Chocolate Pastry" [ref=f25e1067]:
+                    - strong [ref=f25e1068]:
+                      - link "Belgium Chocolate Pastry" [ref=f25e1069] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512513&action=edit
+                    - generic [ref=f25e1070]:
+                      - text: "ID: 987512513 |"
+                      - generic [ref=f25e1071]:
+                        - link "Edit “Belgium Chocolate Pastry”" [ref=f25e1072] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512513&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e1073]:
+                        - button "Quick edit “Belgium Chocolate Pastry” inline" [ref=f25e1074] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e1075]:
+                        - link "Move “Belgium Chocolate Pastry” to the Trash" [ref=f25e1076] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512513&action=trash&_wpnonce=0079ef401d
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e1077]:
+                        - link "View “Belgium Chocolate Pastry”" [ref=f25e1078] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/belgium-chocolate-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e1080] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512513&_wpnonce=305fc25f56
+                        - text: Duplicate
+                  - cell "BK-1311835440" [ref=f25e1081]
+                  - cell [ref=f25e1082]:
+                    - mark [ref=f25e1083]: In stock
+                  - cell "₹200.00" [ref=f25e1084]
+                  - cell [ref=f25e1086]:
+                    - link "Dessert & Pastries" [ref=f25e1087] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e1088]:
+                    - link "egg" [ref=f25e1089] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e1090]: —
+                  - cell [ref=f25e1092]:
+                    - link "Toggle featured" [ref=f25e1093] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512513&_wpnonce=b095267698
+                      - generic [ref=f25e1094]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e1095]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e1096]:
+                  - cell "Select German Chocolate Pastry" [ref=f25e1097]:
+                    - checkbox "Select German Chocolate Pastry" [ref=f25e1098] [cursor=pointer]
+                  - cell [ref=f25e1101]:
+                    - link [ref=f25e1102] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512515&action=edit
+                      - img "Placeholder" [ref=f25e1103]
+                  - rowheader "German Chocolate Pastry" [ref=f25e1104]:
+                    - strong [ref=f25e1105]:
+                      - link "German Chocolate Pastry" [ref=f25e1106] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512515&action=edit
+                    - generic [ref=f25e1107]:
+                      - text: "ID: 987512515 |"
+                      - generic [ref=f25e1108]:
+                        - link "Edit “German Chocolate Pastry”" [ref=f25e1109] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512515&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e1110]:
+                        - button "Quick edit “German Chocolate Pastry” inline" [ref=f25e1111] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e1112]:
+                        - link "Move “German Chocolate Pastry” to the Trash" [ref=f25e1113] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512515&action=trash&_wpnonce=366497ba4d
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e1114]:
+                        - link "View “German Chocolate Pastry”" [ref=f25e1115] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/german-chocolate-pastry/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e1117] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512515&_wpnonce=4c42bd15a7
+                        - text: Duplicate
+                  - cell "BK-1311835508" [ref=f25e1118]
+                  - cell [ref=f25e1119]:
+                    - mark [ref=f25e1120]: In stock
+                  - cell "₹180.00" [ref=f25e1121]
+                  - cell [ref=f25e1123]:
+                    - link "Dessert & Pastries" [ref=f25e1124] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=dessert-pastries&post_type=product
+                  - cell [ref=f25e1125]:
+                    - link "egg" [ref=f25e1126] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=egg&post_type=product
+                  - cell "No brands" [ref=f25e1127]: —
+                  - cell [ref=f25e1129]:
+                    - link "Toggle featured" [ref=f25e1130] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512515&_wpnonce=b095267698
+                      - generic [ref=f25e1131]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e1132]: Published2026/10/19 at 12:20 pm
+                - row [ref=f25e1133]:
+                  - cell "Select Jileby 300 Gm" [ref=f25e1134]:
+                    - checkbox "Select Jileby 300 Gm" [ref=f25e1135] [cursor=pointer]
+                  - cell [ref=f25e1138]:
+                    - link [ref=f25e1139] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512519&action=edit
+                      - img "Placeholder" [ref=f25e1140]
+                  - rowheader "Jileby 300 Gm" [ref=f25e1141]:
+                    - strong [ref=f25e1142]:
+                      - link "Jileby 300 Gm" [ref=f25e1143] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512519&action=edit
+                    - generic [ref=f25e1144]:
+                      - text: "ID: 987512519 |"
+                      - generic [ref=f25e1145]:
+                        - link "Edit “Jileby 300 Gm”" [ref=f25e1146] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512519&action=edit
+                          - text: Edit
+                        - text: "|"
+                      - generic [ref=f25e1147]:
+                        - button "Quick edit “Jileby 300 Gm” inline" [ref=f25e1148] [cursor=pointer]: Quick Edit
+                        - text: "|"
+                      - generic [ref=f25e1149]:
+                        - link "Move “Jileby 300 Gm” to the Trash" [ref=f25e1150] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/wp-admin/post.php?post=987512519&action=trash&_wpnonce=58ceef98a7
+                          - text: Trash
+                        - text: "|"
+                      - generic [ref=f25e1151]:
+                        - link "View “Jileby 300 Gm”" [ref=f25e1152] [cursor=pointer]:
+                          - /url: https://staging.theambrosia.com/product/jileby-300-gm/
+                          - text: View
+                        - text: "|"
+                      - link "Make a duplicate from this product" [ref=f25e1154] [cursor=pointer]:
+                        - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&action=duplicate_product&post=987512519&_wpnonce=8ad859d2af
+                        - text: Duplicate
+                  - cell "BK-1312963489" [ref=f25e1155]
+                  - cell [ref=f25e1156]:
+                    - mark [ref=f25e1157]: In stock
+                  - cell "₹220.00" [ref=f25e1158]
+                  - cell [ref=f25e1160]:
+                    - link "Indian Sweets" [ref=f25e1161] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_cat=indian-sweets-2&post_type=product
+                  - cell [ref=f25e1162]:
+                    - link "veg" [ref=f25e1163] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?product_tag=veg&post_type=product
+                  - cell "No brands" [ref=f25e1164]: —
+                  - cell [ref=f25e1166]:
+                    - link "Toggle featured" [ref=f25e1167] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/admin-ajax.php?action=woocommerce_feature_product&product_id=987512519&_wpnonce=b095267698
+                      - generic [ref=f25e1168]:  No
+                  - cell "Published 2026/10/19 at 12:20 pm" [ref=f25e1169]: Published2026/10/19 at 12:20 pm
+              - rowgroup [ref=f25e1170]:
+                - row [ref=f25e1171]:
+                  - cell "Select All" [ref=f25e1172]:
+                    - checkbox "Select All" [ref=f25e1173] [cursor=pointer]
+                  - columnheader " Image" [ref=f25e1176]
+                  - columnheader [ref=f25e1178]:
+                    - link "Name Sort ascending." [ref=f25e1179] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=title&order=asc
+                      - generic [ref=f25e1180]: Name
+                      - generic [ref=f25e1184]: Sort ascending.
+                  - columnheader [ref=f25e1185]:
+                    - link "SKU Sort ascending." [ref=f25e1186] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=sku&order=asc
+                      - generic [ref=f25e1187]: SKU
+                      - generic [ref=f25e1191]: Sort ascending.
+                  - columnheader "Stock" [ref=f25e1192]
+                  - columnheader [ref=f25e1193]:
+                    - link "Price Sort ascending." [ref=f25e1194] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=price&order=asc
+                      - generic [ref=f25e1195]: Price
+                      - generic [ref=f25e1199]: Sort ascending.
+                  - columnheader "Categories" [ref=f25e1200]
+                  - columnheader "Tags" [ref=f25e1201]
+                  - columnheader "Brands" [ref=f25e1202]
+                  - columnheader " Featured" [ref=f25e1203]
+                  - columnheader [ref=f25e1205]:
+                    - link "Date" [ref=f25e1206] [cursor=pointer]:
+                      - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&orderby=date&order=asc
+            - generic [ref=f25e1211]:
+              - generic [ref=f25e1212]:
+                - generic [ref=f25e1213]: Select bulk action
+                - combobox "Select bulk action" [ref=f25e1214] [cursor=pointer]:
+                  - option "Bulk actions" [selected]
+                  - option "Bulk edit"
+                  - option "Move to Trash"
+                - button "Apply" [ref=f25e1215] [cursor=pointer]
+              - generic [ref=f25e1216]:
+                - text: 487 items
+                - generic [ref=f25e1217]:
+                  - generic [aria-hidden] [ref=f25e1218]: «
+                  - generic [aria-hidden] [ref=f25e1219]: ‹
+                  - generic [ref=f25e1220]: Current Page
+                  - generic [ref=f25e1221]: 1 of 25
+                  - link "Next page" [ref=f25e1223] [cursor=pointer]:
+                    - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&paged=2
+                    - text: ›
+                  - link "Last page" [ref=f25e1225] [cursor=pointer]:
+                    - /url: https://staging.theambrosia.com/wp-admin/edit.php?post_type=product&paged=25
+                    - text: »
+  - contentinfo [ref=f25e1227]:
+    - paragraph [ref=f25e1228]:
+      - generic [ref=f25e1229]:
+        - text: If you like
+        - strong [ref=f25e1230]: WooCommerce
+        - text: please leave us a
+        - link "five star" [ref=f25e1231] [cursor=pointer]:
+          - /url: https://wordpress.org/support/plugin/woocommerce/reviews?rate=5#new-post
+          - text: ★★★★★
+        - text: rating. A huge thanks in advance!
+    - paragraph [ref=f25e1232]: Version 10.3.7

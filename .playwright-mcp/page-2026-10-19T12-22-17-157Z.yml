@@ -1,0 +1,111 @@
+- generic [active] [ref=f19e1]:
+  - generic [ref=f19e3]:
+    - banner [ref=f19e4]:
+      - generic [ref=f19e5]: Place an order for desserts for local pick-up
+      - generic [ref=f19e6]:
+        - generic [ref=f19e7]:
+          - navigation [ref=f19e8]:
+            - list [ref=f19e9]:
+              - listitem [ref=f19e10]:
+                - link "Home" [ref=f19e11] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/
+              - listitem [ref=f19e12]:
+                - link "About Us" [ref=f19e13] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/about-us/
+              - listitem [ref=f19e14]:
+                - link "Products" [ref=f19e15] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/shop/
+              - listitem [ref=f19e16]:
+                - link "Contact Us" [ref=f19e17] [cursor=pointer]:
+                  - /url: https://staging.theambrosia.com/contact-us/
+          - text: a
+        - link [ref=f19e19] [cursor=pointer]:
+          - /url: https://staging.theambrosia.com/
+          - img "Ambrosia - Staging" [ref=f19e20]
+        - generic [ref=f19e21]:
+          - link [ref=f19e22] [cursor=pointer]:
+            - /url: https://www.facebook.com/theambrosiabakehouse
+            - img "facebook" [ref=f19e23]
+          - link [ref=f19e24] [cursor=pointer]:
+            - /url: https://www.instagram.com/theambrosiabakehouse/?hl=en
+            - img "instagram" [ref=f19e25]
+          - link [ref=f19e26] [cursor=pointer]:
+            - /url: https://in.linkedin.com/company/the-ambrosia
+            - img "linkedin" [ref=f19e27]
+          - link [ref=f19e28] [cursor=pointer]:
+            - /url: mailto:info@theambrosia.com
+            - img "mail" [ref=f19e29]
+          - link [ref=f19e31] [cursor=pointer]:
+            - /url: "#"
+            - img "search" [ref=f19e32]
+          - link [ref=f19e33] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/cart
+            - img "cart" [ref=f19e34]
+      - generic [ref=f19e36]:
+        - search [ref=f19e37]:
+          - searchbox "Search for:" [ref=f19e38]
+        - generic [ref=f19e39] [cursor=pointer]: M
+    - generic [ref=f19e40]:
+      - generic [ref=f19e43]:
+        - heading "404 Page" [level=2] [ref=f19e49]
+        - generic [ref=f19e52]:
+          - heading "No Page Found" [level=3] [ref=f19e55]
+          - heading "The page you requested could not be found. Try refining your search, or use the navigation above to locate the post." [level=6] [ref=f19e58]
+      - contentinfo [ref=f19e59]:
+        - generic [ref=f19e61]:
+          - generic [ref=f19e62]:
+            - generic [ref=f19e63]:
+              - img "AmbrosiaLogo 2" [ref=f19e66]
+              - paragraph [ref=f19e69]: Ambrosia, with over 24 years of baking heritage, offers fresh, healthy food made in-house at our central kitchen. With 3 outlets and 2 pickup counters, we ensure quality food without additives, serving customers with care.
+              - generic [ref=f19e74]:
+                - heading "Email" [level=4] [ref=f19e75]
+                - generic [ref=f19e76]: support@theambrosia.com
+              - generic [ref=f19e81]:
+                - heading "Call Us" [level=4] [ref=f19e82]
+                - generic [ref=f19e83]: 305 8520 103
+            - generic [ref=f19e84]: "[contact-form-7 id=\"f12c350\" title=\"footer form\"]"
+          - list [ref=f19e91]:
+            - listitem [ref=f19e92]:
+              - link "Quality Policy" [ref=f19e93] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f19e94]:
+              - link "Refund Policy" [ref=f19e95] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f19e96]:
+              - link "Privacy Policy" [ref=f19e97] [cursor=pointer]:
+                - /url: ""
+            - listitem [ref=f19e98]:
+              - link "Terms & Conditions" [ref=f19e99] [cursor=pointer]:
+                - /url: ""
+          - paragraph [ref=f19e105]:
+            - text: © 2024 Copyright theambrosia .Powered by
+            - link "Bytelabz" [ref=f19e106] [cursor=pointer]:
+              - /url: https://bytelabz.com/
+  - generic [ref=f19e107]:
+    - navigation "Toolbar":
+      - menu:
+        - group [ref=f19e108]:
+          - menuitem "About WordPress" [ref=f19e109] [cursor=pointer]
+        - group [ref=f19e112]:
+          - menuitem "Ambrosia - Staging" [ref=f19e113] [cursor=pointer]
+        - group [ref=f19e114]:
+          - menuitem "Live" [ref=f19e115] [cursor=pointer]
+        - group [ref=f19e116]:
+          - menuitem "17 updates available" [ref=f19e117] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f19e119]: "17"
+        - group [ref=f19e121]:
+          - menuitem "84 Comments in moderation" [ref=f19e122] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f19e124]: "84"
+        - group [ref=f19e126]:
+          - menuitem "New" [ref=f19e127] [cursor=pointer]
+        - group [ref=f19e130]:
+          - menuitem " Enable Visual Builder" [ref=f19e131] [cursor=pointer]
+      - menu [ref=f19e132]:
+        - group [ref=f19e133]:
+          - menuitem "Howdy, amborsia-admin" [ref=f19e134] [cursor=pointer]
+        - group [ref=f19e135]:
+          - menuitem "Search" [ref=f19e136]:
+            - generic [ref=f19e137]:
+              - textbox "Search" [ref=f19e138] [cursor=pointer]
+              - generic [ref=f19e139]: Search
+  - status [ref=f19e140]

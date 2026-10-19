@@ -5,8 +5,10 @@ export async function GET(request) {
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, token ? { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } } : undefined);
+
+  const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get('status');
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
   let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name)').order('requested_at', { ascending: false });
   if (statusFilter) query = query.eq('status', statusFilter);
   const { data, error } = await query;
