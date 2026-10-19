@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { createClient } from '../../../lib/supabaseClient';
 
 export default function MaintenancePage() {
   const [jobs, setJobs] = useState([]);
@@ -9,11 +10,15 @@ export default function MaintenancePage() {
   const [sortBy, setSortBy] = useState('date');
 
   useEffect(() => {
-    fetch('/api/maintenance/jobs')
-      .then(r => r.json())
-      .then(d => {
-        if (d.jobs) setJobs(d.jobs);
-      });
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch('/api/maintenance/jobs', {
+        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+      })
+        .then(r => r.json())
+        .then(d => { if (d.jobs) setJobs(d.jobs); })
+        .catch(err => console.error('Fetch jobs error:', err));
+    });
   }, []);
 
   const handleApprove = (jobId) => {
