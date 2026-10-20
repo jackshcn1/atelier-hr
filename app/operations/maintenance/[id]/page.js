@@ -11,6 +11,7 @@ export default function MaintenanceJobDetailPage() {
   const [isAdmin] = useState(true);
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const handleApprove = async () => {
     try {
@@ -33,24 +34,40 @@ export default function MaintenanceJobDetailPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      fetch(`/api/maintenance/jobs/${jobId}`, {
-        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
-      })
-        .then(r => r.json())
-        .then(d => {
-          if (d.job) setJob(d.job);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error('Fetch job error:', err);
-          setLoading(false);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      try {
+        const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
+          headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
         });
+        const d = await res.json().catch(() => ({}));
+        if (d.job) {
+          setJob(d.job);
+          setLoading(false);
+          return;
+        }
+        setError(d.error || `Request failed with status ${res.status}`);
+
+        // Fallback: query Supabase directly from the browser (session-scoped by RLS)
+        const { data: direct, error: directErr } = await supabase
+          .from('maintenance_jobs')
+          .select('*')
+          .eq('id', jobId)
+          .maybeSingle();
+        if (direct) {
+          setJob({ ...direct, maintenance_pocs: null, job_quotes: [], maintenance_audit_logs: [] });
+        } else if (directErr) {
+          setError(`${d.error || 'Request failed'} | Fallback: ${directErr.message}`);
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     });
   }, [jobId]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading job details...</div>;
-  if (!job) return <div className="min-h-screen flex items-center justify-center">Job not found.</div>;
+  if (!job) return <div className="min-h-screen flex items-center justify-center">Job not found.{error ? ` (${error})` : ''}</div>;
 
 
   return (
