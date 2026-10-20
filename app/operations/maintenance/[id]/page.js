@@ -13,7 +13,20 @@ export default function MaintenanceJobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
+  const canEdit = job && (job.status === 'pending_approval' || job.status === 'Draft');
+  const auditEntries = (job?.maintenance_audit_logs || []).slice();
+  if (job?.requested_at && !auditEntries.some(e => e.action === 'created')) {
+    auditEntries.unshift({ timestamp: job.requested_at, user_name: job.requested_by || 'System', action: 'created', details: `Job ${job.id} raised for ${job.asset_serial}` });
+  }
+  if (job?.status === 'Approved' && !auditEntries.some(e => e.details?.includes('approved') || e.action === 'approved')) {
+    auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'approved', details: 'Maintenance request approved' });
+  }
+  if (job?.status === 'Rejected' && job?.rejection_reason && !auditEntries.some(e => e.details?.includes('rejected') || e.action === 'rejected')) {
+    auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'rejected', details: `Rejected — ${job.rejection_reason}` });
+  }
+  const [selectedStage, setSelectedStage] = useState('pending_approval');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ service_type: '', comments: '', priority: 'normal' });
 
   const handleApprove = async () => {
     try {
@@ -28,6 +41,14 @@ export default function MaintenanceJobDetailPage() {
         body: JSON.stringify({ status: 'Approved' })
       });
       if (!res.ok) throw new Error('Failed to approve');
+      // Record approval in audit log
+      try {
+        await fetch('/api/maintenance/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+          body: JSON.stringify({ job_id: jobId, user_name: 'Super Admin', action: 'approved', details: 'Maintenance request approved' })
+        });
+      } catch (_) {}
       setJob({ ...job, status: 'Approved' });
     } catch (err) {
       alert(err.message);
@@ -168,6 +189,24 @@ export default function MaintenanceJobDetailPage() {
           </div>
         )}
 
+        {/* Audit + Stage */}
+        <div className="panel bg-white border border-[#ebe8e4] rounded-card p-4 mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center text-xs font-medium text-[#8b6f4e] gap-2">
+              <span className="text-[#6b635c]">Stages:</span>
+              <span>Pending Approval → Approved → Assigned → Awaiting POC → In Repair → Awaiting Quote → Completed</span>
+            </div>
+            {isAdmin && job?.status !== 'Rejected' && (
+              <label className="flex items-center gap-2">
+                <span className="text-xs font-medium text-[#6b635c]">Stage:</span>
+                <select className="field text-sm bg-white w-48" value={selectedStage} onChange={e => setSelectedStage(e.target.value)}>
+                  {['pending_approval','Approved','Assigned','Awaiting POC','In Repair','Awaiting Quote','Completed'].map(s => <option key={s} value={s}>{s === 'pending_approval' ? 'Pending approval' : s}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+        </div>
+
         {/* Status Bar */}
         <div className="panel bg-white border border-[#ebe8e4] rounded-card p-4 mb-6">
           <div className="flex flex-wrap justify-between items-center text-xs font-medium text-[#8b6f4e] gap-2">
@@ -191,15 +230,32 @@ export default function MaintenanceJobDetailPage() {
         <div className="space-y-6">
           {/* Overview */}
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
-            <h2 className="font-serif text-xl mb-4">Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div><strong className="text-[#6b635c]">Asset:</strong> {job.asset_serial}</div>
-              <div><strong className="text-[#6b635c]">Service Type:</strong> {job.service_type}</div>
-              <div><strong className="text-[#6b635c]">Priority:</strong> <span className="pill-bad">{job.priority}</span></div>
-              <div><strong className="text-[#6b635c]">Requested By:</strong> {job.requested_by}</div>
-              <div><strong className="text-[#6b635c]">Issues:</strong> {job.issues ? (typeof job.issues === 'object' && !Array.isArray(job.issues) ? Object.entries(job.issues).filter(([,_v])=>_v===true).map(([k])=>k).join(', ') || 'None' : (Array.isArray(job.issues) ? job.issues.join(', ') : String(job.issues))) : 'None'}</div>
-              <div><strong className="text-[#6b635c]">Comments:</strong> {job.comments}</div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-serif text-xl">Overview</h2>
+              {(job?.status === 'pending_approval' || job?.status === 'Draft') && (
+                <button onClick={() => setIsEditing(!isEditing)} className="btn-secondary text-xs px-3 py-1">{isEditing ? 'Cancel' : 'Edit'}</button>
+              )}
+              {job?.status !== 'pending_approval' && job?.status !== 'Draft' && (
+                <span className="pill-quiet text-xs">Locked — {job.status.toLowerCase()}</span>
+              )}
             </div>
+            {isEditing ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <label><span className="text-xs font-medium text-[#6b635c] mb-1 block">Service Type</span><select className="field text-sm bg-white" value={editForm.service_type} onChange={e=>setEditForm({...editForm,service_type:e.target.value})}><option>Routine Service</option><option>Faulty or defective repair</option></select></label>
+                <label><span className="text-xs font-medium text-[#6b635c] mb-1 block">Priority</span><select className="field text-sm bg-white" value={editForm.priority} onChange={e=>setEditForm({...editForm,priority:e.target.value})}><option>Urgent</option><option>Normal</option><option>Can take some time</option><option>Low</option></select></label>
+                <label className="md:col-span-2"><span className="text-xs font-medium text-[#6b635c] mb-1 block">Comments</span><textarea rows={3} className="field text-sm w-full" value={editForm.comments} onChange={e=>setEditForm({...editForm,comments:e.target.value})}/></label>
+                <div className="md:col-span-2 flex gap-3 pt-2"><button onClick={()=>setIsEditing(false)} className="btn-primary text-xs px-3 py-1">Save</button><button onClick={()=>setIsEditing(false)} className="btn-secondary text-xs px-3 py-1">Cancel</button></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div><strong className="text-[#6b635c]">Asset:</strong> {job.asset_serial}</div>
+                <div><strong className="text-[#6b635c]">Service Type:</strong> {job.service_type}</div>
+                <div><strong className="text-[#6b635c]">Priority:</strong> <span className="pill-bad">{job.priority}</span></div>
+                <div><strong className="text-[#6b635c]">Requested By:</strong> {job.requested_by}</div>
+                <div><strong className="text-[#6b635c]">Issues:</strong> {job.issues ? (typeof job.issues === 'object' && !Array.isArray(job.issues) ? Object.entries(job.issues).filter(([,_v])=>_v===true).map(([k])=>k).join(', ') || 'None' : (Array.isArray(job.issues) ? job.issues.join(', ') : String(job.issues))) : 'None'}</div>
+                <div><strong className="text-[#6b635c]">Comments:</strong> {job.comments}</div>
+              </div>
+            )}
           </section>
 
           {/* Maintenance POC */}
@@ -237,11 +293,11 @@ export default function MaintenanceJobDetailPage() {
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
             <h2 className="font-serif text-xl mb-4">Audit Log</h2>
             <div className="space-y-2 text-xs">
-              {job.maintenance_audit_logs && job.maintenance_audit_logs.length > 0 ? (
-                job.maintenance_audit_logs.map((entry, idx) => (
+              {auditEntries.length > 0 ? (
+                auditEntries.map((entry, idx) => (
                   <div key={idx} className="flex gap-2 border-b border-dashed border-[#ebe8e4] py-1">
-                    <span className="text-[#8b6f4e] whitespace-nowrap">{new Date(entry.timestamp).toLocaleString()}</span>
-                    <span className="text-[#1e1812]">{entry.user_name || 'System'} — {entry.details}</span>
+                    <span className="text-[#8b6f4e] whitespace-nowrap">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ''}</span>
+                    <span className="text-[#1e1812]">{entry.user_name || 'System'} — {entry.details || entry.action}</span>
                   </div>
                 ))
               ) : (
