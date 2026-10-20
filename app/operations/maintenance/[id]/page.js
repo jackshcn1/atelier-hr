@@ -9,6 +9,8 @@ export default function MaintenanceJobDetailPage() {
   const jobId = params?.id || 'MNT-103';
 
   const [isAdmin] = useState(true);
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const handleApprove = async () => {
     try {
