@@ -12,6 +12,8 @@ export default function MaintenanceJobDetailPage() {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const handleApprove = async () => {
     try {
@@ -27,6 +29,54 @@ export default function MaintenanceJobDetailPage() {
       });
       if (!res.ok) throw new Error('Failed to approve');
       setJob({ ...job, status: 'Approved' });
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleReject = async () => {
+    const reason = (rejectionReason || '').trim();
+    if (!reason) {
+      alert('Please enter a rejection reason.');
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Authentication required.');
+
+      const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ status: 'Rejected', rejection_reason: reason })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Failed to reject');
+
+      // Record rejection in the job audit log
+      try {
+        await fetch('/api/maintenance/audit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            job_id: jobId,
+            user_name: 'Super Admin',
+            action: 'rejected',
+            details: `Maintenance request rejected by Super Admin — ${reason}`,
+            comment: reason,
+          })
+        });
+      } catch (_) {}
+
+      setJob({ ...job, status: 'Rejected', rejection_reason: reason });
+      setShowRejectDialog(false);
+      setRejectionReason('');
     } catch (err) {
       alert(err.message);
     }
