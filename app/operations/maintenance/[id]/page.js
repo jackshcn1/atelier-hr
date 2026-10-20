@@ -136,9 +136,37 @@ export default function MaintenanceJobDetailPage() {
             </div>
           </div>
           {isAdmin && job.status === 'pending_approval' && (
-            <button onClick={handleApprove} className="btn-primary text-sm px-4 py-2">Approve Job</button>
+            <div className="flex gap-2">
+              <button onClick={handleApprove} className="btn-primary text-sm px-4 py-2">Approve Job</button>
+              <button onClick={() => setShowRejectDialog(true)} className="btn-secondary text-sm px-4 py-2">Reject Job</button>
+            </div>
           )}
         </div>
+
+        {/* Rejection Reason Dialog */}
+        {showRejectDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-card shadow-2xl max-w-md mx-4 p-6 border border-[#ebe8e4]">
+              <h3 className="font-serif text-xl mb-2">Reject Maintenance Request</h3>
+              <p className="text-xs text-[#6b635c] mb-4">Job {job.id} for asset {job.asset_serial} will move to <strong>Rejected</strong>. The asset status stays unchanged.</p>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Rejection Reason</span>
+                <textarea
+                  rows={4}
+                  className="field text-sm w-full"
+                  placeholder="Why is this request being rejected?"
+                  value={rejectionReason}
+                  onChange={e => setRejectionReason(e.target.value)}
+                  autoFocus
+                />
+              </label>
+              <div className="flex gap-3 mt-5">
+                <button onClick={handleReject} className="btn-primary text-sm px-4 py-2">Confirm Reject</button>
+                <button onClick={() => { setShowRejectDialog(false); setRejectionReason(''); }} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Status Bar */}
         <div className="panel bg-white border border-[#ebe8e4] rounded-card p-4 mb-6">
