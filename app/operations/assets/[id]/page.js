@@ -97,6 +97,7 @@ export default function AssetDetailPage() {
 
   const [originalData, setOriginalData] = useState(null);
   const [auditLog, setAuditLog] = useState([]);
+  const [maintenanceJobs, setMaintenanceJobs] = useState([]);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
@@ -239,13 +240,7 @@ export default function AssetDetailPage() {
   };
 
   const handleMaintenanceSubmit = async () => {
-    const nextStatus = 'Maintenance';
-    setForm(prev => ({ ...prev, status: nextStatus }));
-
-    if (originalData) {
-      setOriginalData({ ...originalData, status: nextStatus });
-    }
-
+    // Keep asset status unchanged; audit only
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -282,8 +277,8 @@ export default function AssetDetailPage() {
           job_id: data.job?.id,
           user_name: userName,
           action: 'created',
-          details: `Maintenance recorded for asset ${assetId} (${data.job?.id || 'MNT-XXX'}) — Status changed to Maintenance`,
-          comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
+          details: `${userName} recorded ${assetId} requires maintenance (${maintenanceForm.serviceType}) on ${new Date().toLocaleDateString()}`,
+          comment: `Service type: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
         })
       });
 
@@ -292,11 +287,11 @@ export default function AssetDetailPage() {
         timestamp: currentTime,
         action: 'updated',
         user: userName,
-        details: `Maintenance booked for asset ${assetId} (${data.job?.id || 'MNT-XXX'}) — Status changed to Maintenance`,
+        details: `${userName} recorded ${assetId} requires maintenance (${maintenanceForm.serviceType}) on ${new Date().toLocaleDateString()}`,
         comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
       };
       setAuditLog(prev => [...prev, newAuditEntry]);
-      alert(`Maintenance request successfully logged: ${data.job?.id || 'MNT-XXX'} for ${assetId}. Asset status moved to Maintenance.`);
+      alert(`Maintenance request successfully logged: ${data.job?.id || 'MNT-XXX'} for ${assetId}.`);
     } catch (err) {
       console.error('Error creating maintenance job:', err);
       alert('Error creating maintenance job: ' + err.message);
