@@ -259,6 +259,7 @@ export default function AssetDetailPage() {
         },
         body: JSON.stringify({
           asset_serial: assetId,
+          asset_name: form.name || (originalData ? originalData.name : assetId),
           service_type: maintenanceForm.serviceType,
           issues: maintenanceForm.issues,
           priority: maintenanceForm.priority,
