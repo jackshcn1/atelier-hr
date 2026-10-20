@@ -8,9 +8,11 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get('status');
+  const assetSerial = searchParams.get('asset_serial');
 
   let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name), asset_name').order('requested_at', { ascending: false });
   if (statusFilter) query = query.eq('status', statusFilter);
+  if (assetSerial) query = query.eq('asset_serial', assetSerial);
   const { data: jobs, error: jobsErr } = await query;
   if (jobsErr) return Response.json({ error: jobsErr.message }, { status: 500 });
 
