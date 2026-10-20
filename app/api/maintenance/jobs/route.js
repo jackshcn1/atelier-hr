@@ -9,7 +9,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get('status');
 
-  let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name)').order('requested_at', { ascending: false });
+  let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name), asset_name').order('requested_at', { ascending: false });
   if (statusFilter) query = query.eq('status', statusFilter);
   const { data: jobs, error: jobsErr } = await query;
   if (jobsErr) return Response.json({ error: jobsErr.message }, { status: 500 });
@@ -41,7 +41,7 @@ export async function POST(req) {
       auth: { persistSession: false }
     });
 
-    const { id, asset_serial, service_type, priority, status, issues, comments, requested_by } = await req.json();
+    const { id, asset_serial, asset_name, service_type, priority, status, issues, comments, requested_by } = await req.json();
     let jobId = id;
     if (!jobId) {
       const { data: seqRows, error: seqErr } = await supabase.from('maintenance_jobs').select('id').like('id', 'MNT-0%').order('id', { ascending: false });
@@ -55,7 +55,7 @@ export async function POST(req) {
       jobId = 'MNT-' + String(nextNum).padStart(6, '0');
     }
     const insertJob = (theId) => supabase.from('maintenance_jobs').insert({
-        id: theId, asset_serial, service_type, priority: priority || 'normal', status: status || 'pending_approval', issues, comments, requested_by, requested_at: new Date().toISOString()
+        id: theId, asset_serial, service_type, priority: priority || 'normal', status: status || 'pending_approval', issues, comments, requested_by, requested_at: new Date().toISOString(), asset_name: asset_name || null
       }).select().single();
 
     let { data, error } = await insertJob(jobId);
