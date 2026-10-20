@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '../../../lib/supabaseClient';
+import { createClient } from '../../../../lib/supabaseClient';
 
 export default function MaintenanceJobDetailPage() {
   const params = useParams();
