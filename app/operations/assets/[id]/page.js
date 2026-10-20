@@ -281,7 +281,7 @@ export default function AssetDetailPage() {
           job_id: data.job?.id,
           user_name: userName,
           action: 'created',
-          details: `Maintenance booked for asset ${assetId} (${data.job?.job_number || 'MNT-XXX'}) — Status changed to Maintenance`,
+          details: `Maintenance booked for asset ${assetId} (${data.job?.id || 'MNT-XXX'}) — Status changed to Maintenance`,
           comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
         })
       });
@@ -291,11 +291,11 @@ export default function AssetDetailPage() {
         timestamp: currentTime,
         action: 'updated',
         user: userName,
-        details: `Maintenance booked for asset ${assetId} (${data.job?.job_number || 'MNT-XXX'}) — Status changed to Maintenance`,
+        details: `Maintenance booked for asset ${assetId} (${data.job?.id || 'MNT-XXX'}) — Status changed to Maintenance`,
         comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
       };
       setAuditLog(prev => [...prev, newAuditEntry]);
-      alert(`Maintenance request successfully logged: ${data.job?.job_number || 'MNT-XXX'} for ${assetId}. Asset status moved to Maintenance.`);
+      alert(`Maintenance request successfully logged: ${data.job?.id || 'MNT-XXX'} for ${assetId}. Asset status moved to Maintenance.`);
     } catch (err) {
       console.error('Error creating maintenance job:', err);
       alert('Error creating maintenance job: ' + err.message);
