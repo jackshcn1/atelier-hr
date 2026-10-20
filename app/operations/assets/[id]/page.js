@@ -282,7 +282,7 @@ export default function AssetDetailPage() {
           job_id: data.job?.id,
           user_name: userName,
           action: 'created',
-          details: `Maintenance booked for asset ${assetId} (${data.job?.id || 'MNT-XXX'}) — Status changed to Maintenance`,
+          details: `Maintenance recorded for asset ${assetId} (${data.job?.id || 'MNT-XXX'}) — Status changed to Maintenance`,
           comment: `Request raised by ${userName}: ${maintenanceForm.serviceType} | Priority: ${maintenanceForm.priority}`,
         })
       });
