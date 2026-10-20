@@ -8,8 +8,26 @@ export default function MaintenanceJobDetailPage() {
   const params = useParams();
   const jobId = params?.id || 'MNT-103';
 
-  const [job, setJob] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isAdmin] = useState(true);
+
+  const handleApprove = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ status: 'Approved' })
+      });
+      if (!res.ok) throw new Error('Failed to approve');
+      setJob({ ...job, status: 'Approved' });
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   useEffect(() => {
     const supabase = createClient();
@@ -40,12 +58,17 @@ export default function MaintenanceJobDetailPage() {
           <Link href="/operations/maintenance" className="btn-secondary text-xs px-3 py-1.5">← Maintenance</Link>
         </div>
 
-        <div className="page-head mb-8">
-          <h1 className="font-serif text-3xl text-[#1e1812]">Maintenance Job {job.id}</h1>
-          <div className="flex items-center gap-4 mt-2">
-            <span className="pill-warn">{job.status}</span>
-            <p className="text-xs text-[#6b635c]">Raised by: {job.requested_by} on {job.requested_at ? new Date(job.requested_at).toLocaleDateString() : ''}</p>
+        <div className="page-head mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="font-serif text-3xl text-[#1e1812]">Maintenance Job {job.id}</h1>
+            <div className="flex items-center gap-4 mt-2">
+              <span className="pill-warn">{job.status}</span>
+              <p className="text-xs text-[#6b635c]">Raised by: {job.requested_by} on {job.requested_at ? new Date(job.requested_at).toLocaleDateString() : ''}</p>
+            </div>
           </div>
+          {isAdmin && job.status === 'pending_approval' && (
+            <button onClick={handleApprove} className="btn-primary text-sm px-4 py-2">Approve Job</button>
+          )}
         </div>
 
         {/* Status Bar */}
