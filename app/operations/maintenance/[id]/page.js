@@ -197,7 +197,7 @@ export default function MaintenanceJobDetailPage() {
               <div><strong className="text-[#6b635c]">Service Type:</strong> {job.service_type}</div>
               <div><strong className="text-[#6b635c]">Priority:</strong> <span className="pill-bad">{job.priority}</span></div>
               <div><strong className="text-[#6b635c]">Requested By:</strong> {job.requested_by}</div>
-              <div><strong className="text-[#6b635c]">Issues:</strong> {job.issues ? (Array.isArray(job.issues) ? job.issues.join(', ') : JSON.stringify(job.issues)) : 'None'}</div>
+              <div><strong className="text-[#6b635c]">Issues:</strong> {job.issues ? (typeof job.issues === 'object' && !Array.isArray(job.issues) ? Object.entries(job.issues).filter(([,_v])=>_v===true).map(([k])=>k).join(', ') || 'None' : (Array.isArray(job.issues) ? job.issues.join(', ') : String(job.issues))) : 'None'}</div>
               <div><strong className="text-[#6b635c]">Comments:</strong> {job.comments}</div>
             </div>
           </section>

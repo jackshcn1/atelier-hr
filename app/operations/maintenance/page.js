@@ -98,8 +98,8 @@ export default function MaintenancePage() {
         )}
 
         {/* Filters/Sort */}
-        <div className="flex flex-wrap gap-4 mb-6">
-            <div className="field">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6 items-end">
+            <div>
                 <span className="text-xs font-medium text-[#6b635c] mb-1 block">Raised in last:</span>
                 <select className="field text-sm bg-white" onChange={e => { setDateRange(e.target.value); setRequestFilter(e.target.value); }}>
                     <option value="All">All time</option>
@@ -110,13 +110,7 @@ export default function MaintenancePage() {
                     <option value="custom">Custom…</option>
                 </select>
             </div>
-            {dateRange === 'custom' && (
-                <div className="flex items-center gap-2">
-                    <input type="number" min="1" max="365" value={customDays} onChange={e => setCustomDays(Number(e.target.value))} className="field text-sm w-20 bg-white" />
-                    <span className="text-xs text-[#8b6f4e]">days ago</span>
-                </div>
-            )}
-            <div className="field">
+            <div>
                 <span className="text-xs font-medium text-[#6b635c] mb-1 block">Service type:</span>
                 <select className="field text-sm bg-white" value={serviceFilter} onChange={e => setServiceFilter(e.target.value)}>
                     <option value="All">All</option>
@@ -124,7 +118,7 @@ export default function MaintenancePage() {
                     <option value="Faulty or defective repair">Faulty or defective repair</option>
                 </select>
             </div>
-            <div className="field">
+            <div>
                 <span className="text-xs font-medium text-[#6b635c] mb-1 block">Status:</span>
                 <select className="field text-sm bg-white" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                     <option value="All">All</option>
@@ -135,9 +129,10 @@ export default function MaintenancePage() {
                     <option value="In Repair">In Repair</option>
                     <option value="Awaiting Quote">Awaiting Quote</option>
                     <option value="Completed">Completed</option>
+                    <option value="Rejected">Rejected</option>
                 </select>
             </div>
-            <div className="field">
+            <div>
                 <span className="text-xs font-medium text-[#6b635c] mb-1 block">Completion:</span>
                 <select className="field text-sm bg-white" value={completionFilter} onChange={e => setCompletionFilter(e.target.value)}>
                     <option value="All">All</option>
@@ -145,6 +140,12 @@ export default function MaintenancePage() {
                     <option value="Pending">Pending</option>
                 </select>
             </div>
+            {dateRange === 'custom' && (
+                <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-2">
+                    <input type="number" min="1" max="365" value={customDays} onChange={e => setCustomDays(Number(e.target.value))} className="field text-sm w-24 bg-white" />
+                    <span className="text-xs text-[#8b6f4e]">days ago</span>
+                </div>
+            )}
         </div>
 
         <table className="w-full text-sm bg-white border border-[#ebe8e4] rounded-card p-4">

@@ -1,0 +1,7 @@
+- generic [active] [ref=f5e1]:
+  - navigation [ref=f5e2]:
+    - link "Atelier" [ref=f5e4] [cursor=pointer]:
+      - /url: /
+  - main [ref=f5e5]:
+    - generic [ref=f5e6]: Loading job details...
+  - alert [ref=f5e7]

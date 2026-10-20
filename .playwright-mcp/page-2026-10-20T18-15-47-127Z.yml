@@ -1,0 +1,59 @@
+- generic [active] [ref=f3e1]:
+  - navigation [ref=f3e2]:
+    - link "Atelier" [ref=f3e4] [cursor=pointer]:
+      - /url: /
+  - main [ref=f3e5]:
+    - main [ref=f3e6]:
+      - generic [ref=f3e7]:
+        - generic [ref=f3e8]:
+          - link "← Home" [ref=f3e9] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f3e10]: Operations / Maintenance
+        - generic [ref=f3e11]:
+          - heading "Maintenance & Work Orders" [level=1] [ref=f3e13]
+          - link "View POC Directory →" [ref=f3e14] [cursor=pointer]:
+            - /url: /operations/maintenance-pocs
+        - generic [ref=f3e15]:
+          - generic [ref=f3e16]:
+            - generic [ref=f3e17]: "Raised in last:"
+            - combobox [ref=f3e18]:
+              - option "All time" [selected]
+              - option "3 days"
+              - option "1 week"
+              - option "1 month"
+              - option "60 days"
+              - option "Custom…"
+          - generic [ref=f3e19]:
+            - generic [ref=f3e20]: "Service type:"
+            - combobox [ref=f3e21]:
+              - option "All" [selected]
+              - option "Routine Service"
+              - option "Faulty or defective repair"
+          - generic [ref=f3e22]:
+            - generic [ref=f3e23]: "Status:"
+            - combobox [ref=f3e24]:
+              - option "All" [selected]
+              - option "Pending approval"
+              - option "Approved"
+              - option "Assigned"
+              - option "Awaiting POC"
+              - option "In Repair"
+              - option "Awaiting Quote"
+              - option "Completed"
+          - generic [ref=f3e25]:
+            - generic [ref=f3e26]: "Completion:"
+            - combobox [ref=f3e27]:
+              - option "All" [selected]
+              - option "Completed"
+              - option "Pending"
+        - table [ref=f3e28]:
+          - rowgroup [ref=f3e29]:
+            - row [ref=f3e30]:
+              - columnheader "Job ID" [ref=f3e31]
+              - columnheader "Asset number" [ref=f3e32]
+              - columnheader "Asset name" [ref=f3e33]
+              - columnheader "Request date" [ref=f3e34]
+              - columnheader "Current Status" [ref=f3e35]
+              - columnheader "Completion Status" [ref=f3e36]
+          - rowgroup
+  - alert [ref=f3e37]

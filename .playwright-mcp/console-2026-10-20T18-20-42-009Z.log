@@ -1,0 +1,4 @@
+[    3594ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://atelier-hr-inky.vercel.app/api/maintenance/jobs/MNT-000004:0
+[   11338ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://atelier-hr-inky.vercel.app/_next/static/chunks/7934.js:0
+[   22475ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://atelier-hr-inky.vercel.app/api/maintenance/jobs/MNT-000004:0
+[   27182ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://atelier-hr-inky.vercel.app/_next/static/chunks/app/operations/maintenance/%5Bid%5D/page.js:0

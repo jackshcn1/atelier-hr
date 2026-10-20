@@ -1,0 +1,415 @@
+- generic [ref=f124e2]:
+  - navigation "Main menu":
+    - link "Skip to main content" [ref=f124e3] [cursor=pointer]:
+      - /url: "#wpbody-content"
+    - link "Skip to toolbar" [ref=f124e4] [cursor=pointer]:
+      - /url: "#wp-toolbar"
+    - list [ref=f124e7]:
+      - listitem [ref=f124e8]:
+        - link "Dashboard" [ref=f124e9] [cursor=pointer]:
+          - /url: index.php
+          - generic [aria-hidden] [ref=f124e10]: 
+        - list [ref=f124e12]:
+          - listitem [ref=f124e13]:
+            - link "Home" [ref=f124e14] [cursor=pointer]:
+              - /url: index.php
+          - listitem [ref=f124e15]:
+            - link "Updates 17" [ref=f124e16] [cursor=pointer]:
+              - /url: update-core.php
+              - text: Updates
+              - generic [ref=f124e17]: "17"
+      - listitem [aria-hidden] [ref=f124e18]
+      - listitem [ref=f124e20]:
+        - link "Posts" [ref=f124e21] [cursor=pointer]:
+          - /url: edit.php
+          - generic [aria-hidden] [ref=f124e22]: 
+        - list [ref=f124e24]:
+          - listitem [ref=f124e25]:
+            - link "All Posts" [ref=f124e26] [cursor=pointer]:
+              - /url: edit.php
+          - listitem [ref=f124e27]:
+            - link "Add Post" [ref=f124e28] [cursor=pointer]:
+              - /url: post-new.php
+          - listitem [ref=f124e29]:
+            - link "Categories" [ref=f124e30] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=category
+          - listitem [ref=f124e31]:
+            - link "Tags" [ref=f124e32] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=post_tag
+      - listitem [ref=f124e33]:
+        - link "Media" [ref=f124e34] [cursor=pointer]:
+          - /url: upload.php
+          - generic [aria-hidden] [ref=f124e35]: 
+        - list [ref=f124e37]:
+          - listitem [ref=f124e38]:
+            - link "Library" [ref=f124e39] [cursor=pointer]:
+              - /url: upload.php
+          - listitem [ref=f124e40]:
+            - link "Add Media File" [ref=f124e41] [cursor=pointer]:
+              - /url: media-new.php
+      - listitem [ref=f124e42]:
+        - link "Pages" [ref=f124e43] [cursor=pointer]:
+          - /url: edit.php?post_type=page
+          - generic [aria-hidden] [ref=f124e44]: 
+        - list [ref=f124e46]:
+          - listitem [ref=f124e47]:
+            - link "All Pages" [ref=f124e48] [cursor=pointer]:
+              - /url: edit.php?post_type=page
+          - listitem [ref=f124e49]:
+            - link "Add Page" [ref=f124e50] [cursor=pointer]:
+              - /url: post-new.php?post_type=page
+      - listitem [ref=f124e51]:
+        - link "Comments 84 Comments in moderation" [ref=f124e52] [cursor=pointer]:
+          - /url: edit-comments.php
+          - generic [aria-hidden] [ref=f124e53]: 
+          - generic [ref=f124e54]:
+            - text: Comments
+            - generic [ref=f124e55]:
+              - text: "84"
+              - generic [ref=f124e56]: 84 Comments in moderation
+      - listitem [ref=f124e57]:
+        - link "Projects" [ref=f124e58] [cursor=pointer]:
+          - /url: edit.php?post_type=project
+          - generic [aria-hidden] [ref=f124e59]: 
+        - list [ref=f124e61]:
+          - listitem [ref=f124e62]:
+            - link "All Projects" [ref=f124e63] [cursor=pointer]:
+              - /url: edit.php?post_type=project
+          - listitem [ref=f124e64]:
+            - link "Add New Project" [ref=f124e65] [cursor=pointer]:
+              - /url: post-new.php?post_type=project
+          - listitem [ref=f124e66]:
+            - link "Categories" [ref=f124e67] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_category&post_type=project
+          - listitem [ref=f124e68]:
+            - link "Tags" [ref=f124e69] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=project_tag&post_type=project
+      - listitem [ref=f124e70]:
+        - link "PhonePe PG Support" [ref=f124e71] [cursor=pointer]:
+          - /url: admin.php?page=phonepe-support
+          - generic [aria-hidden] [ref=f124e72]: 
+        - list [ref=f124e74]:
+          - listitem [ref=f124e75]:
+            - link "PhonePe PG Support" [ref=f124e76] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support
+          - listitem [ref=f124e77]:
+            - link "Download Error Logs" [ref=f124e78] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-logs
+          - listitem [ref=f124e79]:
+            - link "Compose Error Report" [ref=f124e80] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-support-mail
+      - listitem [aria-hidden] [ref=f124e81]
+      - listitem [ref=f124e83]:
+        - link "WooCommerce" [ref=f124e84] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin
+        - list [ref=f124e87]:
+          - listitem [ref=f124e88]:
+            - link "Home" [ref=f124e89] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin
+          - listitem [ref=f124e90]:
+            - link "Orders 32" [ref=f124e91] [cursor=pointer]:
+              - /url: admin.php?page=wc-orders
+              - text: Orders
+              - generic [ref=f124e92]: "32"
+          - listitem [ref=f124e93]:
+            - link "PhonePe settings" [ref=f124e94] [cursor=pointer]:
+              - /url: admin.php?page=phonepe-settings
+          - listitem [ref=f124e95]:
+            - link "Customers" [ref=f124e96] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/customers
+          - listitem [ref=f124e97]:
+            - link "Reports" [ref=f124e98] [cursor=pointer]:
+              - /url: admin.php?page=wc-reports
+          - listitem [ref=f124e99]:
+            - link "Settings" [ref=f124e100] [cursor=pointer]:
+              - /url: admin.php?page=wc-settings
+          - listitem [ref=f124e101]:
+            - link "Status" [ref=f124e102] [cursor=pointer]:
+              - /url: admin.php?page=wc-status
+          - listitem [ref=f124e103]:
+            - link "Extensions" [ref=f124e104] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/extensions
+      - listitem [ref=f124e105]:
+        - link "Products" [ref=f124e106] [cursor=pointer]:
+          - /url: edit.php?post_type=product
+          - generic [aria-hidden] [ref=f124e107]: 
+        - list [ref=f124e109]:
+          - listitem [ref=f124e110]:
+            - link "All Products" [ref=f124e111] [cursor=pointer]:
+              - /url: edit.php?post_type=product
+          - listitem [ref=f124e112]:
+            - link "Add new product" [ref=f124e113] [cursor=pointer]:
+              - /url: post-new.php?post_type=product
+          - listitem [ref=f124e114]:
+            - link "Brands" [ref=f124e115] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_brand&post_type=product
+          - listitem [ref=f124e116]:
+            - link "Categories" [ref=f124e117] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_cat&post_type=product
+          - listitem [ref=f124e118]:
+            - link "Tags" [ref=f124e119] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=product_tag&post_type=product
+          - listitem [ref=f124e120]:
+            - link "Attributes" [ref=f124e121] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product_attributes
+          - listitem [ref=f124e122]:
+            - link "Reviews" [ref=f124e123] [cursor=pointer]:
+              - /url: edit.php?post_type=product&page=product-reviews
+      - listitem [ref=f124e124]:
+        - link "Payments" [ref=f124e125] [cursor=pointer]:
+          - /url: admin.php?page=wc-settings&tab=checkout&from=PAYMENTS_MENU_ITEM
+      - listitem [ref=f124e128]:
+        - link "Ambrosia Weight Fix" [ref=f124e129] [cursor=pointer]:
+          - /url: admin.php?page=ambrosia-weight-fix
+          - generic [aria-hidden] [ref=f124e130]: 
+      - listitem [ref=f124e132]:
+        - link "Analytics" [ref=f124e133] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - generic [aria-hidden] [ref=f124e134]: 
+        - list [ref=f124e136]:
+          - listitem [ref=f124e137]:
+            - link "Overview" [ref=f124e138] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/overview
+          - listitem [ref=f124e139]:
+            - link "Products" [ref=f124e140] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/products
+          - listitem [ref=f124e141]:
+            - link "Revenue" [ref=f124e142] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/revenue
+          - listitem [ref=f124e143]:
+            - link "Orders" [ref=f124e144] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/orders
+          - listitem [ref=f124e145]:
+            - link "Variations" [ref=f124e146] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/variations
+          - listitem [ref=f124e147]:
+            - link "Categories" [ref=f124e148] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/categories
+          - listitem [ref=f124e149]:
+            - link "Coupons" [ref=f124e150] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/coupons
+          - listitem [ref=f124e151]:
+            - link "Taxes" [ref=f124e152] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/taxes
+          - listitem [ref=f124e153]:
+            - link "Downloads" [ref=f124e154] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/downloads
+          - listitem [ref=f124e155]:
+            - link "Stock" [ref=f124e156] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/stock
+          - listitem [ref=f124e157]:
+            - link "Settings" [ref=f124e158] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/analytics/settings
+      - listitem [ref=f124e159]:
+        - link "Marketing" [ref=f124e160] [cursor=pointer]:
+          - /url: admin.php?page=wc-admin&path=/marketing
+          - generic [aria-hidden] [ref=f124e161]: 
+        - list [ref=f124e163]:
+          - listitem [ref=f124e164]:
+            - link "Overview" [ref=f124e165] [cursor=pointer]:
+              - /url: admin.php?page=wc-admin&path=/marketing
+          - listitem [ref=f124e166]:
+            - link "Coupons" [ref=f124e167] [cursor=pointer]:
+              - /url: edit.php?post_type=shop_coupon
+      - listitem [ref=f124e168]:
+        - link "Ambrosia Weight Repair" [ref=f124e169] [cursor=pointer]:
+          - /url: admin.php?page=ambrosia-weight-repair
+          - generic [aria-hidden] [ref=f124e170]: 
+      - listitem [aria-hidden] [ref=f124e172]
+      - listitem [ref=f124e174]:
+        - link "Ambrosia Picker Repair" [ref=f124e175] [cursor=pointer]:
+          - /url: admin.php?page=ambrosia-weight-picker-repair
+          - generic [aria-hidden] [ref=f124e176]: 
+      - listitem [ref=f124e178]:
+        - link "Appearance" [ref=f124e179] [cursor=pointer]:
+          - /url: themes.php
+          - generic [aria-hidden] [ref=f124e180]: 
+        - list [ref=f124e182]:
+          - listitem [ref=f124e183]:
+            - link "Themes 4" [ref=f124e184] [cursor=pointer]:
+              - /url: themes.php
+              - text: Themes
+              - generic [ref=f124e185]: "4"
+          - listitem [ref=f124e186]:
+            - link "Design" [ref=f124e187] [cursor=pointer]:
+              - /url: site-editor.php
+          - listitem [ref=f124e188]:
+            - link "Customize" [ref=f124e189] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fadmin.php%3Fpage%3Dambrosia-weight-fix%26awf_run%3D1
+          - listitem [ref=f124e190]:
+            - link "Widgets" [ref=f124e191] [cursor=pointer]:
+              - /url: widgets.php
+          - listitem [ref=f124e192]:
+            - link "Fonts" [ref=f124e193] [cursor=pointer]:
+              - /url: font-library.php
+          - listitem [ref=f124e194]:
+            - link "Menus" [ref=f124e195] [cursor=pointer]:
+              - /url: nav-menus.php
+          - listitem [ref=f124e196]:
+            - link "Background" [ref=f124e197] [cursor=pointer]:
+              - /url: customize.php?return=%2Fwp-admin%2Fadmin.php%3Fpage%3Dambrosia-weight-fix%26awf_run%3D1&autofocus%5Bcontrol%5D=background_image
+          - listitem
+          - listitem [ref=f124e198]:
+            - link "Theme File Editor" [ref=f124e199] [cursor=pointer]:
+              - /url: theme-editor.php
+      - listitem [ref=f124e200]:
+        - link "Plugins 13" [ref=f124e201] [cursor=pointer]:
+          - /url: plugins.php
+          - generic [aria-hidden] [ref=f124e202]: 
+          - generic [ref=f124e203]:
+            - text: Plugins
+            - generic [ref=f124e204]: "13"
+        - list [ref=f124e205]:
+          - listitem [ref=f124e206]:
+            - link "Installed Plugins" [ref=f124e207] [cursor=pointer]:
+              - /url: plugins.php
+          - listitem [ref=f124e208]:
+            - link "Add Plugin" [ref=f124e209] [cursor=pointer]:
+              - /url: plugin-install.php
+          - listitem [ref=f124e210]:
+            - link "Plugin File Editor" [ref=f124e211] [cursor=pointer]:
+              - /url: plugin-editor.php
+      - listitem [ref=f124e212]:
+        - link "Users" [ref=f124e213] [cursor=pointer]:
+          - /url: users.php
+          - generic [aria-hidden] [ref=f124e214]: 
+        - list [ref=f124e216]:
+          - listitem [ref=f124e217]:
+            - link "All Users" [ref=f124e218] [cursor=pointer]:
+              - /url: users.php
+          - listitem [ref=f124e219]:
+            - link "Add User" [ref=f124e220] [cursor=pointer]:
+              - /url: user-new.php
+          - listitem [ref=f124e221]:
+            - link "Profile" [ref=f124e222] [cursor=pointer]:
+              - /url: profile.php
+      - listitem [ref=f124e223]:
+        - link "Tools" [ref=f124e224] [cursor=pointer]:
+          - /url: tools.php
+          - generic [aria-hidden] [ref=f124e225]: 
+        - list [ref=f124e227]:
+          - listitem [ref=f124e228]:
+            - link "Available Tools" [ref=f124e229] [cursor=pointer]:
+              - /url: tools.php
+          - listitem [ref=f124e230]:
+            - link "Import" [ref=f124e231] [cursor=pointer]:
+              - /url: import.php
+          - listitem [ref=f124e232]:
+            - link "Export" [ref=f124e233] [cursor=pointer]:
+              - /url: export.php
+          - listitem [ref=f124e234]:
+            - link "Site Health 1" [ref=f124e235] [cursor=pointer]:
+              - /url: site-health.php
+              - text: Site Health
+              - generic [ref=f124e236]: "1"
+          - listitem [ref=f124e237]:
+            - link "Export Personal Data" [ref=f124e238] [cursor=pointer]:
+              - /url: export-personal-data.php
+          - listitem [ref=f124e239]:
+            - link "Erase Personal Data" [ref=f124e240] [cursor=pointer]:
+              - /url: erase-personal-data.php
+          - listitem [ref=f124e241]:
+            - link "Scheduled Actions" [ref=f124e242] [cursor=pointer]:
+              - /url: tools.php?page=action-scheduler
+      - listitem [ref=f124e243]:
+        - link "Settings" [ref=f124e244] [cursor=pointer]:
+          - /url: options-general.php
+          - generic [aria-hidden] [ref=f124e245]: 
+        - list [ref=f124e247]:
+          - listitem [ref=f124e248]:
+            - link "General" [ref=f124e249] [cursor=pointer]:
+              - /url: options-general.php
+          - listitem [ref=f124e250]:
+            - link "Connectors" [ref=f124e251] [cursor=pointer]:
+              - /url: options-connectors.php
+          - listitem [ref=f124e252]:
+            - link "Writing" [ref=f124e253] [cursor=pointer]:
+              - /url: options-writing.php
+          - listitem [ref=f124e254]:
+            - link "Reading" [ref=f124e255] [cursor=pointer]:
+              - /url: options-reading.php
+          - listitem [ref=f124e256]:
+            - link "Discussion" [ref=f124e257] [cursor=pointer]:
+              - /url: options-discussion.php
+          - listitem [ref=f124e258]:
+            - link "Media" [ref=f124e259] [cursor=pointer]:
+              - /url: options-media.php
+          - listitem [ref=f124e260]:
+            - link "Permalinks" [ref=f124e261] [cursor=pointer]:
+              - /url: options-permalink.php
+          - listitem [ref=f124e262]:
+            - link "Privacy" [ref=f124e263] [cursor=pointer]:
+              - /url: options-privacy.php
+      - listitem [aria-hidden] [ref=f124e264]
+      - listitem [ref=f124e266]:
+        - link "Divi" [ref=f124e267] [cursor=pointer]:
+          - /url: admin.php?page=et_onboarding
+          - generic [aria-hidden] [ref=f124e268]: 
+        - list [ref=f124e270]:
+          - listitem [ref=f124e271]:
+            - link "Dashboard 1" [ref=f124e272] [cursor=pointer]:
+              - /url: admin.php?page=et_onboarding
+              - text: Dashboard
+              - generic [ref=f124e273]: "1"
+          - listitem [ref=f124e274]:
+            - link "Theme Options" [ref=f124e275] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_options
+          - listitem [ref=f124e276]:
+            - link "Theme Builder" [ref=f124e277] [cursor=pointer]:
+              - /url: admin.php?page=et_theme_builder
+          - listitem [ref=f124e278]:
+            - link "Theme Customizer" [ref=f124e279] [cursor=pointer]:
+              - /url: customize.php?et_customizer_option_set=theme
+          - listitem [ref=f124e280]:
+            - link "Role Editor" [ref=f124e281] [cursor=pointer]:
+              - /url: admin.php?page=et_divi_role_editor
+          - listitem [ref=f124e282]:
+            - link "Divi Library" [ref=f124e283] [cursor=pointer]:
+              - /url: edit.php?post_type=et_pb_layout
+          - listitem [ref=f124e284]:
+            - link "Support Center" [ref=f124e285] [cursor=pointer]:
+              - /url: admin.php?page=et_support_center_divi
+      - listitem [ref=f124e286]:
+        - button "Collapse Main menu" [expanded] [ref=f124e287] [cursor=pointer]:
+          - generic [ref=f124e289]: Collapse Menu
+  - generic [ref=f124e290]:
+    - generic [ref=f124e291]:
+      - navigation "Toolbar":
+        - menu:
+          - group [ref=f124e292]:
+            - menuitem "About WordPress" [ref=f124e293] [cursor=pointer]
+          - group [ref=f124e296]:
+            - menuitem "Ambrosia - Staging" [ref=f124e297] [cursor=pointer]
+          - group [ref=f124e298]:
+            - menuitem "Live" [ref=f124e299] [cursor=pointer]
+          - group [ref=f124e300]:
+            - menuitem "17 updates available" [ref=f124e301] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f124e303]: "17"
+          - group [ref=f124e305]:
+            - menuitem "⌘K Open command palette" [ref=f124e306] [cursor=pointer]:
+              - generic [ref=f124e308]:
+                - text: ⌘K
+                - generic [ref=f124e309]: Open command palette
+          - group [ref=f124e310]:
+            - menuitem "84 Comments in moderation" [ref=f124e311] [cursor=pointer]:
+              - generic [aria-hidden] [ref=f124e313]: "84"
+          - group [ref=f124e315]:
+            - menuitem "New" [ref=f124e316] [cursor=pointer]
+        - menu [ref=f124e319]:
+          - group [ref=f124e320]:
+            - menuitem "Howdy, amborsia-admin" [ref=f124e321] [cursor=pointer]
+    - main [ref=f124e322]:
+      - generic [ref=f124e324]:
+        - heading "Ambrosia Weight Fix" [level=1] [ref=f124e325]
+        - paragraph [ref=f124e326]:
+          - link "RUN FIX NOW" [ref=f124e327] [cursor=pointer]:
+            - /url: https://staging.theambrosia.com/wp-admin/admin.php?page=ambrosia-weight-fix&awf_run=1
+        - generic [ref=f124e328]: Array ( [taxonomy_exists] => 1 [wc_attributes] => Array ( [0] => weight (select) ) [terms] => Array ( [0] => 203:1.5kg:1-5kg [1] => 209:100gm:100gm [2] => 179:1kg:1kg [3] => 208:200gm:200gm [4] => 205:250gm:250gm [5] => 180:2kg:2kg [6] => 231:300gm|500gm:300gm500gm [7] => 229:300gm|600gm:300gm600gm [8] => 210:350gm:350gm [9] => 233:350gm|600gm:350gm600gm [10] => 181:3kg:3kg [11] => 204:4.5kg:4-5kg [12] => 254:4kg:4kg [13] => 206:500gm:500gm [14] => 255:5kg:5kg [15] => 207:600gm:600gm ) [last_report] => Array ( [at] => 2026-10-20 12:19:27 [terms] => 3 [fixed] => 81 [skipped] => 0 ) )
+  - contentinfo [ref=f124e329]:
+    - paragraph [ref=f124e330]:
+      - generic [ref=f124e332]:
+        - text: Thank you for creating with
+        - link "WordPress" [ref=f124e333] [cursor=pointer]:
+          - /url: https://wordpress.org/
+        - text: .
+    - paragraph [ref=f124e334]: Version 7.1.3

@@ -1,0 +1,30 @@
+- generic [active] [ref=f6e1]:
+  - heading "Log In" [level=1] [ref=f6e2]
+  - generic [ref=f6e3]:
+    - link "Powered by WordPress" [ref=f6e4] [cursor=pointer]:
+      - /url: https://wordpress.org/
+    - generic [ref=f6e5]:
+      - paragraph [ref=f6e6]:
+        - generic [ref=f6e7]: Username or Email Address
+        - textbox "Username or Email Address" [ref=f6e8]
+      - generic [ref=f6e9]:
+        - generic [ref=f6e10]: Password
+        - generic [ref=f6e11]:
+          - textbox "Password" [ref=f6e12]
+          - button "Show password" [ref=f6e13] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f6e14]: 
+      - paragraph [ref=f6e15]:
+        - checkbox "Remember Me" [ref=f6e16] [cursor=pointer]
+        - generic [ref=f6e17]: Remember Me
+        - generic [ref=f6e18]:
+          - button "Help" [ref=f6e19] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f6e20]: 
+          - text: 
+      - paragraph:
+        - button "Log In" [ref=f6e21] [cursor=pointer]
+    - paragraph [ref=f6e22]:
+      - link "Lost your password?" [ref=f6e23] [cursor=pointer]:
+        - /url: https://staging.theambrosia.com/wp-login.php?action=lostpassword
+    - paragraph [ref=f6e24]:
+      - link "← Go to Ambrosia – Staging" [ref=f6e25] [cursor=pointer]:
+        - /url: https://staging.theambrosia.com/
