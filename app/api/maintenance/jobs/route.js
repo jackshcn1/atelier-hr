@@ -9,7 +9,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get('status');
 
-  let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name)').order('requested_at', { ascending: false });
+  let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name), assets(name)').order('requested_at', { ascending: false });
   if (statusFilter) query = query.eq('status', statusFilter);
   const { data, error } = await query;
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -29,7 +29,18 @@ export async function POST(req) {
     });
 
     const { id, asset_serial, service_type, priority, status, issues, comments, requested_by } = await req.json();
-    const jobId = id || 'MNT-' + Date.now();
+        // Sequential MNT-000001 style
+    let jobId = id;
+    if (!jobId) {
+      const { data: maxRow, error: seqErr } = await supabase.from('maintenance_jobs').select('id').order('requested_at', { ascending: false }).limit(1).maybeSingle();
+      let nextNum = 1;
+      if (maxRow && maxRow.id && /^MNT-\d+$/.test(maxRow.id)) {
+        nextNum = parseInt(maxRow.id.replace('MNT-', ''), 10) + 1;
+      } else if (maxRow && maxRow.id && /^MNT-0+\d+$/.test(maxRow.id)) {
+         nextNum = parseInt(maxRow.id.replace('MNT-', ''), 10) + 1;
+      }
+      jobId = 'MNT-' + String(nextNum).padStart(6, '0');
+    }
     const { data, error } = await supabase.from('maintenance_jobs').insert({
         id: jobId, asset_serial, service_type, priority: priority || 'normal', status: status || 'pending_approval', issues, comments, requested_by, requested_at: new Date().toISOString()
       }).select().single();
