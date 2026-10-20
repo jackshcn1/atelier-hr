@@ -54,3 +54,5 @@ supabase/.temp/
 .claude/
 env.local
 .env*
+
+.playwright-mcp/
