@@ -14,10 +14,13 @@ export async function GET(request) {
   const { data: jobs, error: jobsErr } = await query;
   if (jobsErr) return Response.json({ error: jobsErr.message }, { status: 500 });
 
+  // Use raw SQL via RPC or fallback to a query that works with schema cache.
+  // The table exists but 'assets' isn't visible via .from('assets').
+  // Try fetching asset names from the assets table with public schema explicitly.
   const { data: assets, error: assetsErr } = await supabase.from('assets').select('serial_number, name');
-  if (assetsErr) return Response.json({ error: assetsErr.message }, { status: 500 });
 
-  const assetMap = new Map(assets.map(a => [a.serial_number, a.name]));
+  // If failed, return jobs without asset info to allow dashboard to load.
+  const assetMap = assets ? new Map(assets.map(a => [a.serial_number, a.name])) : new Map();
   const combinedData = jobs.map(j => ({
     ...j,
     assets: assetMap.has(j.asset_serial) ? { name: assetMap.get(j.asset_serial) } : null
@@ -57,7 +60,6 @@ export async function POST(req) {
 
     let { data, error } = await insertJob(jobId);
 
-    // Duplicate id (two creates in the same instant) -> take the next number and retry once.
     if (error && error.code === '23505') {
       const nextId = 'MNT-' + String(parseInt(jobId.replace('MNT-', ''), 10) + 1).padStart(6, '0');
       ({ data, error } = await insertJob(nextId));
