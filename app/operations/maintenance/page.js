@@ -6,7 +6,6 @@ import { createClient } from '../../../lib/supabaseClient';
 export default function MaintenancePage() {
   const [jobs, setJobs] = useState([]);
   const [isAdmin] = useState(true);
-  const [filter, setFilter] = useState('All');
   const [sortBy, setSortBy] = useState('date');
   const [requestFilter, setRequestFilter] = useState('All');
   const [serviceFilter, setServiceFilter] = useState('All');
@@ -64,6 +63,8 @@ export default function MaintenancePage() {
 
   const pendingCount = jobs.filter(j => j.status === 'Pending approval').length;
 
+  const pendingApprovalJobs = jobs.filter(j => j.status === 'pending_approval');
+
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
       <div className="max-w-6xl mx-auto px-6 py-16 lg:py-24">
@@ -77,6 +78,24 @@ export default function MaintenancePage() {
           </div>
           <Link href="/operations/maintenance-pocs" className="btn-secondary text-sm px-4 py-2 self-start">View POC Directory →</Link>
         </div>
+
+        {/* Super Admin Approval Banner */}
+        {isAdmin && pendingApprovalJobs.length > 0 && (
+          <div className="mb-8 p-5 bg-[#fffbeb] border border-[#fef3c7] rounded-card shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="font-serif text-lg text-[#92400e]">⚠️ Approval Action Required</h3>
+              <p className="text-xs text-[#b45309] mt-1">There are {pendingApprovalJobs.length} maintenance request(s) waiting for super-admin approval.</p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {pendingApprovalJobs.map(j => (
+                <div key={j.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-control border border-[#fde68a] text-xs">
+                  <span>{j.id}</span>
+                  <Link href={`/operations/maintenance/${j.id}`} className="hover:underline text-ink font-medium">Open Job →</Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Filters/Sort */}
         <div className="flex flex-wrap gap-4 mb-6">
