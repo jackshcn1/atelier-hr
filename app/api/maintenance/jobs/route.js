@@ -9,11 +9,21 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get('status');
 
-  let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name), assets(name)').order('requested_at', { ascending: false });
+  let query = supabase.from('maintenance_jobs').select('*, maintenance_pocs(name)').order('requested_at', { ascending: false });
   if (statusFilter) query = query.eq('status', statusFilter);
-  const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ jobs: data || [] });
+  const { data: jobs, error: jobsErr } = await query;
+  if (jobsErr) return Response.json({ error: jobsErr.message }, { status: 500 });
+
+  const { data: assets, error: assetsErr } = await supabase.from('assets').select('serial_number, name');
+  if (assetsErr) return Response.json({ error: assetsErr.message }, { status: 500 });
+
+  const assetMap = new Map(assets.map(a => [a.serial_number, a.name]));
+  const combinedData = jobs.map(j => ({
+    ...j,
+    assets: assetMap.has(j.asset_serial) ? { name: assetMap.get(j.asset_serial) } : null
+  }));
+
+  return Response.json({ jobs: combinedData || [] });
 }
 
 export async function POST(req) {
@@ -29,21 +39,29 @@ export async function POST(req) {
     });
 
     const { id, asset_serial, service_type, priority, status, issues, comments, requested_by } = await req.json();
-        // Sequential MNT-000001 style
     let jobId = id;
     if (!jobId) {
-      const { data: maxRow, error: seqErr } = await supabase.from('maintenance_jobs').select('id').order('requested_at', { ascending: false }).limit(1).maybeSingle();
+      const { data: seqRows, error: seqErr } = await supabase.from('maintenance_jobs').select('id').like('id', 'MNT-0%').order('id', { ascending: false });
       let nextNum = 1;
-      if (maxRow && maxRow.id && /^MNT-\d+$/.test(maxRow.id)) {
-        nextNum = parseInt(maxRow.id.replace('MNT-', ''), 10) + 1;
-      } else if (maxRow && maxRow.id && /^MNT-0+\d+$/.test(maxRow.id)) {
-         nextNum = parseInt(maxRow.id.replace('MNT-', ''), 10) + 1;
+      if (seqRows && seqRows.length > 0) {
+        const lastId = seqRows[0].id;
+        if (/^MNT-0+\d+$/.test(lastId)) {
+          nextNum = parseInt(lastId.replace('MNT-', ''), 10) + 1;
+        }
       }
       jobId = 'MNT-' + String(nextNum).padStart(6, '0');
     }
-    const { data, error } = await supabase.from('maintenance_jobs').insert({
-        id: jobId, asset_serial, service_type, priority: priority || 'normal', status: status || 'pending_approval', issues, comments, requested_by, requested_at: new Date().toISOString()
+    const insertJob = (theId) => supabase.from('maintenance_jobs').insert({
+        id: theId, asset_serial, service_type, priority: priority || 'normal', status: status || 'pending_approval', issues, comments, requested_by, requested_at: new Date().toISOString()
       }).select().single();
+
+    let { data, error } = await insertJob(jobId);
+
+    // Duplicate id (two creates in the same instant) -> take the next number and retry once.
+    if (error && error.code === '23505') {
+      const nextId = 'MNT-' + String(parseInt(jobId.replace('MNT-', ''), 10) + 1).padStart(6, '0');
+      ({ data, error } = await insertJob(nextId));
+    }
 
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ job: data }, { status: 201 });
