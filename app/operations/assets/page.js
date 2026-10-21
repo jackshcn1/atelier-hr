@@ -42,6 +42,10 @@ export default function AssetsPageFull() {
           <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">Live restaurant asset inventory from database</p>
         </div>
 
+        <div className="flex justify-between items-center mb-6">
+          <button className="btn-primary text-sm px-4 py-2">+ Add Asset</button>
+        </div>
+
         {loading ? <div>Loading assets...</div> : (
           <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-4">
             <table className="w-full text-xs">
