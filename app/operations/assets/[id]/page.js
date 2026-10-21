@@ -571,10 +571,9 @@ export default function AssetDetailPage() {
                         value={maintenanceForm.priority}
                         onChange={e => setMaintenanceForm({...maintenanceForm, priority: e.target.value})}
                       >
-                        <option>Urgent</option>
-                        <option>Normal</option>
-                        <option>Can take some time</option>
                         <option>Low</option>
+                        <option>Normal</option>
+                        <option>Urgent</option>
                       </select>
                     </div>
 
