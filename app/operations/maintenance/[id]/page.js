@@ -17,16 +17,20 @@ export default function MaintenanceJobDetailPage() {
   const isAdminCanEdit = isAdmin && canEdit;
   const isSuperAdmin = true; // Placeholder for actual role check
   const allowEdit = isSuperAdmin || isAdminCanEdit;
+  // Combine DB audit rows (persisted) with synthesized lifecycle milestones only if genuinely missing.
+  // All real audit events (created, approved, rejected, stage_changed, overview_updated) are stored by /api/maintenance/audit.
   const auditEntries = (job?.maintenance_audit_logs || []).slice();
-  if (job?.requested_at && !auditEntries.some(e => e.action === 'created')) {
+  if (job?.requested_at && !auditEntries.some(e => String(e.action || '').toLowerCase() === 'created')) {
     auditEntries.unshift({ timestamp: job.requested_at, user_name: job.requested_by || 'System', action: 'created', details: `Job ${job.id} raised for ${job.asset_serial}` });
   }
-  if (job?.status === 'Approved' && !auditEntries.some(e => e.details?.includes('approved') || e.action === 'approved')) {
+  if (job?.status === 'Approved' && !auditEntries.some(e => String(e.action || '').toLowerCase() === 'approved')) {
     auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'approved', details: 'Maintenance request approved' });
   }
-  if (job?.status === 'Rejected' && job?.rejection_reason && !auditEntries.some(e => e.details?.includes('rejected') || e.action === 'rejected')) {
+  if (job?.status === 'Rejected' && job?.rejection_reason && !auditEntries.some(e => String(e.action || '').toLowerCase() === 'rejected')) {
     auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'rejected', details: `Rejected — ${job.rejection_reason}` });
   }
+  // Sort by timestamp so audit order is preserved regardless of push/unshift
+  auditEntries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   const [rejectionReason, setRejectionReason] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ service_type: '', comments: '', priority: 'normal' });
