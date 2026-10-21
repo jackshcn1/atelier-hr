@@ -42,11 +42,14 @@ export async function PATCH(req, { params }) {
   // Auto-set asset status to Maintenance on approval
   if (updates.status === 'Approved') {
     try {
-      const { data: jobData } = await supabase.from('maintenance_jobs').select('asset_serial').eq('id', id).single();
+      const adminSupabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false }
+      });
+      const { data: jobData } = await adminSupabase.from('maintenance_jobs').select('asset_serial').eq('id', id).single();
       if (jobData && jobData.asset_serial) {
-        await supabase.from('assets').update({ status: 'Maintenance' }).eq('asset_number', jobData.asset_serial);
+        await adminSupabase.from('assets').update({ status: 'Maintenance' }).eq('asset_number', jobData.asset_serial);
       }
-    } catch(_){}
+    } catch(e){ console.error('Asset status sync error:', e); }
   }
   return NextResponse.json({ job: data });
 }

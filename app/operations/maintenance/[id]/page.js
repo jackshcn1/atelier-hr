@@ -16,7 +16,7 @@ export default function MaintenanceJobDetailPage() {
   const canEdit = job && (job.status !== 'Completed' && job.status !== 'Rejected' && job.status !== 'Approved');
   const isAdminCanEdit = isAdmin && canEdit;
   const isSuperAdmin = true; // Placeholder for actual role check
-  const allowEdit = isSuperAdmin || isAdminCanEdit;
+  const allowEdit = isSuperAdmin && canEdit;
   // Combine DB audit rows (persisted) with synthesized lifecycle milestones only if genuinely missing.
   // All real audit events (created, approved, rejected, stage_changed, overview_updated) are stored by /api/maintenance/audit.
   const auditEntries = (job?.maintenance_audit_logs || []).slice();
