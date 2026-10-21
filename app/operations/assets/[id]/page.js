@@ -133,7 +133,7 @@ export default function AssetDetailPage() {
             model: assetData.model || assetData.model_name || '',
             serial: assetData.serial_number || assetData.id || '',
             vendor: assetData.vendor || '',
-            purchaseDate: assetData.purchase_price ? '' : '',
+            purchaseDate: mockData.purchaseDate || '',
             newOrUsed: assetData.is_new === false ? 'Used' : (assetData.is_new === true ? 'Brand New' : 'Brand New'),
             condition: 'Good',
             status: assetData.status || 'Available',
