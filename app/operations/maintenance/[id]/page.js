@@ -89,6 +89,13 @@ export default function MaintenanceJobDetailPage() {
     }
   };
 
+  const handleAddAnotherPoc = () => {
+    setShowPocPicker(true);
+    setShowPocForm(true);
+    setPocForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5 });
+    setDuplicatePoc(null);
+  };
+
   const handleAddNewPoc = () => {
     setShowPocForm(true);
     setDuplicatePoc(null);
@@ -605,8 +612,18 @@ export default function MaintenanceJobDetailPage() {
               <h2 className="font-serif text-xl">Maintenance POC</h2>
               <button onClick={openPocPicker} className="btn-secondary text-xs px-3 py-1">+ Assign / Pick POC</button>
             </div>
-            <p className="text-sm"><strong>Assigned:</strong> {job.maintenance_pocs?.name || 'Not yet assigned'}</p>
-            <p className="text-xs text-[#6b635c] mt-2">Speciality filter available. Add new POC from directory.</p>
+            <div className="text-sm">{job.maintenance_pocs?.name || 'Not yet assigned'}</div>
+            {job.maintenance_pocs && (
+              <div className="text-xs text-[#6b635c] mt-1 space-y-0.5">
+                <div><strong>Speciality:</strong> {job.maintenance_pocs.speciality || '—'}</div>
+                <div><strong>Contact:</strong> {job.maintenance_pocs.contact_primary || '—'}</div>
+                <div><strong>Rating:</strong> <span className="text-amber-500">{'★'.repeat(job.maintenance_pocs.star_rating ?? 5)}{'☆'.repeat(5 - (job.maintenance_pocs.star_rating ?? 5))}</span></div>
+              </div>
+            )}
+            <div className="flex gap-2 mt-3">
+              <button onClick={openPocPicker} className="btn-secondary text-xs px-3 py-1">+ Assign / Pick POC</button>
+              <button onClick={() => { setShowPocPicker(true); setShowPocForm(false); loadPOCs('', 'All'); }} className="btn-quiet text-xs px-3 py-1">+ Add Another</button>
+            </div>
           </section>
 
           {/* Quotes & Estimates */}
