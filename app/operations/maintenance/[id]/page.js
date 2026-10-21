@@ -27,7 +27,7 @@ export default function MaintenanceJobDetailPage() {
   if (job?.status === 'Rejected' && job?.rejection_reason && !auditEntries.some(e => e.details?.includes('rejected') || e.action === 'rejected')) {
     auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'rejected', details: `Rejected — ${job.rejection_reason}` });
   }
-  const [rejectionReason, setRejectionReason] = useState(''); // Added missing state
+  const [rejectionReason, setRejectionReason] = useState('');
   const statusColors = {
     'pending_approval': 'pill-warn',
     'Approved': 'pill-good',
@@ -38,7 +38,6 @@ export default function MaintenanceJobDetailPage() {
     'Completed': 'pill-good',
     'Rejected': 'pill-bad'
   };
-
   const statusLabel = (s) => (s === 'pending_approval' ? 'Pending approval' : s);
 
   const handleStageChange = async (newStage) => {
@@ -63,8 +62,6 @@ export default function MaintenanceJobDetailPage() {
           body: JSON.stringify({ job_id: jobId, user_name: 'Super Admin', action: 'stage_changed', details: `Stage changed from ${oldStatus} to ${newStage}` })
         });
       } catch (_) {}
-
-      // Refresh job data to fetch updated audit logs
       const refreshRes = await fetch(`/api/maintenance/jobs/${jobId}`, {
         headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
       });
