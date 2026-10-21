@@ -55,6 +55,8 @@ export default function MaintenancePOCsPage() {
   const [showForm, setShowForm] = useState(false);
   const [filterSpeciality, setFilterSpeciality] = useState('All');
   const [selectedPOC, setSelectedPOC] = useState(null);
+  const [duplicatePOC, setDuplicatePOC] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -74,9 +76,28 @@ export default function MaintenancePOCsPage() {
     }).catch(() => {});
   }, []);
 
-  const handleAddPOC = (e) => {
+  const handleAddPOC = async (e) => {
     e.preventDefault();
     if (!form.name || !form.contact) return;
+    setSaving(true);
+    setDuplicatePOC(null);
+    // Check for existing contact number
+    try {
+      const checkRes = await fetch(`/api/maintenance/pocs?contact=${encodeURIComponent(form.contact)}`);
+      const checkData = await checkRes.json();
+      const normalized = String(form.contact).replace(/[\s\-()]/g, '');
+      const match = (checkData.pocs || []).find(p => {
+        const c = String(p.contact_primary || '').replace(/[\s\-()]/g, '');
+        const a = String(p.contact_alternate || '').replace(/[\s\-()]/g, '');
+        return (c && c === normalized) || (a && a === normalized);
+      });
+      if (match) {
+        setDuplicatePOC(match);
+        setSaving(false);
+        return;
+      }
+    } catch (_) {}
+
     fetch('/api/maintenance/pocs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -92,9 +113,11 @@ export default function MaintenancePOCsPage() {
       })
     }).then(r => r.json()).then(d => {
       if (d.poc) setPocs([d.poc, ...pocs]);
+      if (d.error === 'duplicate_contact' && d.existing_poc) setDuplicatePOC(d.existing_poc);
     }).catch(() => {});
     setForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5, attachments: '' });
     setShowForm(false);
+    setSaving(false);
   };
 
   const filteredPocs = filterSpeciality === 'All'
@@ -207,9 +230,21 @@ export default function MaintenancePOCsPage() {
                   />
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-[#ebe8e4]">
-                  <button type="submit" className="btn-primary text-sm px-5 py-2">Save POC</button>
-                  <button type="button" onClick={() => setShowForm(false)} className="btn-secondary text-sm px-5 py-2">Cancel</button>
+                  <button type="submit" disabled={saving} className="btn-primary text-sm px-5 py-2">{saving ? 'Checking...' : 'Save POC'}</button>
+                  <button type="button" onClick={() => { setShowForm(false); setDuplicatePOC(null); }} className="btn-secondary text-sm px-5 py-2">Cancel</button>
                 </div>
+
+                {duplicatePOC && (
+                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded p-3 text-xs">
+                    <div className="font-medium text-amber-800">Contact number already exists</div>
+                    <div className="text-amber-900 mt-1">{duplicatePOC.name} — {duplicatePOC.speciality} — {duplicatePOC.contact_primary || ''}</div>
+                    <div className="text-amber-700 mt-1">Is this the POC you are looking for?</div>
+                    <div className="flex gap-2 mt-2">
+                      <button type="button" onClick={() => { setShowForm(false); setDuplicatePOC(null); setSelectedPOC(duplicatePOC.id); }} className="btn-primary text-xs px-2 py-1">Yes — use this POC</button>
+                      <button type="button" onClick={() => setDuplicatePOC(null)} className="btn-secondary text-xs px-2 py-1">No — try different contact</button>
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
           </div>
