@@ -102,7 +102,7 @@ export default function AssetDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
   const [pendingChanges, setPendingChanges] = useState(null);
-  const [preMaintenanceStatus, setPreMaintenanceStatus] = useState('Available');
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [showCompletedPicker, setShowCompletedPicker] = useState(false);
   const [completedStatusChoice, setCompletedStatusChoice] = useState('Available');
 
