@@ -120,7 +120,9 @@ export default function AssetDetailPage() {
       try {
         // Load from database
         const supabase = createClient();
-        const { data: assetData } = await supabase.from('assets').select('*').eq('asset_number', assetId).single();
+        const { data: dbData } = await supabase.from('assets').select('*').eq('asset_number', assetId).single();
+        const mockData = mockAssetData[assetId] || {};
+        const assetData = dbData ? { ...mockData, ...dbData, status: dbData.status || mockData.status, asset_number: assetId, id: dbData.id || assetId } : mockData;
         if (assetData) {
           setOriginalData(assetData);
           setForm({
