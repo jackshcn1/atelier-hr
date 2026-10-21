@@ -28,6 +28,33 @@ export default function MaintenanceJobDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ service_type: '', comments: '', priority: 'normal' });
 
+  const handleStageChange = async (newStage) => {
+    setSelectedStage(newStage);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session ? `Bearer ${session.access_token}` : ''
+        },
+        body: JSON.stringify({ status: newStage })
+      });
+      if (!res.ok) throw new Error('Failed to update stage');
+      try {
+        await fetch('/api/maintenance/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': session ? `Bearer ${session.access_token}` : '' },
+          body: JSON.stringify({ job_id: jobId, user_name: 'Super Admin', action: 'stage_changed', details: `Stage changed to ${newStage}` })
+        });
+      } catch (_) {}
+      setJob(prev => ({ ...prev, status: newStage }));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const handleApprove = async () => {
     try {
       const supabase = createClient();
@@ -192,37 +219,17 @@ export default function MaintenanceJobDetailPage() {
         {/* Audit + Stage */}
         <div className="panel bg-white border border-[#ebe8e4] rounded-card p-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center text-xs font-medium text-[#8b6f4e] gap-2">
-              <span className="text-[#6b635c]">Stages:</span>
-              <span>Pending Approval → Approved → Assigned → Awaiting POC → In Repair → Awaiting Quote → Completed</span>
+            <div className="text-xs font-medium text-[#8b6f4e]">
+              <span>Maintenance Job Progress Stage</span>
             </div>
             {isAdmin && job?.status !== 'Rejected' && (
               <label className="flex items-center gap-2">
                 <span className="text-xs font-medium text-[#6b635c]">Stage:</span>
-                <select className="field text-sm bg-white w-48" value={selectedStage} onChange={e => setSelectedStage(e.target.value)}>
+                <select className="field text-sm bg-white w-48" value={job.status} onChange={e => handleStageChange(e.target.value)}>
                   {['pending_approval','Approved','Assigned','Awaiting POC','In Repair','Awaiting Quote','Completed'].map(s => <option key={s} value={s}>{s === 'pending_approval' ? 'Pending approval' : s}</option>)}
                 </select>
               </label>
             )}
-          </div>
-        </div>
-
-        {/* Status Bar */}
-        <div className="panel bg-white border border-[#ebe8e4] rounded-card p-4 mb-6">
-          <div className="flex flex-wrap justify-between items-center text-xs font-medium text-[#8b6f4e] gap-2">
-            <span>Pending Approval</span>
-            <span>→</span>
-            <span>Approved</span>
-            <span>→</span>
-            <span>Assigned</span>
-            <span>→</span>
-            <span>Awaiting POC</span>
-            <span>→</span>
-            <span>In Repair</span>
-            <span>→</span>
-            <span>Awaiting Quote</span>
-            <span>→</span>
-            <span>Completed</span>
           </div>
         </div>
 
