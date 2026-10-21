@@ -16,6 +16,8 @@ const buildSpecialityList = (extra = []) => {
   return list;
 };
 
+const SPECIALITY_OPTIONS = buildSpecialityList();
+
 export default function MaintenancePOCsPage() {
   const [pocs, setPocs] = useState([
     {
