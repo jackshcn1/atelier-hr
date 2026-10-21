@@ -81,8 +81,8 @@ export default function MaintenancePOCsPage() {
     if (!form.name || !form.contact) return;
     setSaving(true);
     setDuplicatePOC(null);
-    // Check for existing contact number
     try {
+      // Check for existing contact number
       const checkRes = await fetch(`/api/maintenance/pocs?contact=${encodeURIComponent(form.contact)}`);
       const checkData = await checkRes.json();
       const normalized = String(form.contact).replace(/[\s\-()]/g, '');
@@ -96,28 +96,32 @@ export default function MaintenancePOCsPage() {
         setSaving(false);
         return;
       }
-    } catch (_) {}
-
-    fetch('/api/maintenance/pocs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.name,
-        speciality: form.speciality,
-        contact_primary: form.contact,
-        contact_alternate: form.alternateContact || null,
-        reference: form.reference || null,
-        notes: form.notes || null,
-        star_rating: form.rating,
-        attachment_url: form.attachments || null
-      })
-    }).then(r => r.json()).then(d => {
+      const res = await fetch('/api/maintenance/pocs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          speciality: form.speciality,
+          contact_primary: form.contact,
+          contact_alternate: form.alternateContact || null,
+          reference: form.reference || null,
+          notes: form.notes || null,
+          star_rating: form.rating,
+          attachment_url: form.attachments || null
+        })
+      });
+      const d = await res.json();
       if (d.poc) setPocs([d.poc, ...pocs]);
       if (d.error === 'duplicate_contact' && d.existing_poc) setDuplicatePOC(d.existing_poc);
-    }).catch(() => {});
-    setForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5, attachments: '' });
-    setShowForm(false);
-    setSaving(false);
+      if (!d.error || d.poc) {
+        setForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5, attachments: '', newSpeciality: '' });
+        setShowForm(false);
+      }
+    } catch (_) {
+      // silently fail; user sees saving stays true briefly
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filteredPocs = filterSpeciality === 'All'
@@ -260,14 +264,14 @@ export default function MaintenancePOCsPage() {
                     <h3 className="font-serif text-xl text-[#1e1812]">{poc.name}</h3>
                     <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#f6f4f2] text-[#8b6f4e] text-xs font-medium">{poc.speciality}</span>
                   </div>
-                  <div className="text-amber-500 font-bold text-sm" title={`${poc.rating} / 5 stars`}>
-                    {'★'.repeat(poc.rating)}{'☆'.repeat(5 - poc.rating)}
+                  <div className="text-amber-500 font-bold text-sm" title={`${poc.star_rating ?? poc.rating ?? 5} / 5 stars`}>
+                    {'★'.repeat(poc.star_rating ?? poc.rating ?? 5)}{'☆'.repeat(5 - (poc.star_rating ?? poc.rating ?? 5))}
                   </div>
                 </div>
 
                 <div className="space-y-1.5 text-xs text-[#6b635c] mb-4">
-                  <p><strong className="text-[#1e1812]">Contact:</strong> {poc.contact}</p>
-                  {poc.alternateContact && <p><strong className="text-[#1e1812]">Alt Contact:</strong> {poc.alternateContact}</p>}
+                  <p><strong className="text-[#1e1812]">Contact:</strong> {poc.contact_primary || poc.contact || '—'}</p>
+                  {(poc.contact_alternate || poc.alternateContact) && <p><strong className="text-[#1e1812]">Alt Contact:</strong> {poc.contact_alternate || poc.alternateContact}</p>}
                   {poc.reference && <p><strong className="text-[#1e1812]">Reference:</strong> {poc.reference}</p>}
                   {poc.notes && <p className="italic bg-[#f6f4f2] p-2 rounded mt-2">{poc.notes}</p>}
                 </div>
@@ -275,7 +279,7 @@ export default function MaintenancePOCsPage() {
 
               <div className="pt-4 border-t border-[#ebe8e4]">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-[#8b6f4e] font-medium">{poc.serviceHistory.length} Service Records</span>
+                  <span className="text-[#8b6f4e] font-medium">{(poc.serviceHistory || []).length} Service Records</span>
                   <button onClick={() => setSelectedPOC(selectedPOC === poc.id ? null : poc.id)} className="btn-secondary text-xs px-2.5 py-1">
                     {selectedPOC === poc.id ? 'Hide History' : 'View History'}
                   </button>
@@ -283,8 +287,8 @@ export default function MaintenancePOCsPage() {
 
                 {selectedPOC === poc.id && (
                   <div className="mt-3 pt-3 border-t border-dashed border-[#ebe8e4] space-y-2 text-xs">
-                    {poc.serviceHistory.length > 0 ? (
-                      poc.serviceHistory.map((sh, idx) => (
+                    {(poc.serviceHistory || []).length > 0 ? (
+                      (poc.serviceHistory || []).map((sh, idx) => (
                         <div key={idx} className="bg-[#f6f4f2] p-2 rounded">
                           <div className="flex justify-between font-medium text-[#1e1812]">
                             <span>{sh.jobId} ({sh.date})</span>
