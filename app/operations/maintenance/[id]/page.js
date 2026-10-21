@@ -13,7 +13,7 @@ export default function MaintenanceJobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const canEdit = job && (job.status !== 'Completed' && job.status !== 'Rejected');
+  const canEdit = job && (job.status !== 'Completed' && job.status !== 'Rejected' && job.status !== 'Approved');
   const isAdminCanEdit = isAdmin && canEdit;
   const isSuperAdmin = true; // Placeholder for actual role check
   const allowEdit = isSuperAdmin || isAdminCanEdit;
