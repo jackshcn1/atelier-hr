@@ -72,6 +72,8 @@ export default function MaintenancePOCsPage() {
   const [saving, setSaving] = useState(false);
   const [editingPOC, setEditingPOC] = useState(null);
 
+  const POC_STAGES = ['New','Called','Not answering','Waiting on quote','Working','Completed','Replaced / Rejected'];
+
   const [form, setForm] = useState({
     name: '',
     speciality: 'Electrician',
@@ -81,7 +83,8 @@ export default function MaintenancePOCsPage() {
     notes: '',
     rating: 5,
     attachments: '',
-    newSpeciality: ''
+    newSpeciality: '',
+    stage: 'New'
   });
 
   useEffect(() => {
@@ -116,6 +119,7 @@ export default function MaintenancePOCsPage() {
             reference: form.reference || null,
             notes: form.notes || null,
             star_rating: form.rating,
+            stage: form.stage || 'New',
             attachment_url: form.attachments || null
           })
         });
@@ -156,6 +160,7 @@ export default function MaintenancePOCsPage() {
           reference: form.reference || null,
           notes: form.notes || null,
           star_rating: form.rating,
+          stage: form.stage || 'New',
           attachment_url: form.attachments || null
         })
       });
@@ -170,6 +175,36 @@ export default function MaintenancePOCsPage() {
       // silently fail; user sees saving stays true briefly
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleStageChange = async (poc, stage) => {
+    setPocs(prev => prev.map(p => (p.id === poc.id ? { ...p, stage } : p)));
+    try {
+      const res = await fetch(`/api/maintenance/pocs/${poc.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage })
+      });
+      if (!res.ok) throw new Error('Failed to update stage');
+    } catch (err) {
+      setPocs(prev => prev.map(p => (p.id === poc.id ? { ...p, stage: poc.stage || 'New' } : p)));
+      alert(err.message || 'Failed to update stage');
+    }
+  };
+
+  const handleDeletePOC = async (poc) => {
+    if (!confirm(`Delete ${poc.name} from the directory? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/maintenance/pocs/${poc.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to delete POC');
+      }
+      setPocs(prev => prev.filter(p => p.id !== poc.id));
+      if (selectedPOC === poc.id) setSelectedPOC(null);
+    } catch (err) {
+      alert(err.message || 'Failed to delete POC');
     }
   };
 
@@ -258,6 +293,12 @@ export default function MaintenancePOCsPage() {
                   <input className="field text-sm w-full" value={form.reference} onChange={e => setForm({...form, reference: e.target.value})} placeholder="e.g. Recommended by Chef" />
                 </div>
                 <div>
+                  <label className="text-xs font-medium text-[#6b635c] mb-1 block">Stage</label>
+                  <select className="field text-sm w-full bg-white" value={form.stage} onChange={e => setForm({...form, stage: e.target.value})}>
+                    {POC_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="text-xs font-medium text-[#6b635c] mb-1 block">Star Rating (1 to 5)</label>
                   <select className="field text-sm w-full bg-white" value={form.rating} onChange={e => setForm({...form, rating: Number(e.target.value)})}>
                     <option value={5}>5 Stars - Excellent</option>
@@ -331,12 +372,31 @@ export default function MaintenancePOCsPage() {
               </div>
 
               <div className="pt-4 border-t border-[#ebe8e4]">
-                <div className="flex justify-between items-center text-xs">
+                <div className="flex justify-between items-center text-xs gap-2">
                   <span className="text-[#8b6f4e] font-medium">{(poc.serviceHistory || []).length} Service Records</span>
                   <button onClick={() => setSelectedPOC(selectedPOC === poc.id ? null : poc.id)} className="btn-secondary text-xs px-2.5 py-1">
                     {selectedPOC === poc.id ? 'Hide History' : 'View History'}
                   </button>
-                  <button onClick={() => { setShowForm(true); setEditingPOCId(poc.id); setEditingPOC(poc); setForm({ name: poc.name || '', speciality: poc.speciality || 'Electrician', contact: poc.contact_primary || poc.contact || '', alternateContact: poc.contact_alternate || poc.alternateContact || '', reference: poc.reference || '', notes: poc.notes || '', rating: poc.star_rating ?? poc.rating ?? 5, attachments: poc.attachment_url || '', newSpeciality: '' }); setDuplicatePOC(null); }} className="btn-secondary text-xs px-2.5 py-1">Edit</button>
+                  <button onClick={() => { setShowForm(true); setEditingPOCId(poc.id); setEditingPOC(poc); setForm({ name: poc.name || '', speciality: poc.speciality || 'Electrician', contact: poc.contact_primary || poc.contact || '', alternateContact: poc.contact_alternate || poc.alternateContact || '', reference: poc.reference || '', notes: poc.notes || '', rating: poc.star_rating ?? poc.rating ?? 5, attachments: poc.attachment_url || '', newSpeciality: '', stage: poc.stage || 'New' }); setDuplicatePOC(null); }} className="btn-secondary text-xs px-2.5 py-1">Edit</button>
+                  <button
+                    onClick={() => handleDeletePOC(poc)}
+                    title="Delete POC"
+                    aria-label={`Delete ${poc.name}`}
+                    className="text-[#b23a3a] hover:text-[#8b2626] text-xs px-2 py-1 rounded-control hover:bg-[#fbeaea]"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  <label className="text-xs font-medium text-[#6b635c] mb-1 block">Stage</label>
+                  <select
+                    className="field text-xs bg-white w-full"
+                    value={poc.stage || 'New'}
+                    onChange={e => handleStageChange(poc, e.target.value)}
+                  >
+                    {POC_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
 
                 {selectedPOC === poc.id && (
