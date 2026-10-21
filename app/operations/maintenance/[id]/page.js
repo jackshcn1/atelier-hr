@@ -44,6 +44,11 @@ export default function MaintenanceJobDetailPage() {
     'Completed': 'pill-good',
     'Rejected': 'pill-bad'
   };
+  const priorityColors = {
+    'Low': 'pill-good',
+    'Normal': 'pill-warn',
+    'Urgent': 'pill-bad'
+  };
   const statusLabel = (s) => (s === 'pending_approval' ? 'Pending approval' : s);
 
   const handleStageChange = async (newStage) => {
@@ -317,7 +322,7 @@ export default function MaintenanceJobDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div><strong className="text-[#6b635c]">Asset:</strong> {job.asset_serial}</div>
                 <div><strong className="text-[#6b635c]">Service Type:</strong> {job.service_type}</div>
-                <div><strong className="text-[#6b635c]">Priority:</strong> <span className="pill-bad">{job.priority}</span></div>
+                <div><strong className="text-[#6b635c]">Priority:</strong> <span className={`${priorityColors[job.priority] || 'pill-quiet'} text-sm`}>{job.priority}</span></div>
                 <div><strong className="text-[#6b635c]">Requested By:</strong> {job.requested_by}</div>
                 <div><strong className="text-[#6b635c]">Issues:</strong> {job.issues ? (typeof job.issues === 'object' && !Array.isArray(job.issues) ? Object.entries(job.issues).filter(([,_v])=>_v===true).map(([k])=>k).join(', ') || 'None' : (Array.isArray(job.issues) ? job.issues.join(', ') : String(job.issues))) : 'None'}</div>
                 <div><strong className="text-[#6b635c]">Comments:</strong> {job.comments}</div>
