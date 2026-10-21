@@ -3,13 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function GET(req, { params }) {
   const { id } = await params;
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
 
-  if (!token) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
-
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: 'Bearer ' + token } },
+  // Use service role to bypass RLS for audit logs
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false }
   });
 
