@@ -57,6 +57,7 @@ export default function MaintenancePOCsPage() {
   const [selectedPOC, setSelectedPOC] = useState(null);
   const [duplicatePOC, setDuplicatePOC] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [editingPOC, setEditingPOC] = useState(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -76,13 +77,44 @@ export default function MaintenancePOCsPage() {
     }).catch(() => {});
   }, []);
 
+  const [formTitle, setFormTitle] = useState('Add New Maintenance POC');
+  const [editingPOCId, setEditingPOCId] = useState(null);
+
   const handleAddPOC = async (e) => {
     e.preventDefault();
     if (!form.name || !form.contact) return;
     setSaving(true);
     setDuplicatePOC(null);
     try {
-      // Check for existing contact number
+      if (editingPOCId) {
+        // Edit existing POC
+        const res = await fetch(`/api/maintenance/pocs/${editingPOCId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: form.name,
+            speciality: form.speciality,
+            contact_primary: form.contact,
+            contact_alternate: form.alternateContact || null,
+            reference: form.reference || null,
+            notes: form.notes || null,
+            star_rating: form.rating,
+            attachment_url: form.attachments || null
+          })
+        });
+        const d = await res.json();
+        if (d.poc) {
+          setPocs(pocs.map(p => p.id === editingPOCId ? d.poc : p));
+        }
+        setForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5, attachments: '', newSpeciality: '' });
+        setShowForm(false);
+        setEditingPOCId(null);
+        setEditingPOC(null);
+        setFormTitle('Add New Maintenance POC');
+        return;
+      }
+
+      // Create new — check for existing contact number
       const checkRes = await fetch(`/api/maintenance/pocs?contact=${encodeURIComponent(form.contact)}`);
       const checkData = await checkRes.json();
       const normalized = String(form.contact).replace(/[\s\-()]/g, '');
@@ -140,7 +172,7 @@ export default function MaintenancePOCsPage() {
             <h1 className="page-title font-serif text-4xl lg:text-5xl">Maintenance POCs</h1>
             <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-2">Verified directory of technicians, vendors, electricians, plumbers, and contractors</p>
           </div>
-          <button onClick={() => setShowForm(true)} className="btn-primary text-sm px-5 py-2.5 self-start">+ Add Maintenance POC</button>
+          <button onClick={() => { setShowForm(true); setEditingPOCId(null); setEditingPOC(null); setForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5, attachments: '', newSpeciality: '' }); setFormTitle('Add New Maintenance POC'); setDuplicatePOC(null); }} className="btn-primary text-sm px-5 py-2.5 self-start">+ Add Maintenance POC</button>
         </div>
 
         {/* Filters */}
@@ -161,7 +193,7 @@ export default function MaintenancePOCsPage() {
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-card shadow-2xl max-w-lg mx-4 p-8 border border-[#ebe8e4] w-full max-h-[90vh] overflow-y-auto">
-              <h3 className="font-serif text-2xl mb-4">Add New Maintenance POC</h3>
+              <h3 className="font-serif text-2xl mb-4">{editingPOCId ? 'Edit Maintenance POC' : (formTitle || 'Add New Maintenance POC')}</h3>
               <form onSubmit={handleAddPOC} className="space-y-4 text-sm">
                 <div>
                   <label className="text-xs font-medium text-[#6b635c] mb-1 block">POC / Vendor Name *</label>
@@ -234,8 +266,8 @@ export default function MaintenancePOCsPage() {
                   />
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-[#ebe8e4]">
-                  <button type="submit" disabled={saving} className="btn-primary text-sm px-5 py-2">{saving ? 'Checking...' : 'Save POC'}</button>
-                  <button type="button" onClick={() => { setShowForm(false); setDuplicatePOC(null); }} className="btn-secondary text-sm px-5 py-2">Cancel</button>
+                  <button type="submit" disabled={saving} className="btn-primary text-sm px-5 py-2">{saving ? 'Saving...' : (editingPOCId ? 'Save Changes' : 'Save POC')}</button>
+                  <button type="button" onClick={() => { setShowForm(false); setDuplicatePOC(null); setEditingPOCId(null); setEditingPOC(null); }} className="btn-secondary text-sm px-5 py-2">Cancel</button>
                 </div>
 
                 {duplicatePOC && (
@@ -283,6 +315,7 @@ export default function MaintenancePOCsPage() {
                   <button onClick={() => setSelectedPOC(selectedPOC === poc.id ? null : poc.id)} className="btn-secondary text-xs px-2.5 py-1">
                     {selectedPOC === poc.id ? 'Hide History' : 'View History'}
                   </button>
+                  <button onClick={() => { setShowForm(true); setEditingPOCId(poc.id); setEditingPOC(poc); setForm({ name: poc.name || '', speciality: poc.speciality || 'Electrician', contact: poc.contact_primary || poc.contact || '', alternateContact: poc.contact_alternate || poc.alternateContact || '', reference: poc.reference || '', notes: poc.notes || '', rating: poc.star_rating ?? poc.rating ?? 5, attachments: poc.attachment_url || '', newSpeciality: '' }); setDuplicatePOC(null); }} className="btn-secondary text-xs px-2.5 py-1">Edit</button>
                 </div>
 
                 {selectedPOC === poc.id && (
