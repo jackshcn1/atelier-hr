@@ -3,9 +3,19 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../../lib/supabaseClient';
 
+const CATEGORY_OPTIONS = ['Kitchen Equipment', 'Furniture', 'Uniform', 'Electronics', 'Cleaning Supplies', 'Packaging', 'Other'];
+const TYPE_OPTIONS = ['Chiller', 'Freezer', 'Oven', 'Grill', 'Table', 'Chair', 'Stool', 'Lamp', 'TV', 'AC'];
+
 export default function AssetsPageFull() {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: '', category: 'Kitchen Equipment', type: 'Chiller', condition: 'Brand New', status: 'Available', location: 'Kitchen', asset_number: 'KICH00003' });
+
+  const fallbackAssets = [
+    { asset_number: 'KICH00001', name: 'Chiller', condition: 'Brand New', status: 'Available', location: 'Kitchen' },
+    { asset_number: 'KICH00002', name: 'Chiller', condition: 'Good', status: 'Maintenance', location: 'Bakery' }
+  ];
 
   useEffect(() => {
     const fetchAssets = async () => {
@@ -15,20 +25,24 @@ export default function AssetsPageFull() {
         if (json.assets && json.assets.length > 0) {
           setAssets(json.assets);
         } else {
-          // Fallback if DB empty
-          setAssets([
-            { asset_number: 'KICH00001', name: 'Chiller', condition: 'Brand New', status: 'Available', location: 'Kitchen' },
-            { asset_number: 'KICH00002', name: 'Chiller', condition: 'Good', status: 'Maintenance', location: 'Bakery' }
-          ]);
+          setAssets(fallbackAssets);
         }
       } catch (e) {
-        console.error(e);
+        setAssets(fallbackAssets);
       } finally {
         setLoading(false);
       }
     };
     fetchAssets();
   }, []);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    const newAsset = { ...form };
+    setAssets(prev => [newAsset, ...prev]);
+    setShowForm(false);
+    setForm({ name: '', category: 'Kitchen Equipment', type: 'Chiller', condition: 'Brand New', status: 'Available', location: 'Kitchen', asset_number: 'KICH000' + (assets.length + 3) });
+  };
 
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
@@ -39,12 +53,36 @@ export default function AssetsPageFull() {
         </div>
         <div className="page-head mb-10">
           <h1 className="page-title font-serif text-4xl lg:text-5xl">Assets</h1>
-          <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">Live restaurant asset inventory from database</p>
+          <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">Live restaurant asset inventory</p>
         </div>
 
         <div className="flex justify-between items-center mb-6">
-          <button className="btn-primary text-sm px-4 py-2">+ Add Asset</button>
+          <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm px-4 py-2">+ Add Asset</button>
         </div>
+
+        {showForm && (
+          <form onSubmit={handleAdd} className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6 mb-8">
+            <h3 className="font-serif text-xl mb-4">Add New Asset</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
+              <input className="field text-sm" placeholder="Asset Number (e.g. KICH00003)" value={form.asset_number} onChange={e => setForm({...form, asset_number: e.target.value})} required />
+              <input className="field text-sm" placeholder="Asset Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
+              <select className="field text-sm bg-white" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
+                {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select className="field text-sm bg-white" value={form.condition} onChange={e => setForm({...form, condition: e.target.value})}>
+                <option>Brand New</option><option>Good</option><option>Requires Maintenance</option><option>Bad</option>
+              </select>
+              <select className="field text-sm bg-white" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
+                <option>Available</option><option>In-use</option><option>Maintenance</option><option>Returned</option>
+              </select>
+              <input className="field text-sm" placeholder="Location" value={form.location} onChange={e => setForm({...form, location: e.target.value})} />
+            </div>
+            <div className="flex gap-3">
+              <button type="submit" className="btn-primary text-sm px-4 py-2">Save Asset</button>
+              <button type="button" onClick={() => setShowForm(false)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+            </div>
+          </form>
+        )}
 
         {loading ? <div>Loading assets...</div> : (
           <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-4">
