@@ -118,32 +118,31 @@ export default function AssetDetailPage() {
     const fetchAssetData = async () => {
       setLoading(true);
       try {
-        // Simulate API call - replace with real fetch in production
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const assetData = mockAssetData[assetId];
+        // Load from database
+        const supabase = createClient();
+        const { data: assetData } = await supabase.from('assets').select('*').eq('asset_number', assetId).single();
         if (assetData) {
           setOriginalData(assetData);
           setForm({
-            name: assetData.name,
-            category: assetData.category,
-            type: assetData.type,
-            brand: assetData.brand,
-            model: assetData.model,
-            serial: assetData.serial,
-            vendor: assetData.vendor,
-            purchaseDate: assetData.purchaseDate,
-            newOrUsed: assetData.newOrUsed,
-            condition: assetData.condition,
-            status: assetData.status,
-            location: assetData.location,
-            assignedEmployee: assetData.assignedEmployee || '',
-            warrantyMonths: assetData.warrantyMonths,
-            warrantyContact: assetData.warrantyContact,
-            extendedWarranty: assetData.extendedWarranty,
-            extendedWarrantyMonths: assetData.extendedWarrantyMonths,
-            buyingPrice: assetData.buyingPrice,
-            notes: assetData.notes,
+            name: assetData.name || '',
+            category: assetData.category || '',
+            type: assetData.type || assetData.name || '',
+            brand: assetData.brand || '',
+            model: assetData.model || assetData.model_name || '',
+            serial: assetData.serial_number || assetData.id || '',
+            vendor: assetData.vendor || '',
+            purchaseDate: assetData.purchase_price ? '' : '',
+            newOrUsed: assetData.is_new === false ? 'Used' : (assetData.is_new === true ? 'Brand New' : 'Brand New'),
+            condition: 'Good',
+            status: assetData.status || 'Available',
+            location: assetData.location || '',
+            assignedEmployee: '',
+            warrantyMonths: assetData.warranty_months || 0,
+            warrantyContact: assetData.warranty_contact || '',
+            extendedWarranty: !!assetData.extended_warranty,
+            extendedWarrantyMonths: assetData.extended_warranty_months || 0,
+            buyingPrice: assetData.purchase_price ? String(assetData.purchase_price) : '',
+            notes: assetData.notes || '',
           });
           setAuditLog(mockAuditLog[assetId] || []);
         } else {
