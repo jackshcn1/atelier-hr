@@ -608,22 +608,24 @@ export default function MaintenanceJobDetailPage() {
 
           {/* Maintenance POC */}
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-3">
               <h2 className="font-serif text-xl">Maintenance POC</h2>
-              <button onClick={openPocPicker} className="btn-secondary text-xs px-3 py-1">+ Assign / Pick POC</button>
+              {job.maintenance_pocs ? (
+                <button onClick={() => { setShowPocPicker(true); setShowPocForm(false); loadPOCs('', 'All'); }} className="btn-secondary text-xs px-3 py-1">+ Add another</button>
+              ) : (
+                <button onClick={openPocPicker} className="btn-secondary text-xs px-3 py-1">Assign / Pick POC</button>
+              )}
             </div>
-            <div className="text-sm">{job.maintenance_pocs?.name || 'Not yet assigned'}</div>
-            {job.maintenance_pocs && (
-              <div className="text-xs text-[#6b635c] mt-1 space-y-0.5">
-                <div><strong>Speciality:</strong> {job.maintenance_pocs.speciality || '—'}</div>
-                <div><strong>Contact:</strong> {job.maintenance_pocs.contact_primary || '—'}</div>
-                <div><strong>Rating:</strong> <span className="text-amber-500">{'★'.repeat(job.maintenance_pocs.star_rating ?? 5)}{'☆'.repeat(5 - (job.maintenance_pocs.star_rating ?? 5))}</span></div>
+            {job.maintenance_pocs ? (
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                <span className="font-medium">{job.maintenance_pocs.name}</span>
+                <span className="text-xs text-[#6b635c]"><strong>Speciality:</strong> {job.maintenance_pocs.speciality || '—'}</span>
+                <span className="text-xs text-[#6b635c]"><strong>Contact:</strong> {job.maintenance_pocs.contact_primary || '—'}</span>
+                <span className="text-xs text-[#6b635c]"><strong>Rating:</strong> <span className="text-amber-500">{'★'.repeat(job.maintenance_pocs.star_rating ?? 5)}{'☆'.repeat(5 - (job.maintenance_pocs.star_rating ?? 5))}</span></span>
               </div>
+            ) : (
+              <p className="text-sm text-[#6b635c]">Not yet assigned</p>
             )}
-            <div className="flex gap-2 mt-3">
-              <button onClick={openPocPicker} className="btn-secondary text-xs px-3 py-1">+ Assign / Pick POC</button>
-              <button onClick={() => { setShowPocPicker(true); setShowPocForm(false); loadPOCs('', 'All'); }} className="btn-quiet text-xs px-3 py-1">+ Add Another</button>
-            </div>
           </section>
 
           {/* Quotes & Estimates */}
