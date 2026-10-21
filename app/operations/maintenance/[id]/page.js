@@ -38,7 +38,9 @@ export default function MaintenanceJobDetailPage() {
   const [completedStatus, setCompletedStatus] = useState('Available');
   const [pendingStageChange, setPendingStageChange] = useState(null);
 
-  const SPECIALITY_OPTIONS = ['Carpenter', 'Electrician', 'Plumber', 'AC Technician', 'Appliance Repair', 'Masonry', 'Painter', 'General Contractor', 'Other'];
+  const SPECIALITY_OPTIONS = [
+  'AC Technician', 'Appliance Repair', 'Carpenter', 'Electrician', 'General Contractor', 'Masonry', 'Painter', 'Plumber', 'Other', 'Add New'
+];
 
   const loadPOCs = async (searchTerm = '', specialityFilter = 'All') => {
     setPocLoading(true);
