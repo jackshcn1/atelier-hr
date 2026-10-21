@@ -309,7 +309,7 @@ export default function MaintenanceJobDetailPage() {
             {isEditing ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <label><span className="text-xs font-medium text-[#6b635c] mb-1 block">Service Type</span><select className="field text-sm bg-white" value={editForm.service_type} onChange={e=>setEditForm({...editForm,service_type:e.target.value})}><option>Routine Service</option><option>Faulty or defective repair</option></select></label>
-                <label><span className="text-xs font-medium text-[#6b635c] mb-1 block">Priority</span><select className="field text-sm bg-white" value={editForm.priority} onChange={e=>setEditForm({...editForm,priority:e.target.value})}><option>Urgent</option><option>Normal</option><option>Can take some time</option><option>Low</option></select></label>
+                <label><span className="text-xs font-medium text-[#6b635c] mb-1 block">Priority</span><select className="field text-sm bg-white" value={editForm.priority} onChange={e=>setEditForm({...editForm,priority:e.target.value})}><option>Low</option><option>Normal</option><option>Urgent</option></select></label>
                 <label className="md:col-span-2"><span className="text-xs font-medium text-[#6b635c] mb-1 block">Comments</span><textarea rows={3} className="field text-sm w-full" value={editForm.comments} onChange={e=>setEditForm({...editForm,comments:e.target.value})}/></label>
                 <div className="md:col-span-2 flex gap-3 pt-2"><button onClick={handleUpdateOverview} className="btn-primary text-xs px-3 py-1">Save</button><button onClick={()=>setIsEditing(false)} className="btn-secondary text-xs px-3 py-1">Cancel</button></div>
               </div>
