@@ -28,6 +28,8 @@ export default function MaintenanceJobDetailPage() {
     auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'rejected', details: `Rejected — ${job.rejection_reason}` });
   }
   const [rejectionReason, setRejectionReason] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ service_type: '', comments: '', priority: 'normal' });
   const statusColors = {
     'pending_approval': 'pill-warn',
     'Approved': 'pill-good',
