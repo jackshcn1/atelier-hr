@@ -38,6 +38,132 @@ export default function MaintenanceJobDetailPage() {
   const [completedStatus, setCompletedStatus] = useState('Available');
   const [pendingStageChange, setPendingStageChange] = useState(null);
 
+  const SPECIALITY_OPTIONS = ['Carpenter', 'Electrician', 'Plumber', 'AC Technician', 'Appliance Repair', 'Masonry', 'Painter', 'General Contractor', 'Other'];
+
+  const loadPOCs = async (searchTerm = '', specialityFilter = 'All') => {
+    setPocLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.set('search', searchTerm);
+      if (specialityFilter && specialityFilter !== 'All') params.set('speciality', specialityFilter);
+      const res = await fetch(`/api/maintenance/pocs?${params.toString()}`);
+      const d = await res.json();
+      setPocs(d.pocs || []);
+    } catch (_) {
+      setPocs([]);
+    } finally {
+      setPocLoading(false);
+    }
+  };
+
+  const openPocPicker = () => {
+    setShowPocPicker(true);
+    setPocSearch('');
+    setPocSpeciality('All');
+    loadPOCs('', 'All');
+  };
+
+  const handleAssignPoc = async (poc) => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session ? `Bearer ${session.access_token}` : ''
+        },
+        body: JSON.stringify({ assigned_poc_id: poc.id })
+      });
+      if (!res.ok) throw new Error('Failed to assign POC');
+      setShowPocPicker(false);
+      const refreshRes = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+      });
+      const d = await refreshRes.json();
+      if (d.job) setJob(d.job);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleAddNewPoc = () => {
+    setShowPocForm(true);
+    setDuplicatePoc(null);
+  };
+
+  const checkPocDup = async () => {
+    const c = (pocForm.contact || '').trim();
+    if (!c) return false;
+    const res = await fetch(`/api/maintenance/pocs?contact=${encodeURIComponent(c)}`);
+    const d = await res.json();
+    const match = (d.pocs || []).find(p => (p.contact_primary || '').replace(/[\s\-()]/g, '') === c.replace(/[\s\-()]/g, '') || (p.contact_alternate || '').replace(/[\s\-()]/g, '') === c.replace(/[\s\-()]/g, ''));
+    return match || null;
+  };
+
+  const handleSaveNewPoc = async (e) => {
+    e.preventDefault();
+    setPocSaving(true);
+    setDuplicatePoc(null);
+    const dup = await checkPocDup();
+    if (dup) {
+      setDuplicatePoc(dup);
+      setPocSaving(false);
+      return;
+    }
+    try {
+      const res = await fetch('/api/maintenance/pocs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: pocForm.name,
+          speciality: pocForm.speciality,
+          contact_primary: pocForm.contact,
+          contact_alternate: pocForm.alternateContact || null,
+          reference: pocForm.reference || null,
+          notes: pocForm.notes || null,
+          star_rating: pocForm.rating,
+          attachment_url: null
+        })
+      });
+      const d = await res.json();
+      if (d.poc) {
+        // Assign the new POC to this job
+        await fetch(`/api/maintenance/jobs/${jobId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': '' },
+          body: JSON.stringify({ assigned_poc_id: d.poc.id })
+        });
+        setShowPocPicker(false);
+        setShowPocForm(false);
+        setPocForm({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5 });
+        // Refresh job to reflect assigned POC
+        const refreshRes = await fetch(`/api/maintenance/jobs/${jobId}`);
+        const refreshD = await refreshRes.json();
+        if (refreshD.job) setJob(refreshD.job);
+      } else if (d.error === 'duplicate_contact') {
+        setDuplicatePoc(d.existing_poc);
+      } else {
+        alert('Failed to create POC: ' + (d.error || 'Unknown'));
+      }
+    } catch (_) {
+      alert('Error creating POC');
+    } finally {
+      setPocSaving(false);
+    }
+  };
+
+  // POC picker
+  const [showPocPicker, setShowPocPicker] = useState(false);
+  const [pocs, setPocs] = useState([]);
+  const [pocSearch, setPocSearch] = useState('');
+  const [pocSpeciality, setPocSpeciality] = useState('All');
+  const [pocLoading, setPocLoading] = useState(false);
+  const [showPocForm, setShowPocForm] = useState(false);
+  const [pocForm, setPocForm] = useState({ name: '', speciality: 'Electrician', contact: '', alternateContact: '', reference: '', notes: '', rating: 5 });
+  const [duplicatePoc, setDuplicatePoc] = useState(null);
+  const [pocSaving, setPocSaving] = useState(false);
+
   const ASSET_STATUS_OPTIONS = ['Available', 'In-use', 'Employee-assigned', 'Returned', 'Discarded', 'Transferred', 'Sold'];
   const statusColors = {
     'pending_approval': 'pill-warn',
@@ -362,6 +488,83 @@ export default function MaintenanceJobDetailPage() {
           </div>
         </div>
 
+        {/* POC Picker */}
+        {showPocPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-card shadow-2xl max-w-2xl mx-4 p-6 border border-[#ebe8e4] w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-serif text-xl">Assign Maintenance POC</h3>
+                <button onClick={() => setShowPocPicker(false)} className="btn-quiet text-xs px-2 py-1">Close</button>
+              </div>
+
+              {/* Filters */}
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <span className="text-xs font-medium text-[#6b635c]">Speciality:</span>
+                {['All', ...SPECIALITY_OPTIONS].map(s => (
+                  <button key={s} onClick={() => { setPocSpeciality(s); loadPOCs(pocSearch, s); }} className={`text-xs px-2 py-0.5 rounded-control ${pocSpeciality === s ? 'bg-[#1e1812] text-white' : 'bg-white border border-[#ebe8e4]'}`}>{s}</button>
+                ))}
+                <input className="field text-xs flex-1 min-w-[140px]" placeholder="Search name / contact" value={pocSearch} onChange={e => { setPocSearch(e.target.value); loadPOCs(e.target.value, pocSpeciality); }} />
+              </div>
+
+              {/* List */}
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto mb-4">
+                {pocLoading ? <div className="text-sm text-[#6b635c]">Loading POCs...</div> : (
+                  pocs.length === 0 ? <div className="text-sm text-[#6b635c]">No matching POCs.</div> : pocs.map(p => (
+                    <div key={p.id} className="flex items-center justify-between bg-[#f6f4f2] p-3 rounded">
+                      <div>
+                        <div className="font-medium text-sm">{p.name}</div>
+                        <div className="text-xs text-[#6b635c]">{p.speciality} · {p.contact_primary || ''}</div>
+                      </div>
+                      <button onClick={() => handleAssignPoc(p)} className="btn-primary text-xs px-3 py-1">Select</button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-[#ebe8e4]">
+                <button onClick={handleAddNewPoc} className="btn-secondary text-sm px-4 py-2">+ Add New POC</button>
+                <button onClick={() => setShowPocPicker(false)} className="btn-quiet text-sm px-4 py-2">Cancel</button>
+              </div>
+
+              {/* Add POC Form */}
+              {showPocForm && (
+                <div className="mt-4 pt-4 border-t border-[#ebe8e4] bg-[#faf8f6] p-4 rounded">
+                  <h4 className="font-serif text-lg mb-3">Add New Maintenance POC</h4>
+                  <form onSubmit={handleSaveNewPoc} className="space-y-3 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input required className="field text-sm" placeholder="POC Name *" value={pocForm.name} onChange={e => setPocForm({...pocForm, name: e.target.value})} />
+                      <select className="field text-sm bg-white" value={pocForm.speciality} onChange={e => setPocForm({...pocForm, speciality: e.target.value})}>
+                        {SPECIALITY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <input required className="field text-sm" placeholder="Primary Contact *" value={pocForm.contact} onChange={e => setPocForm({...pocForm, contact: e.target.value})} />
+                      <input className="field text-sm" placeholder="Alternate Contact" value={pocForm.alternateContact} onChange={e => setPocForm({...pocForm, alternateContact: e.target.value})} />
+                    </div>
+                    <input className="field text-sm w-full" placeholder="Reference / Source" value={pocForm.reference} onChange={e => setPocForm({...pocForm, reference: e.target.value})} />
+                    <textarea rows={2} className="field text-sm w-full" placeholder="Notes..." value={pocForm.notes} onChange={e => setPocForm({...pocForm, notes: e.target.value})} />
+
+                    {duplicatePoc && (
+                      <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs">
+                        <div className="font-medium text-amber-800">Contact already exists:</div>
+                        <div className="text-amber-900">{duplicatePoc.name} — {duplicatePoc.speciality} — {duplicatePoc.contact_primary || ''}</div>
+                        <div className="text-amber-700 mt-1">Is this the POC you are looking for?</div>
+                        <div className="flex gap-2 mt-2">
+                          <button type="button" onClick={() => { setShowPocPicker(false); handleAssignPoc(duplicatePoc); }} className="btn-primary text-xs px-2 py-1">Yes — use this POC</button>
+                          <button type="button" onClick={() => setDuplicatePoc(null)} className="btn-secondary text-xs px-2 py-1">No — try different contact</button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 pt-2">
+                      <button type="submit" disabled={pocSaving} className="btn-primary text-sm px-4 py-2">{pocSaving ? 'Saving...' : 'Save POC & Assign'}</button>
+                      <button type="button" onClick={() => { setShowPocForm(false); setDuplicatePoc(null); }} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* All Sections Stacked */}
         <div className="space-y-6">
           {/* Overview */}
@@ -396,7 +599,10 @@ export default function MaintenanceJobDetailPage() {
 
           {/* Maintenance POC */}
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
-            <h2 className="font-serif text-xl mb-4">Maintenance POC</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-serif text-xl">Maintenance POC</h2>
+              <button onClick={openPocPicker} className="btn-secondary text-xs px-3 py-1">+ Assign / Pick POC</button>
+            </div>
             <p className="text-sm"><strong>Assigned:</strong> {job.maintenance_pocs?.name || 'Not yet assigned'}</p>
             <p className="text-xs text-[#6b635c] mt-2">Speciality filter available. Add new POC from directory.</p>
           </section>
