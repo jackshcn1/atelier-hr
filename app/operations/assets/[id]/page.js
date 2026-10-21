@@ -267,6 +267,9 @@ export default function AssetDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create maintenance job');
 
+      // Update asset status to Maintenance
+      await supabase.from('assets').update({ status: 'Maintenance' }).eq('asset_number', assetId);
+
       const userName = 'Current User';
       const auditRes = await fetch('/api/maintenance/audit', {
         method: 'POST',
