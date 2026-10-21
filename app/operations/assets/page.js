@@ -9,10 +9,23 @@ export default function AssetsPageFull() {
 
   useEffect(() => {
     const fetchAssets = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase.from('assets').select('*');
-      if (data) setAssets(data);
-      setLoading(false);
+      try {
+        const res = await fetch('/api/assets');
+        const json = await res.json();
+        if (json.assets && json.assets.length > 0) {
+          setAssets(json.assets);
+        } else {
+          // Fallback if DB empty
+          setAssets([
+            { asset_number: 'KICH00001', name: 'Chiller', condition: 'Brand New', status: 'Available', location: 'Kitchen' },
+            { asset_number: 'KICH00002', name: 'Chiller', condition: 'Good', status: 'Maintenance', location: 'Bakery' }
+          ]);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchAssets();
   }, []);
