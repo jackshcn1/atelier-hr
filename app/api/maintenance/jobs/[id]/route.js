@@ -47,7 +47,11 @@ export async function PATCH(req, { params }) {
       });
       const { data: jobData } = await adminSupabase.from('maintenance_jobs').select('asset_serial').eq('id', id).single();
       if (jobData && jobData.asset_serial) {
-        await adminSupabase.from('assets').update({ status: 'Maintenance' }).eq('asset_number', jobData.asset_serial);
+        const { data: assetCheck, error: assetErr } = await adminSupabase.from('assets').select('*').eq('asset_number', jobData.asset_serial).maybeSingle();
+        console.log('DEBUG: Asset search:', { serial: jobData.asset_serial, assetCheck, assetErr });
+        if (assetCheck) {
+          await adminSupabase.from('assets').update({ status: 'Maintenance' }).eq('asset_number', jobData.asset_serial);
+        }
       }
     } catch(e){ console.error('Asset status sync error:', e); }
   }

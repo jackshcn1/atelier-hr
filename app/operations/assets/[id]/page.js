@@ -268,7 +268,7 @@ export default function AssetDetailPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to create maintenance job');
 
       // Update asset status to Maintenance
-      await supabase.from('assets').update({ status: 'Maintenance' }).eq('asset_number', assetId);
+      // (Handled server-side in /api/maintenance/jobs via service role to bypass RLS)
 
       const userName = 'Current User';
       const auditRes = await fetch('/api/maintenance/audit', {
