@@ -69,16 +69,6 @@ export async function POST(req) {
 
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    // Automatically set asset status to Maintenance when a job is created for it
-    try {
-      const adminSupabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { persistSession: false }
-      });
-      await adminSupabase.from('assets').update({ status: 'Maintenance' }).eq('asset_number', asset_serial);
-    } catch(err) {
-      console.error('Failed to auto-update asset status on job creation:', err);
-    }
-
     return Response.json({ job: data }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
