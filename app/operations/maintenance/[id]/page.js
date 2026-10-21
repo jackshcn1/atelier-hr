@@ -38,6 +38,8 @@ export default function MaintenanceJobDetailPage() {
   const [completedStatus, setCompletedStatus] = useState('Available');
   const [pendingStageChange, setPendingStageChange] = useState(null);
 
+  const POC_STAGES = ['New','Called','Not answering','Waiting on quote','Working','Completed','Replaced / Rejected'];
+
   const SPECIALITY_OPTIONS = [
   'AC Technician', 'Appliance Repair', 'Carpenter', 'Electrician', 'General Contractor', 'Masonry', 'Painter', 'Plumber', 'Other', 'Add New'
 ];
@@ -87,6 +89,28 @@ export default function MaintenanceJobDetailPage() {
     } catch (err) {
       alert(err.message);
     }
+  };
+
+  const handlePocStageUpdate = async (pocId, stage) => {
+    try {
+      const res = await fetch(`/api/maintenance/pocs/${pocId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage })
+      });
+      if (!res.ok) throw new Error('Failed to update stage');
+      setJob(prev => prev && prev.maintenance_pocs ? { ...prev, maintenance_pocs: { ...prev.maintenance_pocs, stage } } : prev);
+    } catch (err) { alert(err.message); }
+  };
+
+  const handleDeletePoc = async (poc) => {
+    if (!confirm(`Remove ${poc.name} from this job? The POC stays in the directory.`)) return;
+    try {
+      const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigned_poc_id: null })
+      });
+      if (!res.ok) throw new Error('Failed to remove POC');
+      setJob(prev => prev ? { ...prev, maintenance_pocs: null } : prev);
+    } catch (err) { alert(err.message); }
   };
 
   const handleAddAnotherPoc = () => {
@@ -617,11 +641,18 @@ export default function MaintenanceJobDetailPage() {
               )}
             </div>
             {job.maintenance_pocs ? (
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                 <span className="font-medium">{job.maintenance_pocs.name}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Speciality:</strong> {job.maintenance_pocs.speciality || '—'}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Contact:</strong> {job.maintenance_pocs.contact_primary || '—'}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Rating:</strong> <span className="text-amber-500">{'★'.repeat(job.maintenance_pocs.star_rating ?? 5)}{'☆'.repeat(5 - (job.maintenance_pocs.star_rating ?? 5))}</span></span>
+                <label className="flex items-center gap-1 text-xs"><span className="text-[#6b635c]">Stage:</span>
+                  <select className="field text-xs bg-white" value={job.maintenance_pocs.stage || 'New'} onChange={e => handlePocStageUpdate(job.maintenance_pocs.id, e.target.value)}>
+                    {POC_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </label>
+                <button onClick={() => handleDeletePoc(job.maintenance_pocs)} title="Remove from job" aria-label={`Remove ${job.maintenance_pocs.name}`}
+                  className="text-[#8b6f4e] hover:text-[#1e1812] text-xs px-2 py-1 rounded-control hover:bg-[#ebe8e4]">✕ Remove</button>
               </div>
             ) : (
               <p className="text-sm text-[#6b635c]">Not yet assigned</p>
