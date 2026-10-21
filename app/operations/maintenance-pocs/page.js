@@ -1,18 +1,19 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 
 const BASE_SPECIALITIES = [
   'AC Technician', 'Appliance Repair', 'Carpenter', 'Electrician', 'General Contractor', 'Masonry', 'Painter', 'Plumber'
 ];
 
-// Alphabetical list of real specialities. 'Other' always sits second to last.
+// Alphabetical list of real specialities. 'Other' is always second to last, 'Add New' always last.
 const buildSpecialityList = (extra = []) => {
   const set = new Set(BASE_SPECIALITIES);
   extra.forEach(s => { if (s && s !== 'Other' && s !== 'Add New') set.add(s); });
   set.delete('Other');
   const list = [...set].sort((a, b) => a.localeCompare(b));
   list.push('Other');
+  list.push('Add New');
   return list;
 };
 
@@ -95,6 +96,10 @@ export default function MaintenancePOCsPage() {
   const handleAddPOC = async (e) => {
     e.preventDefault();
     if (!form.name || !form.contact) return;
+    const speciality = form.speciality === 'Add New'
+      ? (form.newSpeciality || '').trim()
+      : form.speciality;
+    if (!speciality) { alert('Please enter a speciality.'); return; }
     setSaving(true);
     setDuplicatePOC(null);
     try {
@@ -105,7 +110,7 @@ export default function MaintenancePOCsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: form.name,
-            speciality: form.speciality,
+            speciality: speciality,
             contact_primary: form.contact,
             contact_alternate: form.alternateContact || null,
             reference: form.reference || null,
@@ -145,7 +150,7 @@ export default function MaintenancePOCsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name,
-          speciality: form.speciality,
+          speciality,
           contact_primary: form.contact,
           contact_alternate: form.alternateContact || null,
           reference: form.reference || null,
@@ -171,6 +176,17 @@ export default function MaintenancePOCsPage() {
   const filteredPocs = filterSpeciality === 'All'
     ? pocs
     : pocs.filter(p => p.speciality === filterSpeciality);
+
+  // Dropdown options: base list + any custom speciality already used, so editing keeps its value.
+  const formSpecialityOptions = useMemo(() => {
+    const list = buildSpecialityList();
+    if (form.speciality && form.speciality !== 'Add New' && !list.includes(form.speciality)) {
+      const custom = [...list.slice(0, -2), form.speciality].sort((a, b) => a.localeCompare(b));
+      custom.push('Other', 'Add New');
+      return custom;
+    }
+    return list;
+  }, [form.speciality]);
 
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
@@ -213,19 +229,19 @@ export default function MaintenancePOCsPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-[#6b635c] mb-1 block">Speciality *</label>
-                  <select className="field text-sm w-full bg-white" value={form.speciality} onChange={e => { const v = e.target.value; if (v === 'Add New') { setForm({...form, speciality: 'Electrician', newSpeciality: ''}); } else { setForm({...form, speciality: v}); } }}>
-                    {SPECIALITY_OPTIONS.filter(s => s !== 'Add New').map(s => <option key={s} value={s}>{s}</option>)}
-                    <option value="Add New">Add New (type below)</option>
+                  <select className="field text-sm w-full bg-white" value={form.speciality} onChange={e => setForm({...form, speciality: e.target.value, newSpeciality: e.target.value === 'Add New' ? form.newSpeciality : ''})}>
+                    {formSpecialityOptions.map(s => <option key={s} value={s}>{s === 'Add New' ? 'Add New…' : s}</option>)}
                   </select>
-                  {(form.newSpeciality !== '' || (form.speciality === 'Electrician' && !SPECIALITY_OPTIONS.includes('Electrician'))) ? (
+                  {form.speciality === 'Add New' && (
                     <input
                       type="text"
-                      placeholder="New speciality (e.g., HVAC Tech)"
+                      required
+                      placeholder="Enter new speciality, e.g., HVAC Tech"
                       className="field text-sm w-full mt-2 bg-[#f9fafb]"
                       value={form.newSpeciality}
                       onChange={e => setForm({...form, newSpeciality: e.target.value})}
                     />
-                  ) : null}
+                  )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
