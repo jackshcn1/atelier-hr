@@ -1,0 +1,69 @@
+- generic [active] [ref=f52e1]:
+  - navigation [ref=f52e2]:
+    - generic [ref=f52e3]:
+      - link "Atelier" [ref=f52e4] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f52e8]:
+        - button "Operations" [ref=f52e10] [cursor=pointer]
+        - button "Settings" [ref=f52e15] [cursor=pointer]
+        - button "Sign out" [ref=f52e20] [cursor=pointer]
+  - main [ref=f52e5]:
+    - main [ref=f52e21]:
+      - generic [ref=f52e22]:
+        - link "← Maintenance" [ref=f52e24] [cursor=pointer]:
+          - /url: /operations/maintenance
+        - generic [ref=f52e26]:
+          - heading "Maintenance Job MNT-000004" [level=1] [ref=f52e27]
+          - generic [ref=f52e28]:
+            - generic [ref=f52e29]: Awaiting POC
+            - paragraph [ref=f52e30]: "Raised by: Current User on 20/10/2026"
+        - generic [ref=f52e32]:
+          - generic [ref=f52e33]: Maintenance Job Progress Stage
+          - generic [ref=f52e34]:
+            - generic [ref=f52e35]: "Stage:"
+            - combobox "Stage:" [ref=f52e36]:
+              - option "Pending approval"
+              - option "Approved"
+              - option "Assigned"
+              - option "Awaiting POC" [selected]
+              - option "In Repair"
+              - option "Awaiting Quote"
+              - option "Completed"
+        - generic [ref=f52e37]:
+          - generic [ref=f52e38]:
+            - generic [ref=f52e39]:
+              - heading "Overview" [level=2] [ref=f52e40]
+              - button "Edit" [ref=f52e41] [cursor=pointer]
+            - generic [ref=f52e42]:
+              - generic [ref=f52e43]:
+                - strong [ref=f52e44]: "Asset:"
+                - text: KICH00002
+              - strong [ref=f52e46]: "Service Type:"
+              - generic [ref=f52e47]:
+                - strong [ref=f52e48]: "Priority:"
+                - generic [ref=f52e49]: Normal
+              - generic [ref=f52e50]:
+                - strong [ref=f52e51]: "Requested By:"
+                - text: Current User
+              - generic [ref=f52e52]:
+                - strong [ref=f52e53]: "Issues:"
+                - text: Physical damage
+              - strong [ref=f52e55]: "Comments:"
+          - generic [ref=f52e56]:
+            - heading "Maintenance POC" [level=2] [ref=f52e57]
+            - paragraph [ref=f52e58]:
+              - strong [ref=f52e59]: "Assigned:"
+              - text: Not yet assigned
+            - paragraph [ref=f52e60]: Speciality filter available. Add new POC from directory.
+          - generic [ref=f52e61]:
+            - heading "Quotes & Estimates" [level=2] [ref=f52e62]
+            - paragraph [ref=f52e63]: No quotes submitted yet.
+          - generic [ref=f52e64]:
+            - heading "Completion Report" [level=2] [ref=f52e65]
+            - paragraph [ref=f52e66]: Not completed yet — editable until status reaches Completed.
+          - generic [ref=f52e67]:
+            - heading "Audit Log" [level=2] [ref=f52e68]
+            - generic [ref=f52e70]:
+              - generic [ref=f52e71]: 20/10/2026, 21:40:47
+              - generic [ref=f52e72]: Current User — Job MNT-000004 raised for KICH00002
+  - alert [ref=f52e7]

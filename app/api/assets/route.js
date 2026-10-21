@@ -29,10 +29,10 @@ export async function GET(req) {
   const withStatus = (assets || []).map(a => {
     const open = openJobsByAsset.get(a.asset_number) || [];
     // Derived status: an open maintenance job means Maintenance, otherwise the stored status.
-    // A stale stored 'Maintenance' with no open job falls back to Available.
+    // A stale stored 'Maintenance' with no open job falls back to the pre-maintenance status, else Available.
     let status = a.status || 'Available';
     if (open.length > 0) status = 'Maintenance';
-    else if (status === 'Maintenance') status = 'Available';
+    else if (status === 'Maintenance') status = a.pre_maintenance_status || 'Available';
     return { ...a, status, open_maintenance_jobs: open.map(j => ({ id: j.id, status: j.status })) };
   });
 

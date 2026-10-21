@@ -34,6 +34,11 @@ export default function MaintenanceJobDetailPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ service_type: '', comments: '', priority: 'normal' });
+  const [showCompletedPicker, setShowCompletedPicker] = useState(false);
+  const [completedStatus, setCompletedStatus] = useState('Available');
+  const [pendingStageChange, setPendingStageChange] = useState(null);
+
+  const ASSET_STATUS_OPTIONS = ['Available', 'In-use', 'Employee-assigned', 'Returned', 'Discarded', 'Transferred', 'Sold'];
   const statusColors = {
     'pending_approval': 'pill-warn',
     'Approved': 'pill-good',
@@ -51,8 +56,40 @@ export default function MaintenanceJobDetailPage() {
   };
   const statusLabel = (s) => (s === 'pending_approval' ? 'Pending approval' : s);
 
+  const confirmComplete = async () => {
+    setShowCompletedPicker(false);
+    if (!pendingStageChange) return;
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session ? `Bearer ${session.access_token}` : ''
+        },
+        body: JSON.stringify({ status: pendingStageChange, asset_status: completedStatus })
+      });
+      if (!res.ok) throw new Error('Failed to complete job');
+      const d = await res.json();
+      if (d.job) setJob(d.job);
+      setPendingStageChange(null);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleStageChange = async (newStage) => {
     const oldStatus = job.status;
+    if (newStage === 'Completed') {
+      // Completing a job asks the user which status the asset should carry.
+      setPendingStageChange(newStage);
+      setShowCompletedPicker(true);
+      return;
+    }
     setJob(prev => ({ ...prev, status: newStage }));
     try {
       const supabase = createClient();
@@ -270,6 +307,33 @@ export default function MaintenanceJobDetailPage() {
               <div className="flex gap-3 mt-5">
                 <button onClick={handleReject} className="btn-primary text-sm px-4 py-2">Confirm Reject</button>
                 <button onClick={() => { setShowRejectDialog(false); setRejectionReason(''); }} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Completed Status Picker */}
+        {showCompletedPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-card shadow-2xl max-w-md mx-4 p-6 border border-[#ebe8e4]">
+              <h3 className="font-serif text-xl mb-2">Complete Maintenance Job</h3>
+              <p className="text-xs text-[#6b635c] mb-4">
+                Job {job.id} for asset {job.asset_serial}. Choose the status the asset should carry once the job is completed.
+              </p>
+              <label className="block">
+                <span className="text-xs font-medium text-[#6b635c] mb-1 block">Asset Status After Completion</span>
+                <select
+                  className="field text-sm w-full bg-white"
+                  value={completedStatus}
+                  onChange={e => setCompletedStatus(e.target.value)}
+                  autoFocus
+                >
+                  {ASSET_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </label>
+              <div className="flex gap-3 mt-5">
+                <button onClick={confirmComplete} className="btn-primary text-sm px-4 py-2">Complete Job</button>
+                <button onClick={() => { setShowCompletedPicker(false); setPendingStageChange(null); }} className="btn-secondary text-sm px-4 py-2">Cancel</button>
               </div>
             </div>
           </div>

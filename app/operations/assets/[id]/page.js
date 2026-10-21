@@ -102,7 +102,14 @@ export default function AssetDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
   const [pendingChanges, setPendingChanges] = useState(null);
-  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [preMaintenanceStatus, setPreMaintenanceStatus] = useState('Available');
+  const [showCompletedPicker, setShowCompletedPicker] = useState(false);
+  const [completedStatusChoice, setCompletedStatusChoice] = useState('Available');
+
+  const handleCommentDialogClose = () => {
+    setShowCommentDialog(false);
+    setPendingChanges(null);
+  };
   const [maintenanceForm, setMaintenanceForm] = useState({
     serviceType: 'Routine Service',
     issues: {
@@ -204,6 +211,10 @@ export default function AssetDetailPage() {
   };
 
   const handleCommentSubmit = (comment) => {
+    if (form.status === 'Maintenance') {
+      alert('Asset is in maintenance — save blocked until job completed or rejected.');
+      return;
+    }
     // Record changes to audit log with comment
     const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' ' + new Date().toLocaleDateString();
 
