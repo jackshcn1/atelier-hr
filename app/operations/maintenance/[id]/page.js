@@ -17,7 +17,16 @@ export default function MaintenanceJobDetailPage() {
   const isAdminCanEdit = isAdmin && canEdit;
   const isSuperAdmin = true; // Placeholder for actual role check
   const allowEdit = isSuperAdmin || isAdminCanEdit;
-  const auditEntries = (job?.maintenance_audit_logs || []).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const auditEntries = (job?.maintenance_audit_logs || []).slice();
+  if (job?.requested_at && !auditEntries.some(e => e.action === 'created')) {
+    auditEntries.unshift({ timestamp: job.requested_at, user_name: job.requested_by || 'System', action: 'created', details: `Job ${job.id} raised for ${job.asset_serial}` });
+  }
+  if (job?.status === 'Approved' && !auditEntries.some(e => e.details?.includes('approved') || e.action === 'approved')) {
+    auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'approved', details: 'Maintenance request approved' });
+  }
+  if (job?.status === 'Rejected' && job?.rejection_reason && !auditEntries.some(e => e.details?.includes('rejected') || e.action === 'rejected')) {
+    auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'rejected', details: `Rejected — ${job.rejection_reason}` });
+  }
   const [rejectionReason, setRejectionReason] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ service_type: '', comments: '', priority: 'normal' });
