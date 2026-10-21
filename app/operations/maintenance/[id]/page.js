@@ -13,7 +13,10 @@ export default function MaintenanceJobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const canEdit = job && (job.status === 'pending_approval' || job.status === 'Draft');
+  const canEdit = job && (job.status !== 'Completed' && job.status !== 'Rejected');
+  const isAdminCanEdit = isAdmin && canEdit;
+  const isSuperAdmin = true; // Placeholder for actual role check
+  const allowEdit = isSuperAdmin || isAdminCanEdit;
   const auditEntries = (job?.maintenance_audit_logs || []).slice();
   if (job?.requested_at && !auditEntries.some(e => e.action === 'created')) {
     auditEntries.unshift({ timestamp: job.requested_at, user_name: job.requested_by || 'System', action: 'created', details: `Job ${job.id} raised for ${job.asset_serial}` });
@@ -24,12 +27,23 @@ export default function MaintenanceJobDetailPage() {
   if (job?.status === 'Rejected' && job?.rejection_reason && !auditEntries.some(e => e.details?.includes('rejected') || e.action === 'rejected')) {
     auditEntries.push({ timestamp: new Date().toISOString(), user_name: 'Super Admin', action: 'rejected', details: `Rejected — ${job.rejection_reason}` });
   }
-  const [selectedStage, setSelectedStage] = useState('pending_approval');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ service_type: '', comments: '', priority: 'normal' });
+  const [rejectionReason, setRejectionReason] = useState(''); // Added missing state
+  const statusColors = {
+    'pending_approval': 'pill-warn',
+    'Approved': 'pill-good',
+    'Assigned': 'pill-quiet',
+    'Awaiting POC': 'pill-quiet',
+    'In Repair': 'pill-warn',
+    'Awaiting Quote': 'pill-warn',
+    'Completed': 'pill-good',
+    'Rejected': 'pill-bad'
+  };
+
+  const statusLabel = (s) => (s === 'pending_approval' ? 'Pending approval' : s);
 
   const handleStageChange = async (newStage) => {
-    setSelectedStage(newStage);
+    const oldStatus = job.status;
+    setJob(prev => ({ ...prev, status: newStage }));
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -46,11 +60,18 @@ export default function MaintenanceJobDetailPage() {
         await fetch('/api/maintenance/audit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': session ? `Bearer ${session.access_token}` : '' },
-          body: JSON.stringify({ job_id: jobId, user_name: 'Super Admin', action: 'stage_changed', details: `Stage changed to ${newStage}` })
+          body: JSON.stringify({ job_id: jobId, user_name: 'Super Admin', action: 'stage_changed', details: `Stage changed from ${oldStatus} to ${newStage}` })
         });
       } catch (_) {}
-      setJob(prev => ({ ...prev, status: newStage }));
+
+      // Refresh job data to fetch updated audit logs
+      const refreshRes = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+      });
+      const d = await refreshRes.json();
+      if (d.job) setJob(d.job);
     } catch (err) {
+      setJob(prev => ({ ...prev, status: oldStatus }));
       alert(err.message);
     }
   };
@@ -179,7 +200,7 @@ export default function MaintenanceJobDetailPage() {
           <div>
             <h1 className="font-serif text-3xl text-[#1e1812]">Maintenance Job {job.id}</h1>
             <div className="flex items-center gap-4 mt-2">
-              <span className="pill-warn">{job.status}</span>
+              <span className={`${statusColors[job.status] || 'pill-quiet'} text-xs px-2 py-0.5 rounded-full`}>{statusLabel(job.status)}</span>
               <p className="text-xs text-[#6b635c]">Raised by: {job.requested_by} on {job.requested_at ? new Date(job.requested_at).toLocaleDateString() : ''}</p>
             </div>
           </div>
@@ -222,13 +243,19 @@ export default function MaintenanceJobDetailPage() {
             <div className="text-xs font-medium text-[#8b6f4e]">
               <span>Maintenance Job Progress Stage</span>
             </div>
-            {isAdmin && job?.status !== 'Rejected' && (
+            {isAdmin && job?.status !== 'Rejected' && job?.status !== 'Completed' && (
               <label className="flex items-center gap-2">
                 <span className="text-xs font-medium text-[#6b635c]">Stage:</span>
-                <select className="field text-sm bg-white w-48" value={job.status} onChange={e => handleStageChange(e.target.value)}>
-                  {['pending_approval','Approved','Assigned','Awaiting POC','In Repair','Awaiting Quote','Completed'].map(s => <option key={s} value={s}>{s === 'pending_approval' ? 'Pending approval' : s}</option>)}
+                <select className={`field text-sm w-48 ${statusColors[job.status] || ''}`} value={job.status} onChange={e => handleStageChange(e.target.value)}>
+                  {['pending_approval','Approved','Assigned','Awaiting POC','In Repair','Awaiting Quote','Completed'].map(s => <option key={s} value={s}>{statusLabel(s)}</option>)}
                 </select>
               </label>
+            )}
+            {job?.status === 'Completed' && (
+              <span className="pill-good text-sm px-4 py-2">Job Locked — Completed</span>
+            )}
+            {job?.status === 'Rejected' && (
+              <span className="pill-bad text-sm px-4 py-2">Job Rejected</span>
             )}
           </div>
         </div>
@@ -239,10 +266,10 @@ export default function MaintenanceJobDetailPage() {
           <section className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-serif text-xl">Overview</h2>
-              {(job?.status === 'pending_approval' || job?.status === 'Draft') && (
+              {allowEdit && (
                 <button onClick={() => setIsEditing(!isEditing)} className="btn-secondary text-xs px-3 py-1">{isEditing ? 'Cancel' : 'Edit'}</button>
               )}
-              {job?.status !== 'pending_approval' && job?.status !== 'Draft' && (
+              {!allowEdit && (
                 <span className="pill-quiet text-xs">Locked — {job.status.toLowerCase()}</span>
               )}
             </div>

@@ -4,6 +4,18 @@ import Link from 'next/link';
 import { createClient } from '../../../lib/supabaseClient';
 
 export default function MaintenancePage() {
+  const statusColors = {
+    'pending_approval': 'pill-warn',
+    'Approved': 'pill-good',
+    'Assigned': 'pill-quiet',
+    'Awaiting POC': 'pill-quiet',
+    'In Repair': 'pill-warn',
+    'Awaiting Quote': 'pill-warn',
+    'Completed': 'pill-good',
+    'Rejected': 'pill-bad'
+  };
+  const statusLabel = (s) => (s === 'pending_approval' ? 'Pending approval' : s);
+
   const [jobs, setJobs] = useState([]);
   const [isAdmin] = useState(true);
   const [sortBy, setSortBy] = useState('date');
@@ -166,7 +178,9 @@ export default function MaintenancePage() {
                 <td className="px-4 py-3">{job.asset_serial || '-'}</td>
                 <td className="px-4 py-3">{job.assets ? (job.assets.name || '-') : (job.asset_name || '-')}</td>
                 <td className="px-4 py-3">{job.requested_at ? new Date(job.requested_at).toLocaleDateString() : '-'}</td>
-                <td className="px-4 py-3">{job.status || '-'}</td>
+                <td className="px-4 py-3">
+                    <span className={`${statusColors[job.status] || 'pill-quiet'} text-xs px-2 py-0.5 rounded-full`}>{statusLabel(job.status)}</span>
+                </td>
                 <td className="px-4 py-3">{(job.completion_type && job.completion_type.trim() !== '') ? job.completion_type : ''}</td>
               </tr>
             ))}
