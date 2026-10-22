@@ -19,6 +19,9 @@ const buildSpecialityList = (extra = []) => {
 
 const SPECIALITY_OPTIONS = buildSpecialityList();
 
+// Stage picker for the maintenance POC directory
+const POC_STAGES = ['New', 'Called', 'Not answering', 'Waiting on quote', 'Working', 'Completed', 'Replaced / Rejected'];
+
 export default function MaintenancePOCsPage() {
   const [pocs, setPocs] = useState([
     {
@@ -72,7 +75,15 @@ export default function MaintenancePOCsPage() {
   const [saving, setSaving] = useState(false);
   const [editingPOC, setEditingPOC] = useState(null);
 
-  const POC_STAGES = ['New','Called','Not answering','Waiting on quote','Working','Completed','Replaced / Rejected'];
+  // Dynamic stages that incorporate custom/specialty for editing, always preserving 'Other' & 'Add New'
+  const currentPOCStages = useMemo(() => {
+    const fromForm = form.speciality && form.speciality !== 'Other' && form.speciality !== 'Add New' ? form.speciality : null;
+    const set = new Set(POC_STAGES);
+    if (fromForm) set.add(fromForm);
+    const list = Array.from(set).sort((a, b) => a.localeCompare(b));
+    list.push('Other', 'Add New');
+    return list;
+  }, [form.speciality, POC_STAGES]);
 
   const [form, setForm] = useState({
     name: '',
@@ -265,7 +276,7 @@ export default function MaintenancePOCsPage() {
                 <div>
                   <label className="text-xs font-medium text-[#6b635c] mb-1 block">Speciality *</label>
                   <select className="field text-sm w-full bg-white" value={form.speciality} onChange={e => setForm({...form, speciality: e.target.value, newSpeciality: e.target.value === 'Add New' ? form.newSpeciality : ''})}>
-                    {formSpecialityOptions.map(s => <option key={s} value={s}>{s === 'Add New' ? 'Add New…' : s}</option>)}
+                    {currentPOCStages.map(s => <option key={s} value={s}>{s === 'Add New' ? 'Add New…' : s}</option>)}
                   </select>
                   {form.speciality === 'Add New' && (
                     <input
