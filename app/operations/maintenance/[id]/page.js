@@ -660,7 +660,7 @@ export default function MaintenanceJobDetailPage() {
                 <span className="text-xs text-[#6b635c]"><strong>Speciality:</strong> {job.maintenance_pocs.speciality || '—'}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Contact:</strong> {job.maintenance_pocs.contact_primary || '—'}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Rating:</strong> <span className="text-amber-500">{'★'.repeat(job.maintenance_pocs.star_rating ?? 5)}{'☆'.repeat(5 - (job.maintenance_pocs.star_rating ?? 5))}</span></span>
-                <select className="field text-[10px] py-0.5 px-1 bg-white w-24" value={job.maintenance_pocs.stage || 'New'} onChange={e => handlePocStageUpdate(job.maintenance_pocs.id, e.target.value)}>
+                <select className="field text-[11px] py-1 px-2 bg-white w-40" value={job.maintenance_pocs.stage || 'New'} onChange={e => handlePocStageUpdate(job.maintenance_pocs.id, e.target.value)}>
                   {POC_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
