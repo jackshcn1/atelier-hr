@@ -41,6 +41,7 @@ export default function MaintenanceJobDetailPage() {
   const [estDate, setEstDate] = useState(new Date().toISOString().split('T')[0]);
   const [estPoc, setEstPoc] = useState('');
   const [estLines, setEstLines] = useState([{name:'',units:1,cost:0}]);
+  const [editingEstimate, setEditingEstimate] = useState(null);
 
   const POC_STAGES = ['New','Called','Not answering','Waiting on quote','Working','Completed','Replaced / Rejected'];
 
@@ -437,21 +438,50 @@ export default function MaintenanceJobDetailPage() {
   const removeLine = (i) => setEstLines(estLines.filter((_,idx)=>idx!==i));
   const updateLine = (i, k, v) => { const copy=[...estLines]; copy[i][k]=v; setEstLines(copy); };
 
+  const openNewEstimateModal = () => {
+    setEditingEstimate(null);
+    setEstDate(new Date().toISOString().split('T')[0]);
+    setEstPoc(job?.maintenance_pocs?.id || '');
+    setEstLines([{name:'',units:1,cost:0}]);
+    setShowEstimateModal(true);
+  };
+
+  const openEditEstimateModal = (q) => {
+    setEditingEstimate(q);
+    setEstDate(q.date ? q.date.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setEstPoc(q.poc_id || (job?.maintenance_pocs?.id || ''));
+    const parsedLines = q.line_items ? (Array.isArray(q.line_items) ? q.line_items : JSON.parse(q.line_items || '[]')) : [];
+    setEstLines(parsedLines.length > 0 ? parsedLines : [{name:'',units:1,cost:0}]);
+    setShowEstimateModal(true);
+  };
+
   const saveEstimate = async () => {
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/api/maintenance/quotes', {
-        method: 'POST',
+      const totalCost = estLines.reduce((s,l)=>s+(Number(l.units||0)*Number(l.cost||0)),0);
+      const url = '/api/maintenance/quotes';
+      const method = editingEstimate ? 'PATCH' : 'POST';
+      const bodyPayload = editingEstimate
+        ? { id: editingEstimate.id, line_items: JSON.stringify(estLines), date: estDate, cost: totalCost, poc_id: estPoc || null }
+        : { job_id: jobId, vendor_name: job.maintenance_pocs ? job.maintenance_pocs.name : 'POC', quote_type: 'Estimate', cost: totalCost, estimated_delivery: estDate, status: 'pending', line_items: JSON.stringify(estLines), date: estDate, poc_id: estPoc || null };
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json', 'Authorization': session ? `Bearer ${session.access_token}` : '' },
-        body: JSON.stringify({ job_id: jobId, vendor_name: job.maintenance_pocs ? job.maintenance_pocs.name : 'POC', quote_type: 'Estimate', cost: estLines.reduce((s,l)=>s+(Number(l.units||0)*Number(l.cost||0)),0), estimated_delivery: estDate, status: 'pending', line_items: JSON.stringify(estLines), date: estDate, poc_id: estPoc || null })
+        body: JSON.stringify(bodyPayload)
       });
-      if (!res.ok) throw new Error('Failed to save');
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed to save');
       setShowEstimateModal(false);
+      setEditingEstimate(null);
+      setEstLines([{name:'',units:1,cost:0}]);
+      setEstDate(new Date().toISOString().split('T')[0]);
+      setEstPoc('');
       // Refresh job
       const refresh = await fetch(`/api/maintenance/jobs/${jobId}`, { headers: session ? { Authorization: `Bearer ${session.access_token}` } : {} });
-      const d = await refresh.json();
-      if (d.job) setJob(d.job);
+      const refreshData = await refresh.json();
+      if (refreshData.job) setJob(refreshData.job);
     } catch (e) { alert(e.message); }
   };
 
@@ -712,11 +742,22 @@ export default function MaintenanceJobDetailPage() {
             {job.job_quotes && job.job_quotes.length > 0 ? (
               job.job_quotes.map((q, i) => (
                 <div key={q.id || i} className="bg-[#f6f4f2] p-3 rounded mb-3 border border-[#ebe8e4]">
-                  <div className="font-medium text-sm flex items-center gap-2">Estimate #{i+1}{q.is_approved && <span className="pill-good text-[10px]">Approved</span>}{q.status === 'rejected' && <span className="pill-bad text-[10px]">Rejected</span>}</div>
+                  <div className="font-medium text-sm flex items-center gap-2">Estimate #{i+1}{q.is_approved && <span className="pill-good text-[10px]">Approved</span>}{q.status === 'rejected' && <span className="pill-bad text-[10px]">Rejected</span>}
+                    {!q.is_approved && (
+                      <button onClick={() => openEditEstimateModal(q)} className="text-[10px] text-[#8b6f4e] underline hover:text-[#1e1812]">Edit</button>
+                    )}
+                  </div>
                   <div className="text-xs text-[#6b635c] mt-1">POC: {q.poc_id ? (job.maintenance_pocs?.find(p=>p.id===q.poc_id)?.name || 'Assigned') : '—'} · Date: {q.date ? new Date(q.date).toLocaleDateString() : '—'} · Status: {q.status}</div>
                   <div className="text-xs mt-2 space-y-0.5">
                     {(q.line_items ? (Array.isArray(q.line_items) ? q.line_items : JSON.parse(q.line_items||'[]')) : []).map((item, idx) => (
-                      <div key={idx} className="flex justify-between"><span>{item.name}</span><span>{item.units} x {item.cost} = {Number(item.units||0)*Number(item.cost||0)}</span></div>
+                      <div key={idx} className="flex justify-between items-center py-1 border-b border-[#ebe8e4] last:border-0">
+                        <span className="font-medium">{item.name}</span>
+                        <div className="flex gap-4">
+                          <span>{item.units} <span className="text-gray-400">unit</span></span>
+                          <span>{item.cost} <span className="text-gray-400">/unit</span></span>
+                          <span className="font-semibold text-right w-16">{Number(item.units||0)*Number(item.cost||0)}</span>
+                        </div>
+                      </div>
                     ))}
                   </div>
                   <div className="text-xs font-medium mt-1">Total: {q.line_items ? (Array.isArray(q.line_items)?q.line_items:JSON.parse(q.line_items||'[]')).reduce((s,item)=>s+(Number(item.units||0)*Number(item.cost||0)),0) : q.cost}</div>
@@ -738,13 +779,24 @@ export default function MaintenanceJobDetailPage() {
                 <h3 className="font-serif text-xl mb-2">New Estimate</h3>
                 <label className="block mb-2 text-xs font-medium text-[#6b635c]">Date <input type="date" className="field text-sm w-full mt-0.5" value={estDate} onChange={e=>setEstDate(e.target.value)} /></label>
                 <label className="block mb-2 text-xs font-medium text-[#6b635c]">POC <select className="field text-sm w-full mt-0.5 bg-white" value={estPoc} onChange={e=>setEstPoc(e.target.value)}><option value="">Select assigned POC</option>{(job.maintenance_pocs ? [job.maintenance_pocs] : []).map(p=> <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-                <div className="text-xs font-medium text-[#6b635c] mb-1">Line Items</div>
+                <div className="grid grid-cols-[30px_1fr_80px_90px_90px] gap-2 mb-1 text-xs text-[#6b635c] font-medium">
+                  <span></span>
+                  <span>Item</span>
+                  <span className="text-center">Unit</span>
+                  <span className="text-center">Cost</span>
+                  <span className="text-center">Total</span>
+                </div>
                 {estLines.map((line, idx) => (
-                  <div key={idx} className="grid grid-cols-4 gap-2 mb-2 text-xs">
-                    <input className="field text-xs" placeholder="Item" value={line.name} onChange={e=>updateLine(idx,'name',e.target.value)} />
+                  <div key={idx} className="grid grid-cols-[30px_1fr_80px_90px_90px] gap-2 mb-2 items-center text-xs">
+                    <button onClick={()=>removeLine(idx)} title="Delete item" className="text-gray-400 hover:text-red-600 flex justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                    </button>
+                    <input className="field text-xs" placeholder="Item name" value={line.name} onChange={e=>updateLine(idx,'name',e.target.value)} />
                     <input className="field text-xs" placeholder="Units" type="number" value={line.units} onChange={e=>updateLine(idx,'units',e.target.value)} />
                     <input className="field text-xs" placeholder="Cost/unit" type="number" value={line.cost} onChange={e=>updateLine(idx,'cost',e.target.value)} />
-                    <button onClick={()=>removeLine(idx)} className="btn-danger text-xs px-2">−</button>
+                    <div className="bg-[#f6f4f2] px-2 py-1.5 rounded text-center font-medium text-xs">
+                      {Number(line.units||0)*Number(line.cost||0)}
+                    </div>
                   </div>
                 ))}
                 <button onClick={addLine} className="btn-secondary text-xs px-2 py-1 mb-3">+ Add item</button>
