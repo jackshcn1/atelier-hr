@@ -5,15 +5,23 @@ function formatQuote(q) {
   try {
     if (q.estimated_delivery && q.estimated_delivery.startsWith('{')) {
       const parsed = JSON.parse(q.estimated_delivery);
+      let items = parsed.line_items;
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items); } catch (_) { items = []; }
+      }
       return {
         ...q,
-        line_items: parsed.line_items,
-        date: parsed.date,
-        poc_id: parsed.poc_id,
+        line_items: Array.isArray(items) ? items : [],
+        date: parsed.date || q.created_at,
+        poc_id: parsed.poc_id || null,
         estimated_delivery: parsed.estimated_delivery || ''
       };
     }
   } catch (_) {}
+
+  if (q.line_items && typeof q.line_items === 'string') {
+    try { q.line_items = JSON.parse(q.line_items); } catch (_) { q.line_items = []; }
+  }
   return q;
 }
 
@@ -77,7 +85,6 @@ export async function PATCH(req) {
 
   if (result.error && (result.error.message.includes('column') || result.error.code === 'PGRST204')) {
     // Missing columns, need fallback strategy
-    // 1. Fetch current q
     const { data: current } = await supabase.from('job_quotes').select('*').eq('id', id).single();
     let currentParsed = {};
     if (current && current.estimated_delivery && current.estimated_delivery.startsWith('{')) {
