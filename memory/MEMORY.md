@@ -5,3 +5,4 @@
 - [Salary Split](salary-split-logic.md) — Kerala minimum wage floor, Basic+DA/HRA split rules
 - [Variable Pay Engine](variable-pay-engine.md) — Multi-metric incentive schemes, qualification floors, ceilings, and calculator
 - [Workflow Preferences](workflow-preferences.md) — Branches, plans before code, security rules, explanations
+- [Maintenance Module Lock](maintenance-lock-summary.txt) — job POC section (stage picker + bin icon + single-line flex), DB migrations applied (join table + stage col on pocs + stage col on join), deploy Ready (atelier-hr-inky.vercel.app)

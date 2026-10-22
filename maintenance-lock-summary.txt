@@ -1,0 +1,8 @@
+Locking / saving context:
+- File: app/operations/maintenance/[id]/page.js (job POC section with stage picker + bin icon + auth headers)
+- File: supabase/migrations/20261021140000_maintenance_job_pocs_join_table.sql (poc_id TEXT FK fixed)
+- File: supabase/migrations/20261021150000_add_poc_stage.sql (stage on directory pocs)
+- File: supabase/migrations/20261021160000_add_stage_to_job_pocs.sql (stage on join + FK)
+- DB applied: maintenance_job_pocs table exists with stage column; RLS enabled
+- Deploy: https://atelier-hr-inky.vercel.app (Ready, build green)
+- Next session reference: use for maintenance-module framework (POC picker + stage + multi-POC join)
