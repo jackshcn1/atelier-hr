@@ -75,16 +75,6 @@ export default function MaintenancePOCsPage() {
   const [saving, setSaving] = useState(false);
   const [editingPOC, setEditingPOC] = useState(null);
 
-  // Dynamic stages that incorporate custom/specialty for editing, always preserving 'Other' & 'Add New'
-  const currentPOCStages = useMemo(() => {
-    const fromForm = form.speciality && form.speciality !== 'Other' && form.speciality !== 'Add New' ? form.speciality : null;
-    const set = new Set(POC_STAGES);
-    if (fromForm) set.add(fromForm);
-    const list = Array.from(set).sort((a, b) => a.localeCompare(b));
-    list.push('Other', 'Add New');
-    return list;
-  }, [form.speciality, POC_STAGES]);
-
   const [form, setForm] = useState({
     name: '',
     speciality: 'Electrician',
