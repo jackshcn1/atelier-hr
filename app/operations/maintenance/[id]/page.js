@@ -651,7 +651,11 @@ export default function MaintenanceJobDetailPage() {
               )}
             </div>
             {job.maintenance_pocs ? (
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm whitespace-nowrap">
+                <button onClick={() => handleDeletePoc(job.maintenance_pocs)} title="Remove from job" aria-label={`Remove ${job.maintenance_pocs.name}`}
+                  className="text-[#8b6f4e] hover:text-[#b23a3a] text-xs p-1 rounded-control hover:bg-[#fbeaea]">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                </button>
                 <span className="font-medium">{job.maintenance_pocs.name}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Speciality:</strong> {job.maintenance_pocs.speciality || '—'}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Contact:</strong> {job.maintenance_pocs.contact_primary || '—'}</span>
@@ -659,15 +663,6 @@ export default function MaintenanceJobDetailPage() {
                 <select className="field text-xs bg-white" value={job.maintenance_pocs.stage || 'New'} onChange={e => handlePocStageUpdate(job.maintenance_pocs.id, e.target.value)}>
                   {POC_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <button onClick={() => handleDeletePoc(job.maintenance_pocs)} title="Remove from job" aria-label={`Remove ${job.maintenance_pocs.name}`}
-                  className="text-[#8b6f4e] hover:text-[#b23a3a] text-xs p-1.5 rounded-control hover:bg-[#fbeaea]">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                    <path d="M4 7h16" />
-                    <path d="M10 11v6M14 11v6" />
-                    <path d="M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12" />
-                    <path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2" />
-                  </svg>
-                </button>
               </div>
             ) : (
               <p className="text-sm text-[#6b635c]">Not yet assigned</p>
