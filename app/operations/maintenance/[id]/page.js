@@ -93,8 +93,12 @@ export default function MaintenanceJobDetailPage() {
 
   const handlePocStageUpdate = async (pocId, stage) => {
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`/api/maintenance/pocs/${pocId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage })
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': session ? `Bearer ${session.access_token}` : '' },
+        body: JSON.stringify({ stage })
       });
       if (!res.ok) throw new Error('Failed to update stage');
       setJob(prev => prev && prev.maintenance_pocs ? { ...prev, maintenance_pocs: { ...prev.maintenance_pocs, stage } } : prev);
@@ -104,11 +108,17 @@ export default function MaintenanceJobDetailPage() {
   const handleDeletePoc = async (poc) => {
     if (!confirm(`Remove ${poc.name} from this job? The POC stays in the directory.`)) return;
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`/api/maintenance/jobs/${jobId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': session ? `Bearer ${session.access_token}` : '' },
         body: JSON.stringify({ assigned_poc_id: null })
       });
-      if (!res.ok) throw new Error('Failed to remove POC');
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to remove POC');
+      }
       setJob(prev => prev ? { ...prev, maintenance_pocs: null } : prev);
     } catch (err) { alert(err.message); }
   };
@@ -646,13 +656,18 @@ export default function MaintenanceJobDetailPage() {
                 <span className="text-xs text-[#6b635c]"><strong>Speciality:</strong> {job.maintenance_pocs.speciality || '—'}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Contact:</strong> {job.maintenance_pocs.contact_primary || '—'}</span>
                 <span className="text-xs text-[#6b635c]"><strong>Rating:</strong> <span className="text-amber-500">{'★'.repeat(job.maintenance_pocs.star_rating ?? 5)}{'☆'.repeat(5 - (job.maintenance_pocs.star_rating ?? 5))}</span></span>
-                <label className="flex items-center gap-1 text-xs"><span className="text-[#6b635c]">Stage:</span>
-                  <select className="field text-xs bg-white" value={job.maintenance_pocs.stage || 'New'} onChange={e => handlePocStageUpdate(job.maintenance_pocs.id, e.target.value)}>
-                    {POC_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </label>
+                <select className="field text-xs bg-white" value={job.maintenance_pocs.stage || 'New'} onChange={e => handlePocStageUpdate(job.maintenance_pocs.id, e.target.value)}>
+                  {POC_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
                 <button onClick={() => handleDeletePoc(job.maintenance_pocs)} title="Remove from job" aria-label={`Remove ${job.maintenance_pocs.name}`}
-                  className="text-[#8b6f4e] hover:text-[#1e1812] text-xs px-2 py-1 rounded-control hover:bg-[#ebe8e4]">✕ Remove</button>
+                  className="text-[#8b6f4e] hover:text-[#b23a3a] text-xs p-1.5 rounded-control hover:bg-[#fbeaea]">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                    <path d="M4 7h16" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12" />
+                    <path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2" />
+                  </svg>
+                </button>
               </div>
             ) : (
               <p className="text-sm text-[#6b635c]">Not yet assigned</p>
