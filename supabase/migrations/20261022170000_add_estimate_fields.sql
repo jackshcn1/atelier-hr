@@ -1,0 +1,3 @@
+ALTER TABLE job_quotes ADD COLUMN line_items JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE job_quotes ADD COLUMN date TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE job_quotes ADD COLUMN poc_id TEXT REFERENCES maintenance_pocs(id) ON DELETE SET NULL;
