@@ -747,7 +747,7 @@ export default function MaintenanceJobDetailPage() {
                       <button onClick={() => openEditEstimateModal(q)} className="text-[10px] text-[#8b6f4e] underline hover:text-[#1e1812]">Edit</button>
                     )}
                   </div>
-                  <div className="text-xs text-[#6b635c] mt-1">POC: {q.poc_id ? (job.maintenance_pocs?.find(p=>p.id===q.poc_id)?.name || 'Assigned') : '—'} · Date: {q.date ? new Date(q.date).toLocaleDateString() : '—'} · Status: {q.status}</div>
+                  <div className="text-xs text-[#6b635c] mt-1">POC: {q.poc_id ? (job.maintenance_pocs && job.maintenance_pocs.id === q.poc_id ? job.maintenance_pocs.name : 'Assigned') : '—'} · Date: {q.date ? new Date(q.date).toLocaleDateString() : '—'} · Status: {q.status}</div>
                   <div className="text-xs mt-2 space-y-0.5">
                     {(q.line_items ? (Array.isArray(q.line_items) ? q.line_items : JSON.parse(q.line_items||'[]')) : []).map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center py-1 border-b border-[#ebe8e4] last:border-0">
