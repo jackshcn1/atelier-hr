@@ -1,6 +1,31 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+function formatQuote(q) {
+  if (!q) return q;
+  try {
+    if (q.estimated_delivery && q.estimated_delivery.startsWith('{')) {
+      const parsed = JSON.parse(q.estimated_delivery);
+      let items = parsed.line_items;
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items); } catch (_) { items = []; }
+      }
+      return {
+        ...q,
+        line_items: Array.isArray(items) ? items : [],
+        date: parsed.date || q.created_at,
+        poc_id: parsed.poc_id || null,
+        estimated_delivery: parsed.estimated_delivery || ''
+      };
+    }
+  } catch (_) {}
+
+  if (q.line_items && typeof q.line_items === 'string') {
+    try { q.line_items = JSON.parse(q.line_items); } catch (_) { q.line_items = []; }
+  }
+  return q;
+}
+
 export async function GET(req, { params }) {
   const { id } = await params;
 
