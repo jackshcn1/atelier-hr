@@ -486,11 +486,47 @@ export default function MaintenanceJobDetailPage() {
   };
 
   const approveEstimate = async (id) => {
-    try { await fetch('/api/maintenance/quotes', { method: 'PATCH', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ id, is_approved: true, status: 'approved' }) }); const r=await fetch(`/api/maintenance/jobs/${jobId}`); const d=await r.json(); if(d.job) setJob(d.job); } catch(e){alert(e.message)}
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/maintenance/quotes', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session ? `Bearer ${session.access_token}` : ''
+        },
+        body: JSON.stringify({ id, is_approved: true, status: 'approved' })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed to approve');
+      const r = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+      });
+      const refreshData = await r.json();
+      if (refreshData.job) setJob(refreshData.job);
+    } catch (e) { alert(e.message); }
   };
 
   const rejectEstimate = async (id) => {
-    try { await fetch('/api/maintenance/quotes', { method: 'PATCH', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ id, is_approved: false, status: 'rejected' }) }); const r=await fetch(`/api/maintenance/jobs/${jobId}`); const d=await r.json(); if(d.job) setJob(d.job); } catch(e){alert(e.message)}
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/maintenance/quotes', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session ? `Bearer ${session.access_token}` : ''
+        },
+        body: JSON.stringify({ id, is_approved: false, status: 'rejected' })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed to reject');
+      const r = await fetch(`/api/maintenance/jobs/${jobId}`, {
+        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+      });
+      const refreshData = await r.json();
+      if (refreshData.job) setJob(refreshData.job);
+    } catch (e) { alert(e.message); }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading job details...</div>;
@@ -747,7 +783,11 @@ export default function MaintenanceJobDetailPage() {
                       <button onClick={() => openEditEstimateModal(q)} className="text-[10px] text-[#8b6f4e] underline hover:text-[#1e1812]">Edit</button>
                     )}
                   </div>
-                  <div className="text-xs text-[#6b635c] mt-1">POC: {q.poc_id ? (job.maintenance_pocs && job.maintenance_pocs.id === q.poc_id ? job.maintenance_pocs.name : 'Assigned') : '—'} · Date: {q.date ? new Date(q.date).toLocaleDateString() : '—'} · Status: {q.status}</div>
+                  <div className="text-xs text-[#6b635c] mt-1 flex gap-4">
+                    <span className="flex-1">POC: {q.poc_id ? (job.maintenance_pocs && job.maintenance_pocs.id === q.poc_id ? job.maintenance_pocs.name : 'Assigned') : '—'}</span>
+                    <span>Date: {q.date ? new Date(q.date).toLocaleDateString() : '—'}</span>
+                    <span>Status: {q.status}</span>
+                  </div>
                   <div className="text-xs mt-2 space-y-0.5">
                     {(q.line_items ? (Array.isArray(q.line_items) ? q.line_items : JSON.parse(q.line_items||'[]')) : []).map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center py-1 border-b border-[#ebe8e4] last:border-0">
