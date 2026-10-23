@@ -73,8 +73,10 @@ export async function PATCH(req) {
     auth: { persistSession: false }
   });
 
-  const update = {};
-  if (is_approved !== undefined) update.is_approved = is_approved;
+  let update = {};
+  if (is_approved !== undefined) {
+    update.status = is_approved ? 'approved' : 'rejected';
+  }
   if (status !== undefined) update.status = status;
   if (line_items !== undefined) update.line_items = line_items;
   if (date !== undefined) update.date = date;
@@ -98,6 +100,8 @@ export async function PATCH(req) {
       };
     }
 
+    const newStatus = status !== undefined ? status : (is_approved !== undefined ? (is_approved ? 'approved' : 'rejected') : (current.status || 'pending'));
+
     const fallbackVal = JSON.stringify({
       line_items: line_items !== undefined ? line_items : (currentParsed.line_items || '[]'),
       date: date !== undefined ? date : (currentParsed.date || new Date().toISOString()),
@@ -105,9 +109,7 @@ export async function PATCH(req) {
       estimated_delivery: currentParsed.estimated_delivery || ''
     });
 
-    const fallbackUpdate = { estimated_delivery: fallbackVal };
-    if (is_approved !== undefined) fallbackUpdate.is_approved = is_approved;
-    if (status !== undefined) fallbackUpdate.status = status;
+    const fallbackUpdate = { estimated_delivery: fallbackVal, status: newStatus };
     if (cost !== undefined) fallbackUpdate.cost = cost;
 
     result = await supabase.from('job_quotes').update(fallbackUpdate).eq('id', id).select().single();
