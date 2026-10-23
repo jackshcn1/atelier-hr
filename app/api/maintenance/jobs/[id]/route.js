@@ -25,7 +25,9 @@ export async function GET(req, { params }) {
     supabase.from('maintenance_audit_logs').select('*').eq('job_id', id)
   ]);
 
-  return NextResponse.json({ job: { ...job, maintenance_pocs: pocs, job_quotes: quotes, maintenance_audit_logs: logs } });
+  const formattedQuotes = (quotes || []).map(formatQuote);
+
+  return NextResponse.json({ job: { ...job, maintenance_pocs: pocs, job_quotes: formattedQuotes, maintenance_audit_logs: logs } });
 }
 
 export async function PATCH(req, { params }) {
