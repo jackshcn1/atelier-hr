@@ -778,8 +778,8 @@ export default function MaintenanceJobDetailPage() {
             {job.job_quotes && job.job_quotes.length > 0 ? (
               job.job_quotes.map((q, i) => (
                 <div key={q.id || i} className="bg-[#f6f4f2] p-3 rounded mb-3 border border-[#ebe8e4]">
-                  <div className="font-medium text-sm flex items-center gap-2">Estimate #{i+1}{q.is_approved && <span className="pill-good text-[10px]">Approved</span>}{q.status === 'rejected' && <span className="pill-bad text-[10px]">Rejected</span>}
-                    {!q.is_approved && (
+                  <div className="font-medium text-sm flex items-center gap-2">Estimate #{i+1}{(q.is_approved || q.status === 'approved') && <span className="pill-good text-[10px]">Approved</span>}{q.status === 'rejected' && <span className="pill-bad text-[10px]">Rejected</span>}
+                    {q.status !== 'approved' && (
                       <button onClick={() => openEditEstimateModal(q)} className="text-[10px] text-[#8b6f4e] underline hover:text-[#1e1812]">Edit</button>
                     )}
                   </div>
@@ -802,8 +802,8 @@ export default function MaintenanceJobDetailPage() {
                   </div>
                   <div className="text-xs font-medium mt-1">Total: {q.line_items ? (Array.isArray(q.line_items)?q.line_items:JSON.parse(q.line_items||'[]')).reduce((s,item)=>s+(Number(item.units||0)*Number(item.cost||0)),0) : q.cost}</div>
                   <div className="flex gap-2 mt-2">
-                    {!q.is_approved && (<button onClick={() => approveEstimate(q.id)} className="btn-primary text-[10px] px-2 py-0.5">Approve</button>)}
-                    {!q.is_approved && (<button onClick={() => rejectEstimate(q.id)} className="btn-danger text-[10px] px-2 py-0.5">Reject</button>)}
+                    {q.status !== 'approved' && (<button onClick={() => approveEstimate(q.id)} className="btn-primary text-[10px] px-2 py-0.5">Approve</button>)}
+                    {q.status !== 'approved' && q.status !== 'rejected' && (<button onClick={() => rejectEstimate(q.id)} className="btn-danger text-[10px] px-2 py-0.5">Reject</button>)}
                   </div>
                 </div>
               ))
