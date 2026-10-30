@@ -193,7 +193,8 @@ export default function Navbar() {
 
   const currentModule = pathname.startsWith('/operations') ? 'operations' :
                         pathname.startsWith('/sales') ? 'sales' :
-                        pathname.startsWith('/marketing') ? 'marketing' : 'hrms';
+                        pathname.startsWith('/marketing') ? 'marketing' :
+                        pathname.startsWith('/finance') ? 'finance' : 'hrms';
 
   // Define module-specific navigations
   const MODULE_NAV = {
@@ -234,6 +235,14 @@ export default function Navbar() {
       ],
       employee: [
         { label: 'Marketing', links: [{ href: '/marketing', label: 'Spends & ROI' }] },
+      ]
+    },
+    finance: {
+      admin: [
+        { label: 'Finance', links: [{ href: '/finance', label: 'Overview' }, { href: '/finance/costs', label: 'Costs & Expenses' }, { href: '/finance/cashflow', label: 'Cashflow' }, { href: '/finance/pnl', label: 'P&L Statement' }] },
+      ],
+      employee: [
+        { label: 'Finance', links: [{ href: '/finance', label: 'Overview' }] },
       ]
     }
   };

@@ -34,6 +34,13 @@ export default function Home() {
       href: '/marketing',
       accent: '#5e7d5e',
     },
+    {
+      title: 'Finance',
+      subtitle: 'Costs, Cashflow & P&L',
+      description: 'Track operational costs, cashflow, and profit and loss statements',
+      href: '/finance',
+      accent: '#4a6b82',
+    },
   ];
 
   return (
