@@ -168,7 +168,7 @@ export default function ExpenseReviewDashboard() {
                             </div>
                           ))}
                         </div>
-                      }
+                      )}
                     </div>
                   </div>
                 </div>
