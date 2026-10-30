@@ -21,6 +21,7 @@ import {
 import { parseCustomerFeedback } from '../lib/feedbackParsers.js';
 import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
+import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -1004,6 +1005,130 @@ export async function runPetpoojaSync(options = {}) {
     } catch (ie) {
       failedReports++;
       console.error('⚠️ Could not access Petpooja Inventory:', ie.message);
+    }
+
+    // REPORT 10: Petpooja Purchase Invoices (Expense Sync)
+    try {
+      console.log('\n📥 Fetching Purchase Invoices from Petpooja Inventory...');
+
+      // Try to navigate to purchase invoices
+      const purchaseInvoiceUrl = 'https://inventory.petpooja.com/inventories/purchase_invoice_list/';
+      const purchaseRows = await fetchCustomReport(purchaseInvoiceUrl, 'Purchase Invoices', cycle);
+
+      if (purchaseRows && purchaseRows.length > 0) {
+        const purchaseResult = parsePurchaseInvoices(purchaseRows, cycle);
+        if (purchaseResult.ok && purchaseResult.invoices.length > 0) {
+          console.log(`  📊 Found ${purchaseResult.invoices.length} purchase invoices`);
+
+          // Sync each invoice to expenses table
+          for (const invoice of purchaseResult.invoices) {
+            try {
+              const payload = {
+                category: 'Vendor',
+                cost_type: 'variable',
+                entry_type: 'actual',
+                status: 'approved', // Petpooja data is auto-approved
+                amount: invoice.total_amount,
+                debit_note: 0,
+                vendor_name: invoice.vendor_name,
+                invoice_number: invoice.invoice_number,
+                invoice_date: invoice.invoice_date,
+                description: invoice.description || 'Petpooja purchase invoice',
+                payment_status: invoice.payment_status || 'due',
+                payment_date: invoice.payment_date || null,
+                payment_mode: invoice.payment_mode || null,
+                bank_reference: invoice.bank_reference || null,
+                created_by: null, // System-generated
+                approved_by: null
+              };
+
+              const { error } = await supabase
+                .from('expenses')
+                .upsert([payload], {
+                  onConflict: 'vendor_name,invoice_number',
+                  ignoreDuplicates: false
+                });
+
+              if (error) {
+                console.error(`  ❌ Failed to sync invoice ${invoice.invoice_number}:`, error.message);
+              } else {
+                console.log(`  ✓ Synced invoice ${invoice.invoice_number} (₹${invoice.total_amount})`);
+              }
+            } catch (syncErr) {
+              console.error(`  ❌ Error syncing invoice ${invoice.invoice_number}:`, syncErr.message);
+            }
+          }
+
+          successfulReports++;
+        } else {
+          console.log('  ℹ️ No purchase invoices found for this period');
+        }
+      }
+    } catch (pe) {
+      failedReports++;
+      console.error('⚠️ Could not sync Purchase Invoices:', pe.message);
+    }
+
+    // REPORT 11: Petpooja Purchase Returns / Debit Notes (Expense Sync)
+    try {
+      console.log('\n📥 Fetching Purchase Returns / Debit Notes from Petpooja Inventory...');
+
+      const purchaseReturnUrl = 'https://inventory.petpooja.com/inventories/purchase_return_list/';
+      const returnRows = await fetchCustomReport(purchaseReturnUrl, 'Purchase Returns', cycle);
+
+      if (returnRows && returnRows.length > 0) {
+        const returnsResult = parsePurchaseReturns(returnRows, cycle);
+        if (returnsResult.ok && returnsResult.returns.length > 0) {
+          console.log(`  📊 Found ${returnsResult.returns.length} purchase returns (debit notes)`);
+
+          // Sync each debit note to expenses table
+          for (const ret of returnsResult.returns) {
+            try {
+              // Create debit note entry (negative amount) or update existing vendor expense
+              const payload = {
+                category: 'Vendor',
+                cost_type: 'variable',
+                entry_type: 'actual',
+                status: 'approved',
+                amount: ret.total_amount, // Store as positive, debit_note field handles reduction
+                debit_note: ret.total_amount,
+                vendor_name: ret.vendor_name,
+                invoice_number: ret.return_number,
+                invoice_date: ret.return_date,
+                description: `Debit Note: ${ret.description || 'Purchase return'}`,
+                payment_status: 'due',
+                payment_date: null,
+                payment_mode: null,
+                bank_reference: null,
+                created_by: null,
+                approved_by: null
+              };
+
+              const { error } = await supabase
+                .from('expenses')
+                .upsert([payload], {
+                  onConflict: 'vendor_name,invoice_number',
+                  ignoreDuplicates: false
+                });
+
+              if (error) {
+                console.error(`  ❌ Failed to sync debit note ${ret.return_number}:`, error.message);
+              } else {
+                console.log(`  ✓ Synced debit note ${ret.return_number} (₹${ret.total_amount})`);
+              }
+            } catch (syncErr) {
+              console.error(`  ❌ Error syncing debit note ${ret.return_number}:`, syncErr.message);
+            }
+          }
+
+          successfulReports++;
+        } else {
+          console.log('  ℹ️ No purchase returns found for this period');
+        }
+      }
+    } catch (re) {
+      failedReports++;
+      console.error('⚠️ Could not sync Purchase Returns:', re.message);
     }
 
     console.log('\n=============================================================');
