@@ -1,17 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function ExpenseEntryForm() {
+  const [vendors, setVendors] = useState([]);
   const [formData, setFormData] = useState({
     category: '',
-    cost_type: 'variable',
     entry_type: 'actual',
     status: 'pending',
     amount: '',
-    debit_note: 0,
-    vendor_name: '',
+    vendor_id: '',
     invoice_number: '',
     invoice_date: '',
     description: '',
@@ -23,6 +22,15 @@ export default function ExpenseEntryForm() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    fetch('/api/finance/vendors')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) setVendors(d.data);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -47,12 +55,10 @@ export default function ExpenseEntryForm() {
         setMessage('Expense submitted successfully!');
         setFormData({
           category: '',
-          cost_type: 'variable',
           entry_type: 'actual',
           status: 'pending',
           amount: '',
-          debit_note: 0,
-          vendor_name: '',
+          vendor_id: '',
           invoice_number: '',
           invoice_date: '',
           description: '',
@@ -122,15 +128,18 @@ export default function ExpenseEntryForm() {
                 </div>
 
                 <div className="field">
-                  <label className="field-label block text-sm font-medium mb-2">Cost Type</label>
+                  <label className="field-label block text-sm font-medium mb-2">Vendor</label>
                   <select
-                    name="cost_type"
-                    value={formData.cost_type}
+                    name="vendor_id"
+                    value={formData.vendor_id}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
+                    required
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
                   >
-                    <option value="fixed">Fixed Cost</option>
-                    <option value="variable">Variable Cost</option>
+                    <option value="">Select Vendor</option>
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -144,33 +153,7 @@ export default function ExpenseEntryForm() {
                     placeholder="0.00"
                     step="0.01"
                     required
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
-                  />
-                </div>
-
-                <div className="field">
-                  <label className="field-label block text-sm font-medium mb-2">Debit Note Amount</label>
-                  <input
-                    type="number"
-                    name="debit_note"
-                    value={formData.debit_note}
-                    onChange={handleInputChange}
-                    placeholder="0.00"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
-                  />
-                </div>
-
-                <div className="field">
-                  <label className="field-label block text-sm font-medium mb-2">Vendor Name</label>
-                  <input
-                    type="text"
-                    name="vendor_name"
-                    value={formData.vendor_name}
-                    onChange={handleInputChange}
-                    placeholder="Vendor or supplier name"
-                    required
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
                   />
                 </div>
 
@@ -182,7 +165,7 @@ export default function ExpenseEntryForm() {
                     value={formData.invoice_number}
                     onChange={handleInputChange}
                     placeholder="Invoice #"
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
                   />
                 </div>
 
@@ -193,11 +176,11 @@ export default function ExpenseEntryForm() {
                     name="invoice_date"
                     value={formData.invoice_date}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
                   />
                 </div>
 
-                <div className="field">
+                <div className="field md:col-span-2">
                   <label className="field-label block text-sm font-medium mb-2">Description</label>
                   <textarea
                     name="description"
@@ -205,7 +188,7 @@ export default function ExpenseEntryForm() {
                     onChange={handleInputChange}
                     placeholder="Expense details..."
                     rows="3"
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
                   />
                 </div>
 
@@ -215,7 +198,7 @@ export default function ExpenseEntryForm() {
                     name="payment_mode"
                     value={formData.payment_mode}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
                   >
                     <option value="">Select Mode</option>
                     <option value="UPI">UPI</option>
@@ -234,7 +217,7 @@ export default function ExpenseEntryForm() {
                     value={formData.bank_reference}
                     onChange={handleInputChange}
                     placeholder="UTR / Reference #"
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus-border-[#8b6f4e]"
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
                   />
                 </div>
               </div>
@@ -252,12 +235,10 @@ export default function ExpenseEntryForm() {
                   type="button"
                   onClick={() => setFormData({
                     category: '',
-                    cost_type: 'variable',
                     entry_type: 'actual',
                     status: 'pending',
                     amount: '',
-                    debit_note: 0,
-                    vendor_name: '',
+                    vendor_id: '',
                     invoice_number: '',
                     invoice_date: '',
                     description: '',
