@@ -28,6 +28,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
+
+    if (body.invoice_date === "") body.invoice_date = null;
+    if (body.payment_date === "") body.payment_date = null;
+
     const { data, error } = await supabase.from('expenses').insert([body]).select();
 
     if (error) throw error;
