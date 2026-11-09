@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import FinanceDashboard from '@/app/components/FinanceDashboard';
+import FinanceDashboard from '../../components/FinanceDashboard';
 
 export default function CostsExpensesPage() {
   return (
