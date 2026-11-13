@@ -14,7 +14,6 @@ import {
   parseWastage,
   parseB2bGstOrders,
   parseCreditRecovery,
-  parsePurchaseReturns,
   parseDeliverySales,
   parseCounterSales
 } from '../lib/variablePayParsers.js';
@@ -149,6 +148,18 @@ export async function runPetpoojaSync(options = {}) {
     .maybeSingle();
 
   if (!period) {
+    const { data: openPeriods } = await supabase
+      .from('variable_pay_periods')
+      .select('id')
+      .eq('status', 'open');
+    if (openPeriods && openPeriods.length > 0) {
+      const { error: closeErr } = await supabase
+        .from('variable_pay_periods')
+        .update({ status: 'locked' })
+        .in('id', openPeriods.map(p => p.id));
+      if (closeErr) throw new Error(`Failed to lock stale periods: ${closeErr.message}`);
+      console.log(`✓ Locked ${openPeriods.length} stale open period(s)`);
+    }
     const { data: newPeriod, error: pErr } = await supabase
       .from('variable_pay_periods')
       .insert([{ period_start: cycle.start, period_end: cycle.end, status: 'open' }])
@@ -157,12 +168,28 @@ export async function runPetpoojaSync(options = {}) {
     if (pErr) throw new Error(`Failed to create period: ${pErr.message}`);
     period = newPeriod;
     console.log(`✓ Initialized new open period #${period.id}`);
+  } else if (period.status === 'open') {
+    console.log(`✓ Period #${period.id} already open; reusing`);
   } else {
-    console.log(`✓ Loaded period #${period.id} (Status: ${period.status})`);
-    if (period.status === 'locked' || period.status === 'paid') {
-      console.log(`🔒 Period #${period.id} is ${period.status}. Automated sync will not overwrite locked data.`);
-      return { skipped: true, reason: `Period is ${period.status}` };
+    const { data: openPeriods } = await supabase
+      .from('variable_pay_periods')
+      .select('id')
+      .eq('status', 'open');
+    if (openPeriods && openPeriods.length > 0) {
+      const { error: closeErr } = await supabase
+        .from('variable_pay_periods')
+        .update({ status: 'locked' })
+        .in('id', openPeriods.map(p => p.id));
+      if (closeErr) throw new Error(`Failed to lock stale periods: ${closeErr.message}`);
+      console.log(`✓ Locked ${openPeriods.length} stale open period(s)`);
     }
+    const { error: uErr } = await supabase
+      .from('variable_pay_periods')
+      .update({ period_start: cycle.start, period_end: cycle.end, status: 'open' })
+      .eq('id', period.id);
+    if (uErr) throw new Error(`Failed to update period: ${uErr.message}`);
+    period = { id: period.id, period_start: cycle.start, period_end: cycle.end, status: 'open' };
+    console.log(`✓ Updated period #${period.id} to new cycle`);
   }
 
   // 2. Fetch employees, schemes, and kitchen categories
@@ -235,6 +262,10 @@ export async function runPetpoojaSync(options = {}) {
     };
 
     let saveErr = null;
+    // The unique index is (period_id, metric_id, coalesce(employee_id, 'TEAM')).
+    // Supabase onConflict requires exact column names matching the index.
+    // We normalize employee_id to 'TEAM' in the payload for team metrics
+    // so the onConflict clause uses plain column names.
     if (existing?.id) {
       const { error } = await supabase
         .from('variable_metric_inputs')
