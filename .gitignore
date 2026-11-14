@@ -63,3 +63,6 @@ memory/maintenance-module-status.md
 # Supabase CLI access token + database backups — NEVER commit
 .supabase-access-token
 .backups/
+
+# shared secret for the hosted Petpooja sync endpoint — NEVER commit
+.vercel-sync-secret

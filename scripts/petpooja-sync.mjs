@@ -26,10 +26,16 @@ import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParse
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Load credentials from the local config file, then let real env vars win.
+// The config file is gitignored, so it is absent on CI runners and serverless
+// functions — in that case the environment must supply everything.
 function loadLocalConfig() {
   const cfg = {};
   const cfgPath = join(__dirname, 'petpooja-config.json');
   if (!existsSync(cfgPath)) {
+    if (process.env.PETPOOJA_EMAIL && process.env.PETPOOJA_PASSWORD) {
+      console.log('ℹ️  No local petpooja-config.json — using environment variables.');
+      return cfg;
+    }
     console.error('❌ Missing scripts/petpooja-config.json');
     console.error('   Run:  node scripts/setup-petpooja.mjs   (one-time setup)');
     process.exit(1);
@@ -204,8 +210,12 @@ export async function runPetpoojaSync(options = {}) {
   const schemes = schemeRes.data || [];
   const kitchenCategories = (catRes.data || []).map(c => c.category);
 
-  // Dynamically import playwright
-  const { chromium } = await import('playwright');
+  // Dynamically import playwright.
+  // playwright-core is used so a serverless bundle does not pull the full
+  // playwright package (and its browser download) — the browser binary itself
+  // is supplied via PETPOOJA_CHROMIUM_EXECUTABLE_PATH when running headless
+  // outside a desktop.
+  const { chromium } = await import('playwright-core');
 
   // Headed mode (default on local runs) is more reliable — Petpooja is far
   // less likely to challenge a real visible Chrome window than a headless one.
@@ -213,7 +223,7 @@ export async function runPetpoojaSync(options = {}) {
   const headless = String(process.env.PETPOOJA_HEADLESS ?? 'false').toLowerCase() === 'true';
 
   console.log(`🌐 Launching browser (headless=${headless})...`);
-  const browser = await chromium.launch({
+  const launchOptions = {
     headless,
     channel: headless ? undefined : 'chrome', // use installed Chrome when headed
     args: [
@@ -222,7 +232,16 @@ export async function runPetpoojaSync(options = {}) {
       '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled'
     ]
-  });
+  };
+  // Serverless: point at a provided Chromium binary instead of a bundled one.
+  if (process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH;
+    launchOptions.channel = undefined; // Playwright rejects channel + executablePath together
+    if (process.env.PETPOOJA_CHROMIUM_ARGS) {
+      launchOptions.args = JSON.parse(process.env.PETPOOJA_CHROMIUM_ARGS);
+    }
+  }
+  const browser = await chromium.launch(launchOptions);
 
   const context = await browser.newContext({
     acceptDownloads: true,
@@ -1285,7 +1304,10 @@ export async function runPetpoojaSync(options = {}) {
 
 // Direct execution from CLI — also mirrors output to a rotating log file so a
 // scheduled run can be inspected later without re-running it.
-if (process.argv[1]?.endsWith('petpooja-sync.mjs') || process.argv[1]?.endsWith('petpooja-sync.js')) {
+// The basename is compared exactly (not endsWith) so that importing this
+// module from a bundled serverless function can never trigger an auto-run.
+const cliEntry = process.argv[1]?.split(/[\\/]/).pop();
+if (cliEntry === 'petpooja-sync.mjs' || cliEntry === 'petpooja-sync.js') {
   const logPath = join(__dirname, 'petpooja-sync.log');
   const stamp = () => `[${new Date().toISOString()}]`;
 
