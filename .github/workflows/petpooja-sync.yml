@@ -1,24 +1,40 @@
 name: Petpooja Variable Pay Automated Sync
 
+# Runs unattended so the local office computer no longer has to stay on.
+#
+# Schedule is UTC (GitHub cron is always UTC):
+#   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * *'
+#
+# The payroll cycle is computed from the current date, so the runner timezone
+# is pinned to Asia/Kolkata. Without this the cycle would roll over at the
+# wrong moment (the runner is 5h30m behind IST).
 on:
-  # 1. Runs automatically every night at 2:30 AM IST (21:00 UTC)
   schedule:
-    - cron: '0 21 * * *'
+    - cron: '30 23 * * *'
 
-  # 2. Allows manual 1-click trigger from GitHub Actions tab anytime
+  # Manual trigger from the Actions tab, with optional period override for backfills.
   workflow_dispatch:
     inputs:
       start_date:
         description: 'Optional Pay Period Start Date (YYYY-MM-DD)'
         required: false
+      default: ''
       end_date:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
+        default: ''
+
+# Never let two syncs overlap — they would race on the same metric rows.
+concurrency:
+  group: petpooja-sync
+  cancel-in-progress: false
 
 jobs:
   sync-petpooja:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Kolkata
 
     steps:
       - name: Check out repository
@@ -27,24 +43,73 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright & Chromium
-        run: |
-          npm install -D playwright
-          npx playwright install --with-deps chromium
+      - name: Install Playwright browser and system dependencies
+        run: npx playwright install --with-deps chromium
 
-      - name: Run Petpooja Variable Pay Sync Engine
+      - name: Build runtime config from secrets
         env:
           PETPOOJA_EMAIL: ${{ secrets.PETPOOJA_EMAIL }}
           PETPOOJA_PASSWORD: ${{ secrets.PETPOOJA_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://wzxswmopfxnucmeygqeg.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SYNC_START_DATE: ${{ github.event.inputs.start_date }}
-          SYNC_END_DATE: ${{ github.event.inputs.end_date }}
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+          GOOGLE_PRIVATE_KEY_B64: ${{ secrets.GOOGLE_PRIVATE_KEY_B64 }}
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SHEETS_SHEET_NAME: ${{ secrets.GOOGLE_SHEETS_SHEET_NAME }}
+          GOOGLE_SHEETS_RANGE: ${{ secrets.GOOGLE_SHEETS_RANGE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          PETPOOJA_HEADLESS: 'false'
+        run: node scripts/ci-write-petpooja-config.mjs
+
+      # Headed Chrome under Xvfb. Petpooja is far more tolerant of a real
+      # browser window than of a headless one, so headed is the primary path.
+      - name: Run Petpooja sync (headed Chrome under Xvfb)
+        env:
+          SYNC_START_DATE: ${{ inputs.start_date }}
+          SYNC_END_DATE: ${{ inputs.end_date }}
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" node scripts/petpooja-sync.mjs
+
+      # Fallback: if the headed run failed (e.g. no X server on the image),
+      # retry headless rather than losing the whole day.
+      - name: Retry sync headless
+        if: failure()
+        env:
+          SYNC_START_DATE: ${{ inputs.start_date }}
+          SYNC_END_DATE: ${{ inputs.end_date }}
+          PETPOOJA_HEADLESS: 'true'
+        run: node scripts/petpooja-sync.mjs
+
+      - name: Upload sync log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: petpooja-sync-log
+          path: |
+            scripts/petpooja-sync.log
+            scripts/last-successful-sync.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Write run summary
+        if: always()
         run: |
-          node scripts/petpooja-sync.mjs
+          {
+            echo "### Petpooja sync — $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo
+            if [ -f scripts/petpooja-sync.log ]; then
+              echo '```'
+              tail -n 60 scripts/petpooja-sync.log
+              echo '```'
+            else
+              echo 'No sync log was produced.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
