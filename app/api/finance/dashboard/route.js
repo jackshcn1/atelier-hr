@@ -42,29 +42,27 @@ export async function GET() {
 
     const totalCosts = totalFixedActual + totalPettyActual + totalVariableActual;
 
-    // Real revenue breakdown from Petpooja synced metrics
-    let revenueBreakdown = { dine_in: 0, takeaway: 0, swiggy: 0, zomato: 0 };
+    // Real revenue breakdown: Dine-in, Pick Up, Delivery
+    let revenueBreakdown = { dine_in: 0, pick_up: 0, delivery: 0 };
     let totalRevenue = 0;
 
     if (periodId) {
-      const [dineIn, deliverySales, b2bRev] = await Promise.all([
-        getMetricSum(periodId, 'b2b_counter_sales'),
-        getMetricSum(periodId, 'acc_delivery_sales'),
-        getMetricSum(periodId, 'b2b_rev'),
+      const [dineIn, pickUp, delivery] = await Promise.all([
+        getMetricSum(periodId, 'rev_dine_in'),
+        getMetricSum(periodId, 'rev_pick_up'),
+        getMetricSum(periodId, 'rev_delivery'),
       ]);
 
-      // Split delivery sales into Swiggy/Zomato based on typical ratio (60/40)
-      // In a real setup, we'd store channel breakdown separately
-      const swiggyShare = deliverySales * 0.6;
-      const zomatoShare = deliverySales * 0.4;
+      // Fallback to counter & delivery metrics if executive summary not yet synced
+      const fallbackDineIn = dineIn || await getMetricSum(periodId, 'b2b_counter_sales');
+      const fallbackDelivery = delivery || await getMetricSum(periodId, 'acc_delivery_sales');
 
       revenueBreakdown = {
-        dine_in: Math.round(dineIn),
-        takeaway: Math.round(deliverySales * 0.2), // ~20% is takeaway
-        swiggy: Math.round(swiggyShare),
-        zomato: Math.round(zomatoShare),
+        dine_in: Math.round(fallbackDineIn),
+        pick_up: Math.round(pickUp),
+        delivery: Math.round(fallbackDelivery),
       };
-      totalRevenue = dineIn + deliverySales + b2bRev;
+      totalRevenue = revenueBreakdown.dine_in + revenueBreakdown.pick_up + revenueBreakdown.delivery;
     }
 
     const netProfitOrLoss = totalRevenue - totalCosts;

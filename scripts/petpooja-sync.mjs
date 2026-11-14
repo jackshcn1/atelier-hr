@@ -15,7 +15,8 @@ import {
   parseB2bGstOrders,
   parseCreditRecovery,
   parseDeliverySales,
-  parseCounterSales
+  parseCounterSales,
+  parseExecutiveOrderTypes
 } from '../lib/variablePayParsers.js';
 import { parseCustomerFeedback } from '../lib/feedbackParsers.js';
 import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
@@ -804,7 +805,24 @@ export async function runPetpoojaSync(options = {}) {
       console.error('⚠️ Could not sync Due Payment Report:', e.message);
     }
 
-    // REPORT 6B: Kitchen Prep Time Report (#78 - KOT itemwise with preparation times)
+    
+    // REPORT 7: Executive Sales Summary (#All)
+    try {
+      console.log("📥 Fetching Executive Sales Summary...");
+      const execRows = await fetchCustomReport("https://billing.petpooja.com/reports/executive_sales_summary/all", "Executive Sales Summary", cycle);
+      const execResult = parseExecutiveOrderTypes(execRows);
+      if (execResult.ok) {
+        console.log("  📊 Executive Sales breakdown:", JSON.stringify(execResult.data));
+        await saveMetric("rev_dine_in", execResult.data.dine_in, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+        await saveMetric("rev_delivery", execResult.data.delivery, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+        await saveMetric("rev_pick_up", execResult.data.pick_up, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+        successfulReports++;
+      }
+    } catch (e) {
+      failedReports++;
+      console.error("⚠️ Could not sync Executive Sales Summary:", e.message);
+    }
+// REPORT 6B: Kitchen Prep Time Report (#78 - KOT itemwise with preparation times)
     try {
       console.log('📥 Fetching Kitchen Prep Time Report...');
 
