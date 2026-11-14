@@ -89,9 +89,8 @@ export default function FinanceDashboard() {
               <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">Click to Drilldown</span>
             </div>
             <Meter type="revenue" label="Dine-in" actual={data.revenue.breakdown.dine_in} forecast={data.revenue.breakdown.dine_in * 1.1} />
-            <Meter type="revenue" label="Takeaway / Delivery" actual={data.revenue.breakdown.takeaway} forecast={data.revenue.breakdown.takeaway * 1.1} />
-            <Meter type="revenue" label="Swiggy" actual={data.revenue.breakdown.swiggy} forecast={data.revenue.breakdown.swiggy * 1.1} />
-            <Meter type="revenue" label="Zomato" actual={data.revenue.breakdown.zomato} forecast={data.revenue.breakdown.zomato * 1.1} />
+            <Meter type="revenue" label="Pick Up" actual={data.revenue.breakdown.pick_up} forecast={data.revenue.breakdown.pick_up * 1.1} />
+            <Meter type="revenue" label="Delivery" actual={data.revenue.breakdown.delivery} forecast={data.revenue.breakdown.delivery * 1.1} />
           </div>
           <div className="mt-8 pt-4 border-t border-[#ebe8e4] flex flex-col gap-2 bg-[#faf8f6] p-4 rounded-xl">
             <div className="flex justify-between items-center">
