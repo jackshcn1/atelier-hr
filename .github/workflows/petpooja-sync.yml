@@ -18,11 +18,9 @@ on:
       start_date:
         description: 'Optional Pay Period Start Date (YYYY-MM-DD)'
         required: false
-      default: ''
       end_date:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
-        default: ''
 
 # Never let two syncs overlap — they would race on the same metric rows.
 concurrency:
