@@ -70,6 +70,9 @@ jobs:
 
       # Headed Chrome under Xvfb. Petpooja is far more tolerant of a real
       # browser window than of a headless one, so headed is the primary path.
+      - name: Diagnose Petpooja access from this runner
+        run: xvfb-run --auto-servernum node scripts/ci-check-petpooja-access.mjs
+
       - name: Run Petpooja sync (headed Chrome under Xvfb)
         env:
           SYNC_START_DATE: ${{ inputs.start_date }}
