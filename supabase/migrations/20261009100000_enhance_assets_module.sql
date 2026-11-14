@@ -1,5 +1,5 @@
 -- 1. Asset Categories
-create table asset_categories (
+create table if not exists asset_categories (
   id bigint generated always as identity primary key,
   name text not null unique,
   prefix text not null unique,
@@ -7,7 +7,7 @@ create table asset_categories (
 );
 
 -- 2. Asset Types
-create table asset_types (
+create table if not exists asset_types (
   id bigint generated always as identity primary key,
   name text not null unique,
   prefix text not null unique,
@@ -16,14 +16,14 @@ create table asset_types (
 );
 
 -- 3. Asset Locations
-create table asset_locations (
+create table if not exists asset_locations (
   id bigint generated always as identity primary key,
   name text not null unique,
   created_at timestamptz default now()
 );
 
 -- 4. Vendors
-create table vendors (
+create table if not exists vendors (
   id bigint generated always as identity primary key,
   name text not null unique,
   description text,
@@ -59,9 +59,10 @@ alter table assets add column if not exists useful_life_years integer;
 alter table assets add column if not exists qr_code_url text;
 
 -- 6. Asset Audit Log
-create table asset_audit_log (
+-- asset_id references assets(id): the live assets table keys on text id, not asset_id.
+create table if not exists asset_audit_log (
   id bigint generated always as identity primary key,
-  asset_id bigint references assets(asset_id) on delete cascade,
+  asset_id text references assets(id) on delete cascade,
   action text not null, -- 'assigned', 'status_change', 'maintenance', etc.
   performed_by text,
   previous_value text,
@@ -76,22 +77,27 @@ alter table maintenance_work_orders add column if not exists parts_cost numeric 
 alter table maintenance_work_orders add column if not exists service_report_url text;
 
 -- Seed initial data
+-- on conflict do nothing: the seed set contains a duplicate 'CH' prefix
+-- (Chiller / Chair), so the second row is skipped rather than aborting the seed.
 insert into asset_categories (name, prefix) values
 ('Kitchen Equipment', 'KE'),
 ('Furniture', 'FU'),
 ('Uniform', 'UN'),
-('Electronics', 'EL');
+('Electronics', 'EL')
+on conflict do nothing;
 
 insert into asset_types (name, prefix, category) values
 ('Chiller', 'CH', 'Kitchen Equipment'),
 ('Freezer', 'FR', 'Kitchen Equipment'),
 ('Table', 'TA', 'Furniture'),
 ('Chair', 'CH', 'Furniture'),
-('Staff Uniform', 'SU', 'Uniform');
+('Staff Uniform', 'SU', 'Uniform')
+on conflict do nothing;
 
 insert into asset_locations (name) values
 ('Kitchen'),
 ('Restaurant'),
 ('Office'),
 ('Sales Counter'),
-('Storage');
+('Storage')
+on conflict do nothing;

@@ -56,3 +56,10 @@ env.local
 .env*
 
 .playwright-mcp/
+
+# contains local access credentials — local-only, never commit
+memory/maintenance-module-status.md
+
+# Supabase CLI access token + database backups — NEVER commit
+.supabase-access-token
+.backups/
