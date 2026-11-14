@@ -1,5 +1,9 @@
 -- Operations: Assets
-create table assets (
+-- Reconciled 2026-11-14: the live `assets` table was recreated by
+-- 20261020110000_create_assets_table.sql with a text `id` primary key, so this
+-- migration now creates the table only when absent and back-fills the columns
+-- the application expects on the existing table.
+create table if not exists assets (
   asset_id bigint generated always as identity primary key,
   name text not null,
   asset_number text not null unique,
@@ -12,10 +16,18 @@ create table assets (
   created_at timestamptz default now()
 );
 
+alter table assets add column if not exists assigned_employee_id text references employees(employee_id) on update cascade on delete set null;
+alter table assets add column if not exists condition text;
+alter table assets add column if not exists purchase_date date;
+alter table assets add column if not exists depreciation_rate numeric default 0;
+alter table assets add column if not exists last_maintenance_date date;
+alter table assets add column if not exists created_at timestamptz default now();
+
 -- Operations: Maintenance Work Orders
-create table maintenance_work_orders (
+-- asset_id references assets(id): the live assets table keys on text id, not asset_id.
+create table if not exists maintenance_work_orders (
   work_order_id bigint generated always as identity primary key,
-  asset_id bigint references assets(asset_id) on delete cascade,
+  asset_id text references assets(id) on delete cascade,
   title text not null,
   description text,
   status text check (status in ('pending', 'in_progress', 'completed', 'cancelled')) default 'pending',
@@ -27,7 +39,7 @@ create table maintenance_work_orders (
 );
 
 -- Operations: Compliance Licenses
-create table compliance_licenses (
+create table if not exists compliance_licenses (
   license_id bigint generated always as identity primary key,
   name text not null,
   license_number text,
@@ -38,7 +50,7 @@ create table compliance_licenses (
 );
 
 -- Sales: Daily Data
-create table sales_data (
+create table if not exists sales_data (
   sale_id bigint generated always as identity primary key,
   date date not null default current_date,
   amount numeric not null default 0,
@@ -49,7 +61,7 @@ create table sales_data (
 );
 
 -- Sales: KPIs
-create table sales_kpis (
+create table if not exists sales_kpis (
   kpi_id bigint generated always as identity primary key,
   metric_name text not null,
   value numeric not null default 0,

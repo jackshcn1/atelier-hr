@@ -14,7 +14,9 @@ create table if not exists public.onboarding_doc_templates (
 );
 
 alter table public.onboarding_doc_templates enable row level security;
+drop policy if exists "odt_read" on onboarding_doc_templates;
 create policy "odt_read" on onboarding_doc_templates for select using (auth.role() = 'authenticated');
+drop policy if exists "odt_write" on onboarding_doc_templates;
 create policy "odt_write" on onboarding_doc_templates for all using (is_admin() or has_permission('manage_documents'));
 
 -- 2. Acknowledgment tracking: one combined signed document per employee
@@ -32,7 +34,9 @@ create table if not exists public.onboarding_acknowledgments (
 );
 
 alter table public.onboarding_acknowledgments enable row level security;
+drop policy if exists "ack_read" on onboarding_acknowledgments;
 create policy "ack_read" on onboarding_acknowledgments for select using (is_admin() or has_permission('manage_documents') or has_permission('edit_employees'));
+drop policy if exists "ack_write" on onboarding_acknowledgments;
 create policy "ack_write" on onboarding_acknowledgments for all using (is_admin() or has_permission('manage_documents') or has_permission('edit_employees'));
 
 -- 3. Add acknowledgment reference to employees (for quick Active gate check)
