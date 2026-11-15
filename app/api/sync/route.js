@@ -15,6 +15,7 @@
  *   GET  with  Authorization: Bearer <SYNC_SECRET>   (Vercel Cron sends this)
  *   POST with  x-sync-secret: <SYNC_SECRET>           (GitHub Actions / manual)
  */
+import { NextResponse } from 'next/server';
 import chromium from '@sparticuz/chromium';
 import { runPetpoojaSync } from '../../../scripts/petpooja-sync.mjs';
 
@@ -22,22 +23,25 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-function authorized(req) {
+function isAuthorized(req) {
   const expected = process.env.SYNC_SECRET;
   if (!expected) return false;
-  const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-  const header = (req.headers['x-sync-secret'] || '').trim();
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const header = (req.headers.get('x-sync-secret') || '').trim();
   return bearer === expected || header === expected;
 }
 
-async function run(req, res) {
+async function handle(req) {
   const started = Date.now();
 
   if (!process.env.SYNC_SECRET) {
-    return res.status(500).json({ ok: false, error: 'SYNC_SECRET is not configured' });
+    return NextResponse.json(
+      { ok: false, error: 'SYNC_SECRET is not configured' },
+      { status: 500 },
+    );
   }
-  if (!authorized(req)) {
-    return res.status(401).json({ ok: false, error: 'unauthorized' });
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
   const logs = [];
@@ -57,19 +61,19 @@ async function run(req, res) {
     ]);
 
     // Optional period override for backfills: ?start=YYYY-MM-DD&end=YYYY-MM-DD
-    const src = { ...(req.query || {}), ...(req.body || {}) };
-    const start = src.start || src.periodStart;
-    const end = src.end || src.periodEnd;
+    const params = new URL(req.url).searchParams;
+    const start = params.get('start');
+    const end = params.get('end');
     if (start && end) {
-      process.env.SYNC_START_DATE = String(start);
-      process.env.SYNC_END_DATE = String(end);
+      process.env.SYNC_START_DATE = start;
+      process.env.SYNC_END_DATE = end;
       push(`📅 Overriding period: ${start} → ${end}`);
     }
 
     push('🌐 Starting Petpooja sync on Vercel...');
     const result = await runPetpoojaSync();
 
-    return res.status(200).json({
+    return NextResponse.json({
       ok: true,
       durationMs: Date.now() - started,
       result,
@@ -77,19 +81,22 @@ async function run(req, res) {
     });
   } catch (err) {
     console.error('Sync failed:', err);
-    return res.status(500).json({
-      ok: false,
-      durationMs: Date.now() - started,
-      error: err?.message || String(err),
-      logs: logs.slice(-80),
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        durationMs: Date.now() - started,
+        error: err?.message || String(err),
+        logs: logs.slice(-80),
+      },
+      { status: 500 },
+    );
   }
 }
 
-export async function GET(req, res) {
-  return run(req, res);
+export async function GET(req) {
+  return handle(req);
 }
 
-export async function POST(req, res) {
-  return run(req, res);
+export async function POST(req) {
+  return handle(req);
 }
