@@ -7,9 +7,10 @@ name: Petpooja Variable Pay Automated Sync
 # cannot reach billing.petpooja.com at all. Vercel (AWS egress) is allowed,
 # so this workflow only schedules the request and collects the result.
 #
-# The sync is split into six report groups because a full run is longer than
-# a serverless function is allowed to run. The groups are called one after the
-# other so they never race on the same metric rows.
+# The sync is split into ten report groups — one report each — because a full
+# run is longer than a serverless function is allowed to run, and two reports per
+# group could still overrun the 300 s ceiling on a slow Petpooja day. The groups
+# are called one after the other so they never race on the same metric rows.
 #
 # Schedule is UTC (GitHub cron is always UTC):
 #   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * *'
@@ -27,7 +28,7 @@ on:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
       group:
-        description: 'Run only one report group (1-6). Leave empty to run all six.'
+        description: 'Run only one report group (1-10). Leave empty to run all ten.'
         required: false
 
 # Never let two syncs overlap — they would race on the same metric rows.
@@ -38,7 +39,9 @@ concurrency:
 jobs:
   sync-petpooja:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Ten groups, each one report, with a retry and a pause in between: a slow
+    # Petpooja day needs room for all of that.
+    timeout-minutes: 55
 
     steps:
       - name: Request the Petpooja sync
@@ -71,7 +74,7 @@ jobs:
           if [ -n "$ONLY_GROUP" ]; then
             SYNC_GROUPS="$ONLY_GROUP"
           else
-            SYNC_GROUPS="1 2 3 4 5 6"
+            SYNC_GROUPS="1 2 3 4 5 6 7 8 9 10"
           fi
 
           FAILED=""
@@ -137,7 +140,7 @@ jobs:
 
             # Let the finished session lapse before the next group logs in, so
             # Petpooja never sees two logins at once.
-            sleep 10
+            sleep 15
           done
 
           if [ -n "$FAILED" ]; then

@@ -47,25 +47,32 @@ architecture, not an obstacle to it.
 
 A full sync runs **240–285 s**, right against Vercel Hobby's `maxDuration: 300`,
 and the first hosted attempt died with `FUNCTION_INVOCATION_TIMEOUT`. So the
-reports are split into six groups and the workflow calls them one after the
+reports are split into groups and the workflow calls them one after the
 other (never in parallel — they write the same metric rows):
 
-| Group | Reports | Measured |
+| Group | Report | Measured (fast day) |
 |---|---|---|
-| 1 | `captain`, `pax` | ~110 s |
-| 2 | `item` (8.4 MB Item Report) | ~75 s |
-| 3 | `gstn`, `due_payment` | ~128 s |
-| 4 | `executive`, `kot` (KOT needs the Base Menu too) | ~146 s |
-| 5 | `inventory` (wastage), `purchase_invoices` | ~143 s |
-| 6 | `purchase_returns` (debit notes) | ~109 s |
+| 1 | `captain` | ~60 s |
+| 2 | `pax` | ~50 s |
+| 3 | `item` (8.4 MB Item Report) | ~75 s |
+| 4 | `gstn` (Corporate GSTN Summary) | ~70 s |
+| 5 | `due_payment` | ~60 s |
+| 6 | `executive` (17-sheet workbook) | ~80 s |
+| 7 | `kot` (needs the Base Menu too) | ~70 s |
+| 8 | `inventory` (wastage) | ~70 s |
+| 9 | `purchase_invoices` | ~75 s |
+| 10 | `purchase_returns` (debit notes) | ~110 s |
 
 **The groups are sized for a slow day, not a fast one.** Petpooja's pages can
 take twice as long to load; a group that fits on a good day but not on a bad
 one fails the whole nightly run. An earlier four-group layout put gstn +
 due_payment + executive + kot together, which measured 188 s on a fast day and
-went past 300 s on a slow day.
+went past 300 s on a slow day. A six-group layout (two reports each) also went
+past the ceiling on a slow afternoon — groups 4 and 5 came back **HTTP 504**
+after exactly 300 s. **One report per group** is the layout that survives a bad
+day; the extra cost is one login.
 
-- `?group=1|2|3|4|5|6` selects one group; `?reports=a,b` selects an explicit
+- `?group=1..10` selects one group; `?reports=a,b` selects an explicit
   set; **no parameter runs everything** — that is the local-computer path and
   it is unchanged.
 - `SYNC_GROUP` / `SYNC_REPORTS` (env) are the underlying switches, read by

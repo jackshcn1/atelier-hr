@@ -56,20 +56,35 @@ function loadLocalConfig() {
 
 // Report selection. A full sync takes longer than a serverless function's
 // maximum duration, so the reports are split into groups that each fit.
-// Set SYNC_GROUP=1|2|3|4|5, or SYNC_REPORTS=captain,pax for an explicit set.
+// Set SYNC_GROUP=1..10, or SYNC_REPORTS=captain,pax for an explicit set.
 // With neither set, every report runs — the local computer path is unchanged.
 //
 // The groups are sized for a *slow* day, not a fast one: Petpooja's pages can
 // take twice as long to load, and a group that fits on a good day but not on a
 // bad one fails the whole nightly run.
+//
+// There is now one report per group. A serverless function may run for at most
+// 300 seconds, and a slow Petpooja afternoon pushed the old two-report groups
+// past that ceiling — the run came back with HTTP 504 for the groups that were
+// too big. One report per group keeps every request well inside the limit and
+// costs only one extra login.
 export const REPORT_GROUPS = {
-  1: ['captain', 'pax'],
-  2: ['item'],
-  3: ['gstn', 'due_payment'],
-  4: ['executive', 'kot'],
-  5: ['inventory', 'purchase_invoices'],
-  6: ['purchase_returns'],
+  1: ['captain'],
+  2: ['pax'],
+  3: ['item'],
+  4: ['gstn'],
+  5: ['due_payment'],
+  6: ['executive'],
+  7: ['kot'],
+  8: ['inventory'],
+  9: ['purchase_invoices'],
+  10: ['purchase_returns'],
 };
+
+// The login gets one time budget for every attempt it makes. A serverless
+// function may run for 300 seconds in total and the reports need most of that,
+// so the login may not spend the whole request.
+const LOGIN_BUDGET_MS = 150000;
 
 // Every report the engine knows about, used to reject a bad group or report
 // name instead of quietly running nothing.
@@ -389,6 +404,19 @@ export async function runPetpoojaSync(options = {}) {
         'Accept-Language': 'en-US,en;q=0.9'
       }
     });
+
+    // The pages we drive are single-page apps. On the serverless CPU the
+    // images, fonts and trackers are what stop the app from painting its form
+    // in time — the login form then sits in the DOM but stays invisible.
+    // None of them are needed to read a report, so they are never fetched.
+    await context.route('**/*', (route) => {
+      const type = route.request().resourceType();
+      if (type === 'image' || type === 'font' || type === 'media') {
+        return route.abort();
+      }
+      return route.continue();
+    });
+
     page = await context.newPage();
   }
 
@@ -561,14 +589,18 @@ export async function runPetpoojaSync(options = {}) {
 
   // 3. Login to Petpooja Billing (2-Step Form)
   //
-  // The login page is flaky on the serverless browser: sometimes the form is
-  // in the DOM but not yet painted (the fill times out with "element is not
-  // visible"), and sometimes the second step never appears because the page
-  // did not accept the email. Both clear up on a fresh load of the page, so
-  // every step waits for a *visible* field and the whole login is retried.
+  // The login page is flaky on the serverless browser, in three separate ways:
+  // the page sometimes fails to load at all (chrome-error://chromewebdata/),
+  // sometimes the app boots but never paints the form (it sits in the DOM,
+  // invisible), and sometimes the second step never appears. A fresh browser
+  // and a fresh load of the page fix all three, so the login retries — but
+  // every attempt and every browser restart shares ONE time budget, because a
+  // serverless function may only run for 300 seconds and the reports still
+  // need most of that.
   async function loginToPetpooja() {
     const EMAIL = '#UserEmail, input[name="data[User][email]"], input[placeholder*="Email"]';
     const PASS = '#UserPassword, input[name="data[User][password]"], input[type="password"]';
+    const deadline = Date.now() + LOGIN_BUDGET_MS;
 
     // What the page is actually showing. This is the difference between
     // "still loading" and "Petpooja is telling us something", and it is the
@@ -582,11 +614,27 @@ export async function runPetpoojaSync(options = {}) {
       }
     };
 
-    console.log('🔐 Navigating to Petpooja Billing (https://billing.petpooja.com/)...');
+    const left = () => Math.max(0, deadline - Date.now());
 
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await page.goto('https://billing.petpooja.com/', { waitUntil: 'load', timeout: 45000 })
-        .catch(() => {});
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      if (left() <= 5000) break;
+
+      // A browser that died is replaced, not reloaded.
+      let dead = false;
+      try {
+        await page.goto('https://billing.petpooja.com/', { waitUntil: 'load', timeout: Math.min(45000, left()) })
+          .catch((err) => { if (/closed|Target closed/i.test(err.message)) dead = true; });
+      } catch (err) {
+        if (/closed|Target closed/i.test(err.message)) dead = true;
+      }
+      if (dead) {
+        console.error(`  ⚠️ Browser died before the login (attempt ${attempt}/5) — starting a fresh one.`);
+        await closeBrowser();
+        await new Promise(r => setTimeout(r, 5000));
+        await openBrowser();
+        continue;
+      }
+
       await page.waitForTimeout(4000);
 
       console.log(`  Current Page URL: ${page.url()}`);
@@ -594,11 +642,13 @@ export async function runPetpoojaSync(options = {}) {
       console.log(`  Total input tags found on page: ${await page.locator('input').count()}`);
 
       // Step 1: Email / Username — it must be *visible*, not merely present.
+      // The wait is generous on purpose: the app is slow to boot on the
+      // serverless CPU, and reloading too early restarts that boot for ever.
       const emailInput = page.locator(EMAIL).first();
-      const emailReady = await emailInput.waitFor({ state: 'visible', timeout: 20000 })
+      const emailReady = await emailInput.waitFor({ state: 'visible', timeout: Math.min(40000, left()) })
         .then(() => true).catch(() => false);
       if (!emailReady) {
-        console.error(`  ⚠️ Login form not visible (attempt ${attempt}/3). Page says: ${await pageText()}`);
+        console.error(`  ⚠️ Login form not visible (attempt ${attempt}/5). Page says: ${await pageText()}`);
         continue;
       }
 
@@ -610,10 +660,10 @@ export async function runPetpoojaSync(options = {}) {
 
       // Step 2: Password — it only appears once the email step is accepted.
       const passInput = page.locator(PASS).first();
-      const passReady = await passInput.waitFor({ state: 'visible', timeout: 25000 })
+      const passReady = await passInput.waitFor({ state: 'visible', timeout: Math.min(30000, left()) })
         .then(() => true).catch(() => false);
       if (!passReady) {
-        console.error(`  ⚠️ Password box never appeared (attempt ${attempt}/3). Page says: ${await pageText()}`);
+        console.error(`  ⚠️ Password box never appeared (attempt ${attempt}/5). Page says: ${await pageText()}`);
         continue;
       }
 
@@ -631,34 +681,17 @@ export async function runPetpoojaSync(options = {}) {
       // A login that did not land on the dashboard did not succeed, however
       // cheerful the form looked.
       if (!/dashboard/i.test(page.url())) {
-        throw new Error(`Login did not reach the dashboard (landed on ${page.url()}). Page says: ${await pageText()}`);
+        console.error(`  ⚠️ Login did not reach the dashboard. Page says: ${await pageText()}`);
+        continue;
       }
       return;
     }
 
-    throw new Error(`Petpooja login did not complete after 3 attempts. Last page said: ${await pageText()}`);
+    throw new Error(`Petpooja login did not complete. Last page said: ${await pageText()}`);
   }
 
-  // A dead browser or an unusable login page means the session never started,
-  // not that a report is broken. Start a fresh browser and try again before
-  // failing the whole group — a group that restarts costs one login, while a
-  // failed group costs the whole daily sync.
-  const isRetryableLogin = (err) => /has been closed|Target closed|Connection closed|browser.*closed|login did not complete|Timeout .* exceeded/i.test(err?.message || '');
-
   try {
-    for (let attempt = 1; ; attempt++) {
-      try {
-        await loginToPetpooja();
-        break;
-      } catch (err) {
-        if (!isRetryableLogin(err) || attempt >= 3) throw err;
-        console.error(`  ⚠️ Login failed (attempt ${attempt}/3): ${err.message}`);
-        console.error('  ⚠️ Starting a fresh browser and retrying in 15s...');
-        await closeBrowser();
-        await new Promise(r => setTimeout(r, 15000));
-        await openBrowser();
-      }
-    }
+    await loginToPetpooja();
 
     // Helper: download custom report and return sheet rows
     // `sheetMatch` picks the sheet to read when a report spreads its sections
