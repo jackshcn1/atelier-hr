@@ -70,6 +70,21 @@ async function handle(req) {
       push(`📅 Overriding period: ${start} → ${end}`);
     }
 
+    // A full sync is longer than a serverless function may run, so the
+    // reports are split into groups that each fit. ?group=1|2|3 runs one
+    // group; ?reports=captain,pax runs an explicit set; no parameter runs
+    // everything (the local-computer path).
+    const group = params.get('group');
+    const reports = params.get('reports');
+    if (group) {
+      process.env.SYNC_GROUP = group;
+      push(`📦 Report group: ${group}`);
+    }
+    if (reports) {
+      process.env.SYNC_REPORTS = reports;
+      push(`📦 Reports: ${reports}`);
+    }
+
     push('🌐 Starting Petpooja sync on Vercel...');
     const result = await runPetpoojaSync();
 

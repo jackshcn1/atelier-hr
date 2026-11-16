@@ -7,6 +7,10 @@ name: Petpooja Variable Pay Automated Sync
 # cannot reach billing.petpooja.com at all. Vercel (AWS egress) is allowed,
 # so this workflow only schedules the request and collects the result.
 #
+# The sync is split into three report groups because a full run is longer than
+# a serverless function is allowed to run. The groups are called one after the
+# other so they never race on the same metric rows.
+#
 # Schedule is UTC (GitHub cron is always UTC):
 #   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * *'
 on:
@@ -22,6 +26,9 @@ on:
       end_date:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
+      group:
+        description: 'Run only one report group (1, 2, 3). Leave empty to run all three.'
+        required: false
 
 # Never let two syncs overlap — they would race on the same metric rows.
 concurrency:
@@ -31,36 +38,61 @@ concurrency:
 jobs:
   sync-petpooja:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Request the Petpooja sync
         env:
           SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
           SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          ONLY_GROUP: ${{ inputs.group }}
         run: |
+          set -u
           if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
             echo "::error::VERCEL_SYNC_URL and VERCEL_SYNC_SECRET must be configured as repository secrets."
             exit 1
           fi
 
-          URL="$SYNC_URL"
-          if [ -n "${{ inputs.start_date }}" ] && [ -n "${{ inputs.end_date }}" ]; then
-            URL="$SYNC_URL?start=${{ inputs.start_date }}&end=${{ inputs.end_date }}"
-            echo "Overriding period: ${{ inputs.start_date }} -> ${{ inputs.end_date }}"
+          if [ -n "$START_DATE" ] && [ -n "$END_DATE" ]; then
+            PERIOD="start=$START_DATE&end=$END_DATE"
+            echo "Overriding period: $START_DATE -> $END_DATE"
+          else
+            PERIOD=""
           fi
 
-          STATUS=$(curl -sS -o response.json -w '%{http_code}' -X POST "$URL" \
-            -H "x-sync-secret: $SYNC_SECRET" \
-            -H 'Content-Type: application/json' \
-            --max-time 900) || STATUS="000"
+          # A manual run may target a single group; the scheduled run does all three.
+          if [ -n "$ONLY_GROUP" ]; then
+            GROUPS="$ONLY_GROUP"
+          else
+            GROUPS="1 2 3"
+          fi
 
-          echo "HTTP $STATUS"
-          head -c 4000 response.json || true
-          echo ""
+          FAILED=""
+          for G in $GROUPS; do
+            echo ""
+            echo "=== Report group $G ==="
+            URL="$SYNC_URL?group=$G"
+            [ -n "$PERIOD" ] && URL="$URL&$PERIOD"
 
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Petpooja sync failed with HTTP $STATUS"
+            STATUS=$(curl -sS -o "response-group-$G.json" -w '%{http_code}' -X POST "$URL" \
+              -H "x-sync-secret: $SYNC_SECRET" \
+              -H 'Content-Type: application/json' \
+              --max-time 600) || STATUS="000"
+
+            echo "HTTP $STATUS"
+            head -c 4000 "response-group-$G.json" || true
+            echo ""
+
+            if [ "$STATUS" != "200" ]; then
+              echo "::error::Report group $G failed with HTTP $STATUS"
+              FAILED="$FAILED $G"
+            fi
+          done
+
+          if [ -n "$FAILED" ]; then
+            echo "::error::Failed report groups:$FAILED"
             exit 1
           fi
 
@@ -71,9 +103,12 @@ jobs:
             echo "### Petpooja daily sync"
             echo
             echo "- Finished: $(date -u '+%Y-%m-%d %H:%M UTC')"
-            if [ -f response.json ]; then
+            for f in response-group-*.json; do
+              [ -e "$f" ] || continue
+              echo ""
+              echo "#### ${f%.json}"
               echo '```json'
-              head -c 4000 response.json
+              head -c 2000 "$f"
               echo '```'
-            fi
+            done
           } >> "$GITHUB_STEP_SUMMARY"

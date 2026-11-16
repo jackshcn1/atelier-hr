@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import { existsSync, readFileSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   parseCaptainPerformance,
@@ -51,6 +52,62 @@ function loadLocalConfig() {
     if (process.env[k] === undefined) process.env[k] = String(v ?? '');
   }
   return cfg;
+}
+
+// Report selection. A full sync takes longer than a serverless function's
+// maximum duration, so the reports are split into groups that each fit.
+// Set SYNC_GROUP=1|2|3, or SYNC_REPORTS=captain,pax for an explicit set.
+// With neither set, every report runs — the local computer path is unchanged.
+const REPORT_GROUPS = {
+  1: ['captain', 'pax', 'item'],
+  2: ['gstn', 'due_payment', 'executive', 'kot'],
+  3: ['inventory', 'purchase_invoices', 'purchase_returns'],
+};
+
+function reportEnabled(name) {
+  const explicit = process.env.SYNC_REPORTS;
+  if (explicit) {
+    return explicit.split(',').map((s) => s.trim()).filter(Boolean).includes(name);
+  }
+  const group = process.env.SYNC_GROUP;
+  if (group) {
+    const list = REPORT_GROUPS[Number(group)] || [];
+    return list.includes(name);
+  }
+  return true;
+}
+
+// The Google Sheets customer-feedback pull is not a Petpooja report, but it
+// shares the same pay period and writes to the same metric rows. When the
+// run is split into groups it must run only once — the last group — so the
+// values are not written over and over.
+function feedbackEnabled() {
+  if (process.env.SYNC_REPORTS) return false; // an explicit report list means Petpooja only
+  const group = process.env.SYNC_GROUP;
+  if (!group) return true;
+  return Number(group) === 3;
+}
+
+// Download timeout for report files. The default suits a local desktop; a
+// serverless runner is slower and needs longer for the large Item Report.
+const DOWNLOAD_TIMEOUT = Number(process.env.PETPOOJA_DOWNLOAD_TIMEOUT || 35000);
+
+// Debug screenshots are diagnostic only. The working directory is read-only
+// on a serverless runtime, so fall back to a temp directory — and never let a
+// failed screenshot mask the real error it was meant to capture.
+async function saveDebugScreenshot(page, name, options = {}) {
+  const file = `debug-${name.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+  const dir = process.env.PETPOOJA_DEBUG_DIR
+    || (existsSync(join(process.cwd(), 'scripts')) ? 'scripts' : tmpdir());
+  const filePath = join(dir, file);
+  try {
+    await page.screenshot({ path: filePath, fullPage: true, ...options });
+    console.log(`  📸 Saved screenshot to ${filePath}`);
+    return filePath;
+  } catch (e) {
+    console.warn(`  📸 Could not save screenshot to ${filePath}: ${e.message}`);
+    return null;
+  }
 }
 
 // Calculate active 20th–19th payroll cycle (e.g. 2026-09-20 to 2026-10-19 when today is Sep 29)
@@ -489,11 +546,11 @@ export async function runPetpoojaSync(options = {}) {
           }
         }
 
-        await downloadLink.waitFor({ state: 'visible', timeout: 35000 });
+        await downloadLink.waitFor({ state: 'visible', timeout: DOWNLOAD_TIMEOUT });
 
         console.log('  ✓ Clicking underlined Download link in queue table...');
         const downloadPromise = new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
+          const timer = setTimeout(() => reject(new Error('Download timeout')), DOWNLOAD_TIMEOUT);
           page.once('download', dl => { clearTimeout(timer); resolve(dl); });
           context.once('page', async p => {
             p.once('download', dl => { clearTimeout(timer); resolve(dl); });
@@ -515,7 +572,7 @@ export async function runPetpoojaSync(options = {}) {
       if (url.includes('all_restaurant_orders')) {
         console.log('  Handling Corporate GSTN Orders Export (Export all)...');
         const downloadPromise = new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
+          const timer = setTimeout(() => reject(new Error('Download timeout')), DOWNLOAD_TIMEOUT);
           page.once('download', dl => { clearTimeout(timer); resolve(dl); });
           context.once('page', async p => {
             p.once('download', dl => { clearTimeout(timer); resolve(dl); });
@@ -563,9 +620,7 @@ export async function runPetpoojaSync(options = {}) {
           }
 
           // Take a debug screenshot before looking for Export
-          const debugPath = `scripts/debug-Wastage-before-export.png`;
-          await page.screenshot({ path: debugPath, fullPage: false });
-          console.log(`  📸 Saved screenshot to ${debugPath}`);
+          await saveDebugScreenshot(page, 'Wastage-before-export', { fullPage: false });
         }
 
         // Look for the Export button (it's a dropdown toggle)
@@ -576,7 +631,7 @@ export async function runPetpoojaSync(options = {}) {
         await page.waitForTimeout(1500);
 
         const downloadPromise = new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Download timeout')), 35000);
+          const timer = setTimeout(() => reject(new Error('Download timeout')), DOWNLOAD_TIMEOUT);
           page.once('download', dl => { clearTimeout(timer); resolve(dl); });
           context.once('page', async p => {
             p.once('download', dl => { clearTimeout(timer); resolve(dl); });
@@ -646,17 +701,15 @@ export async function runPetpoojaSync(options = {}) {
       }
 
       if (!targetBtn || (await targetBtn.count()) === 0) {
-        const debugPath = `scripts/debug-${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
-        await page.screenshot({ path: debugPath, fullPage: true });
-        console.error(`  ❌ Excel button not found with any selector. Saved screenshot to ${debugPath}`);
-        throw new Error(`Excel button not found on ${reportName}. Screenshot saved to ${debugPath}`);
+        const debugPath = await saveDebugScreenshot(page, reportName);
+        throw new Error(`Excel button not found on ${reportName}.${debugPath ? ` Screenshot saved to ${debugPath}` : ''}`);
       }
 
       console.log(`  ✓ Found Excel button using selector: "${matchedSelector}"`);
       let download = null;
 
       try {
-        const downloadPromise = page.waitForEvent('download', { timeout: 35000 });
+        const downloadPromise = page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT });
         await targetBtn.click({ force: true });
 
         // Check if an export sub-menu opened
@@ -669,8 +722,7 @@ export async function runPetpoojaSync(options = {}) {
 
         download = await downloadPromise;
       } catch (dlErr) {
-        const debugPath = `scripts/debug-${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
-        await page.screenshot({ path: debugPath, fullPage: true });
+        await saveDebugScreenshot(page, reportName);
         throw new Error(`Download timed out or failed on ${reportName}: ${dlErr.message}`);
       }
 
@@ -687,516 +739,526 @@ export async function runPetpoojaSync(options = {}) {
     let successfulReports = 0;
     let failedReports = 0;
 
-    // REPORT 1: Captain Performance Report (#27)
-    try {
-      const captainRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/27', 'Captain Performance Report');
-      const capResult = parseCaptainPerformance(captainRows, cycle);
-      if (capResult.ok && capResult.captains) {
-        for (const cap of capResult.captains) {
-          const emp = findEmployeeByName(cap.name, employees);
-          if (emp) {
-            await saveMetric('cap_sales', cap.total, 'petpooja', 'Captain Performance Report', {
-              scheme_name: 'service_captain',
-              captain_name: cap.name
-            }, emp.employee_id);
+    if (reportEnabled('captain')) {
+      try {
+        const captainRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/27', 'Captain Performance Report');
+        const capResult = parseCaptainPerformance(captainRows, cycle);
+        if (capResult.ok && capResult.captains) {
+          for (const cap of capResult.captains) {
+            const emp = findEmployeeByName(cap.name, employees);
+            if (emp) {
+              await saveMetric('cap_sales', cap.total, 'petpooja', 'Captain Performance Report', {
+                scheme_name: 'service_captain',
+                captain_name: cap.name
+              }, emp.employee_id);
+            }
           }
+          // Save team total for helpers
+          await saveMetric('hlp_team_sales', capResult.teamTotal, 'petpooja', 'Captain Performance Report', {
+            scheme_name: 'service_helpers',
+            team_total: capResult.teamTotal
+          });
+          successfulReports++;
         }
-        // Save team total for helpers
-        await saveMetric('hlp_team_sales', capResult.teamTotal, 'petpooja', 'Captain Performance Report', {
-          scheme_name: 'service_helpers',
-          team_total: capResult.teamTotal
-        });
-        successfulReports++;
+      } catch (e) {
+        failedReports++;
+        console.error('⚠️ Could not sync Captain Performance Report:', e.message);
       }
-    } catch (e) {
-      failedReports++;
-      console.error('⚠️ Could not sync Captain Performance Report:', e.message);
     }
 
-    // REPORT 2: Pax Sales Report (#61)
-    try {
-      const paxRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/61', 'Pax Sales Report');
-      const paxResult = parsePaxSales(paxRows, cycle);
-      if (paxResult.ok && paxResult.people) {
-        for (const person of paxResult.people) {
-          const emp = findEmployeeByName(person.name, employees);
-          if (emp) {
-            await saveMetric('cap_pax_avg', person.apc, 'petpooja', 'Pax Sales Report', {
-              scheme_name: 'service_captain',
-              pax: person.pax,
-              sales: person.sales
-            }, emp.employee_id);
+    if (reportEnabled('pax')) {
+      try {
+        const paxRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/61', 'Pax Sales Report');
+        const paxResult = parsePaxSales(paxRows, cycle);
+        if (paxResult.ok && paxResult.people) {
+          for (const person of paxResult.people) {
+            const emp = findEmployeeByName(person.name, employees);
+            if (emp) {
+              await saveMetric('cap_pax_avg', person.apc, 'petpooja', 'Pax Sales Report', {
+                scheme_name: 'service_captain',
+                pax: person.pax,
+                sales: person.sales
+              }, emp.employee_id);
+            }
           }
+          successfulReports++;
         }
-        successfulReports++;
+      } catch (e) {
+        failedReports++;
+        console.error('⚠️ Could not sync Pax Sales Report:', e.message);
       }
-    } catch (e) {
-      failedReports++;
-      console.error('⚠️ Could not sync Pax Sales Report:', e.message);
     }
 
-    // REPORT 3: Counter Sales & Delivery Sales / Item Report (#65)
-    try {
-      const itemRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/65', 'Item Report (Counter & Delivery Sales)');
-
-      // A. Calculate Counter Sales
-      const counterResult = parseCounterSales(itemRows, cycle);
-      if (counterResult.ok) {
-        console.log('  📊 Counter Sales breakdown by category:', JSON.stringify(counterResult.byCategory));
-        console.log(`  📊 Total Counter Sales: ₹${counterResult.total} across ${counterResult.itemsCounted || 0} items`);
-        await saveMetric('b2b_counter_sales', counterResult.total, 'petpooja', 'Item Report (Counter Sales)', {
-          scheme_name: 'b2b_counter',
-          byCategory: counterResult.byCategory
-        });
-        successfulReports++;
+    if (reportEnabled('item')) {
+      try {
+        const itemRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/65', 'Item Report (Counter & Delivery Sales)');
+  
+        // A. Calculate Counter Sales
+        const counterResult = parseCounterSales(itemRows, cycle);
+        if (counterResult.ok) {
+          console.log('  📊 Counter Sales breakdown by category:', JSON.stringify(counterResult.byCategory));
+          console.log(`  📊 Total Counter Sales: ₹${counterResult.total} across ${counterResult.itemsCounted || 0} items`);
+          await saveMetric('b2b_counter_sales', counterResult.total, 'petpooja', 'Item Report (Counter Sales)', {
+            scheme_name: 'b2b_counter',
+            byCategory: counterResult.byCategory
+          });
+          successfulReports++;
+        }
+  
+        // B. Calculate Delivery Sales (Swiggy + Zomato) directly from the same master item report
+        const itemDeliveryResult = parseDeliverySales(itemRows, cycle);
+        if (itemDeliveryResult.ok && itemDeliveryResult.total > 0) {
+          console.log('  📊 Delivery Sales breakdown from Item Report:', JSON.stringify(itemDeliveryResult.byChannel));
+          console.log(`  📊 Total Delivery Sales: ₹${itemDeliveryResult.total} across ${itemDeliveryResult.orders || 0} rows`);
+          await saveMetric('acc_delivery_sales', itemDeliveryResult.total, 'petpooja', 'Item Report (Delivery Sales)', {
+            scheme_name: 'accounting',
+            byChannel: itemDeliveryResult.byChannel
+          });
+          successfulReports++;
+        }
+      } catch (e) {
+        failedReports++;
+        console.error('⚠️ Could not sync Counter & Delivery Sales from Item Report:', e.message);
       }
-
-      // B. Calculate Delivery Sales (Swiggy + Zomato) directly from the same master item report
-      const itemDeliveryResult = parseDeliverySales(itemRows, cycle);
-      if (itemDeliveryResult.ok && itemDeliveryResult.total > 0) {
-        console.log('  📊 Delivery Sales breakdown from Item Report:', JSON.stringify(itemDeliveryResult.byChannel));
-        console.log(`  📊 Total Delivery Sales: ₹${itemDeliveryResult.total} across ${itemDeliveryResult.orders || 0} rows`);
-        await saveMetric('acc_delivery_sales', itemDeliveryResult.total, 'petpooja', 'Item Report (Delivery Sales)', {
-          scheme_name: 'accounting',
-          byChannel: itemDeliveryResult.byChannel
-        });
-        successfulReports++;
-      }
-    } catch (e) {
-      failedReports++;
-      console.error('⚠️ Could not sync Counter & Delivery Sales from Item Report:', e.message);
     }
 
-    // REPORT 5: All Restaurant Orders with GSTN (pulled for T-99 days to verify new unique clients)
-    try {
-      const today = new Date();
-      const past99 = new Date(today);
-      past99.setDate(today.getDate() - 99);
-      const start99 = past99.toISOString().slice(0, 10);
-      const b2bQueryCycle = {
-        ...cycle,
-        start: start99,
-        queryEnd: cycle.queryEnd || cycle.end
-      };
-
-      console.log(`  Pulling Corporate GSTN summary for 100 days history (${start99} to ${b2bQueryCycle.queryEnd})...`);
-      const gstRows = await fetchCustomReport('https://billing.petpooja.com/reports/all_restaurant_orders/all', 'Corporate GSTN Summary', b2bQueryCycle);
-      const b2bResult = parseB2bGstOrders(gstRows, cycle);
-      if (b2bResult.ok) {
-        console.log(`  📊 B2B Revenue in period: ₹${b2bResult.totalRevenue} across ${b2bResult.ordersInPeriod} orders`);
-        console.log(`  📊 New B2B Clients: ${b2bResult.newCustomerCount} (historical clients seen: ${b2bResult.historicalGstins})`);
-        await saveMetric('b2b_rev', b2bResult.totalRevenue, 'petpooja', 'Corporate GSTN Summary', {
-          scheme_name: 'b2b_counter',
-          ordersInPeriod: b2bResult.ordersInPeriod
-        });
-        await saveMetric('b2b_clients', b2bResult.newCustomerCount, 'petpooja', 'Corporate GSTN Summary', {
-          scheme_name: 'b2b_counter',
-          newCustomers: b2bResult.newCustomers
-        });
-        successfulReports++;
+    if (reportEnabled('gstn')) {
+      try {
+        const today = new Date();
+        const past99 = new Date(today);
+        past99.setDate(today.getDate() - 99);
+        const start99 = past99.toISOString().slice(0, 10);
+        const b2bQueryCycle = {
+          ...cycle,
+          start: start99,
+          queryEnd: cycle.queryEnd || cycle.end
+        };
+  
+        console.log(`  Pulling Corporate GSTN summary for 100 days history (${start99} to ${b2bQueryCycle.queryEnd})...`);
+        const gstRows = await fetchCustomReport('https://billing.petpooja.com/reports/all_restaurant_orders/all', 'Corporate GSTN Summary', b2bQueryCycle);
+        const b2bResult = parseB2bGstOrders(gstRows, cycle);
+        if (b2bResult.ok) {
+          console.log(`  📊 B2B Revenue in period: ₹${b2bResult.totalRevenue} across ${b2bResult.ordersInPeriod} orders`);
+          console.log(`  📊 New B2B Clients: ${b2bResult.newCustomerCount} (historical clients seen: ${b2bResult.historicalGstins})`);
+          await saveMetric('b2b_rev', b2bResult.totalRevenue, 'petpooja', 'Corporate GSTN Summary', {
+            scheme_name: 'b2b_counter',
+            ordersInPeriod: b2bResult.ordersInPeriod
+          });
+          await saveMetric('b2b_clients', b2bResult.newCustomerCount, 'petpooja', 'Corporate GSTN Summary', {
+            scheme_name: 'b2b_counter',
+            newCustomers: b2bResult.newCustomers
+          });
+          successfulReports++;
+        }
+      } catch (e) {
+        failedReports++;
+        console.error('⚠️ Could not sync GSTN Orders Report:', e.message);
       }
-    } catch (e) {
-      failedReports++;
-      console.error('⚠️ Could not sync GSTN Orders Report:', e.message);
     }
 
-    // REPORT 6: Due Payment Report (#73 - from March 04, 2026 to check aged unpaid invoices)
-    try {
-      const dueQueryCycle = {
-        ...cycle,
-        start: '2026-03-04',
-        queryEnd: cycle.queryEnd || cycle.end
-      };
-      console.log(`  Pulling Due Payment report from March 04, 2026 (${dueQueryCycle.start} to ${dueQueryCycle.queryEnd})...`);
-      const dueRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/73', 'Due Payment Report', dueQueryCycle);
-      const creditResult = parseCreditRecovery(dueRows, { end: cycle.end, maxAgeDays: 30 });
-      if (creditResult.ok) {
-        console.log(`  📊 B2B Credit Recovery: Pass=${creditResult.pass}, Overdue=${creditResult.overdueCount}, Outstanding=₹${creditResult.outstandingAmount}`);
-        await saveMetric('b2b_credit', creditResult.pass ? 1 : 0, 'petpooja', 'Due Payment Report', {
-          scheme_name: 'b2b_counter',
-          overdueCount: creditResult.overdueCount,
-          outstandingAmount: creditResult.outstandingAmount
-        });
-        successfulReports++;
+    if (reportEnabled('due_payment')) {
+      try {
+        const dueQueryCycle = {
+          ...cycle,
+          start: '2026-03-04',
+          queryEnd: cycle.queryEnd || cycle.end
+        };
+        console.log(`  Pulling Due Payment report from March 04, 2026 (${dueQueryCycle.start} to ${dueQueryCycle.queryEnd})...`);
+        const dueRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/73', 'Due Payment Report', dueQueryCycle);
+        const creditResult = parseCreditRecovery(dueRows, { end: cycle.end, maxAgeDays: 30 });
+        if (creditResult.ok) {
+          console.log(`  📊 B2B Credit Recovery: Pass=${creditResult.pass}, Overdue=${creditResult.overdueCount}, Outstanding=₹${creditResult.outstandingAmount}`);
+          await saveMetric('b2b_credit', creditResult.pass ? 1 : 0, 'petpooja', 'Due Payment Report', {
+            scheme_name: 'b2b_counter',
+            overdueCount: creditResult.overdueCount,
+            outstandingAmount: creditResult.outstandingAmount
+          });
+          successfulReports++;
+        }
+      } catch (e) {
+        failedReports++;
+        console.error('⚠️ Could not sync Due Payment Report:', e.message);
       }
-    } catch (e) {
-      failedReports++;
-      console.error('⚠️ Could not sync Due Payment Report:', e.message);
     }
 
     
-    // REPORT 7: Executive Sales Summary (#All)
-    try {
-      console.log("📥 Fetching Executive Sales Summary...");
-      const execRows = await fetchCustomReport("https://billing.petpooja.com/reports/executive_sales_summary/all", "Executive Sales Summary", cycle);
-      const execResult = parseExecutiveOrderTypes(execRows);
-      if (execResult.ok) {
-        console.log("  📊 Executive Sales breakdown:", JSON.stringify(execResult.data));
-        await saveMetric("rev_dine_in", execResult.data.dine_in, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
-        await saveMetric("rev_delivery", execResult.data.delivery, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
-        await saveMetric("rev_pick_up", execResult.data.pick_up, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
-        successfulReports++;
-      }
-    } catch (e) {
-      failedReports++;
-      console.error("⚠️ Could not sync Executive Sales Summary:", e.message);
-    }
-// REPORT 6B: Kitchen Prep Time Report (#78 - KOT itemwise with preparation times)
-    try {
-      console.log('📥 Fetching Kitchen Prep Time Report...');
-
-      // Base Menu cache directory
-      const cacheDir = join(__dirname, '../.claude/base-menu-cache');
-      const cacheFile = join(cacheDir, 'base-menu.json');
-      const CACHE_DAYS = 15; // Refresh Base Menu every 15 days
-
-      let baseMenuRows = null;
-      let usedCache = false;
-
-      // Check if cached Base Menu exists and is fresh
-      if (existsSync(cacheFile)) {
-        try {
-          const cache = JSON.parse(readFileSync(cacheFile, 'utf8'));
-          const cacheAge = Math.floor((Date.now() - new Date(cache.timestamp)) / (1000 * 60 * 60 * 24));
-
-          if (cacheAge < CACHE_DAYS) {
-            baseMenuRows = cache.rows;
-            usedCache = true;
-            console.log(`  ✓ Using cached Base Menu (${cacheAge} days old, ${baseMenuRows.length} rows)`);
-          } else {
-            console.log(`  ℹ️ Base Menu cache is ${cacheAge} days old (>${CACHE_DAYS} days), will refresh...`);
-          }
-        } catch (e) {
-          console.log('  ⚠️ Could not read Base Menu cache, will download fresh:', e.message);
-        }
-      }
-
-      // Download Base Menu if not cached or cache is stale
-      if (!baseMenuRows) {
-        try {
-          console.log('  📥 Fetching Base Menu export from menu.petpooja.com...');
-          await page.goto('https://menu.petpooja.com/menus/menu_item_list_new', { waitUntil: 'load', timeout: 30000 });
-          await page.waitForTimeout(3000);
-
-          // Step 1: Click "Quick Actions" button
-          const quickActionsBtn = page.locator('button:visible:has-text("Quick Actions"), a:visible:has-text("Quick Actions"), .btn:visible:has-text("Quick Actions")').first();
-          await quickActionsBtn.waitFor({ state: 'visible', timeout: 15000 });
-          await quickActionsBtn.click({ force: true });
-          console.log('  ✓ Clicked Quick Actions button');
-          await page.waitForTimeout(2000);
-
-          // Step 2: Click "Download Base Menu [Backup]"
-          const downloadMenuBtn = page.locator('a:visible:has-text("Download Base Menu"), button:visible:has-text("Download Base Menu"), li:visible:has-text("Download Base Menu")').first();
-          await downloadMenuBtn.waitFor({ state: 'visible', timeout: 15000 });
-          await downloadMenuBtn.click({ force: true });
-          console.log('  ✓ Clicked Download Base Menu [Backup]');
-          await page.waitForTimeout(3000);
-
-          // Step 3: Select all Group Categories - CRITICAL STEP
-          // Look for "Select All" checkbox or link
-          const selectAllOptions = [
-            'input[type="checkbox"][id*="select" i][id*="all" i]:visible',
-            'input[type="checkbox"]:visible[value*="all" i]',
-            'label:visible:has-text("Select All")',
-            'a:visible:has-text("Select All")',
-            'button:visible:has-text("Select All")',
-            '.select-all:visible',
-            '#select_all:visible',
-            'input[name="select_all"]:visible'
-          ];
-
-          let selectAllClicked = false;
-          for (const selector of selectAllOptions) {
-            const elem = page.locator(selector).first();
-            if (await elem.count() > 0 && await elem.isVisible().catch(() => false)) {
-              await elem.click({ force: true });
-              console.log(`  ✓ Selected all Group Categories using selector: ${selector}`);
-              selectAllClicked = true;
-              await page.waitForTimeout(1000);
-              break;
-            }
-          }
-
-          if (!selectAllClicked) {
-            // Fallback: find all checkboxes and click them individually
-            const allCheckboxes = page.locator('input[type="checkbox"]:visible');
-            const checkboxCount = await allCheckboxes.count();
-            if (checkboxCount > 0) {
-              console.log(`  ℹ️ Select All not found, clicking ${checkboxCount} checkboxes individually...`);
-              for (let i = 0; i < checkboxCount; i++) {
-                await allCheckboxes.nth(i).click({ force: true }).catch(() => {});
-              }
-              console.log('  ✓ Clicked all category checkboxes');
-            }
-          }
-
-          // Step 4: Click Save/Submit to download the zip
-          const saveBtn = page.locator('button:visible:has-text("Save"), button:visible:has-text("Download"), button[type="submit"]:visible, input[type="submit"]:visible[value*="Save"]').first();
-
-          // Set up download listener before clicking
-          const menuZipPromise = page.waitForEvent('download', { timeout: 45000 });
-
-          console.log('  ✓ Clicking Save button, waiting for download...');
-          await saveBtn.click({ force: true });
-          await page.waitForTimeout(2000);
-
-          const menuZipDownload = await menuZipPromise;
-          const menuZipPath = await menuZipDownload.path();
-          console.log(`  ✓ Downloaded Base Menu zip`);
-
-          // Step 5: Unzip and find the "items" file
-          const AdmZip = await import('adm-zip').then(m => m.default);
-          const zip = new AdmZip(menuZipPath);
-          const zipEntries = zip.getEntries();
-
-          let itemsFile = null;
-          for (const entry of zipEntries) {
-            if (entry.entryName.toLowerCase().startsWith('items') && !entry.isDirectory) {
-              itemsFile = entry;
-              break;
-            }
-          }
-
-          if (itemsFile) {
-            const itemsBuffer = itemsFile.getData();
-            console.log(`  ✓ Found items file: ${itemsFile.entryName} (${itemsBuffer.length} bytes)`);
-            baseMenuRows = parseWorkbookBuffer(itemsBuffer);
-            console.log(`  ✓ Parsed Base Menu: ${baseMenuRows.length} rows`);
-
-            // Cache the Base Menu for future runs
-            const { mkdirSync } = await import('node:fs');
-            mkdirSync(cacheDir, { recursive: true });
-            const cacheData = {
-              timestamp: new Date().toISOString(),
-              rows: baseMenuRows
-            };
-            const { writeFileSync } = await import('node:fs');
-            writeFileSync(cacheFile, JSON.stringify(cacheData));
-            console.log(`  💾 Cached Base Menu for next ${CACHE_DAYS} days`);
-          } else {
-            console.log('  ⚠️ Could not find "items" file in Base Menu zip');
-          }
-        } catch (menuErr) {
-          console.log('  ⚠️ Could not fetch Base Menu, will skip kitchen prep time:', menuErr.message);
-        }
-      }
-
-      if (baseMenuRows && baseMenuRows.length > 0) {
-        // Now fetch the KOT report #78
-        const kotRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/78', 'KOT Preparation Time Report', cycle);
-        const prepResult = parseKitchenPrepTime(kotRows, baseMenuRows, { ...cycle, kitchenCategories });
-        if (prepResult.ok && prepResult.averageMinutes !== null) {
-          console.log(`  📊 Kitchen Prep Time: ${prepResult.averageMinutes} minutes average across ${prepResult.itemsCounted} items`);
-          console.log(`  📊 Breakdown by category:`, JSON.stringify(prepResult.byCategory));
-          if (prepResult.skipped.notOnMenu > 0) console.log(`  ℹ️ Skipped ${prepResult.skipped.notOnMenu} items not found in Base Menu`);
-          if (prepResult.skipped.nonKitchen > 0) console.log(`  ℹ️ Skipped ${prepResult.skipped.nonKitchen} items not in approved kitchen categories`);
-
-          await saveMetric('kit_prep_time', prepResult.averageMinutes, 'petpooja', 'KOT Preparation Time Report', {
-            scheme_name: 'kitchen',
-            itemsCounted: prepResult.itemsCounted,
-            byCategory: prepResult.byCategory,
-            skipped: prepResult.skipped,
-            usedCachedMenu: usedCache
-          });
-          successfulReports++;
-        }
-      }
-    } catch (e) {
-      failedReports++;
-      console.error('⚠️ Could not sync Kitchen Prep Time Report:', e.message);
-    }
-
-    // REPORT 7: Petpooja Inventory (Wastage & Purchase Returns)
-    try {
-      console.log('🔐 Navigating to Petpooja Inventory via SSO...');
-      await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
-      await page.waitForTimeout(2000);
-
-      // Navigate to Inventory module (opens in same page or new tab)
-      const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
-      if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
-        console.log('  ✓ Clicking Inventory in sidebar navigation...');
-        const [newPage] = await Promise.all([
-          context.waitForEvent('page', { timeout: 8000 }).catch(() => null),
-          invLink.click({ force: true })
-        ]);
-        if (newPage) {
-          await newPage.waitForLoadState('load').catch(() => {});
-          await newPage.waitForTimeout(3000);
-        } else {
-          await page.waitForURL(/inventory\.petpooja\.com/, { timeout: 15000 }).catch(() => {});
-          await page.waitForTimeout(3000);
-        }
-      }
-
-      // Wastage download
+    if (reportEnabled('executive')) {
       try {
-        const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report', cycle);
-        const wastageResult = parseWastage(wastageRows, cycle);
-        if (wastageResult.ok) {
-          console.log(`  📊 Total Kitchen Wastage: ₹${wastageResult.total} across ${wastageResult.entries} entries`);
-          if (wastageResult.skippedCancelled > 0) {
-            console.log(`  ℹ️ Skipped ${wastageResult.skippedCancelled} cancelled wastage entries`);
-          }
-          await saveMetric('kit_wastage', wastageResult.total, 'petpooja', 'Wastage Report', {
-            scheme_name: 'kitchen',
-            entries: wastageResult.entries,
-            skippedCancelled: wastageResult.skippedCancelled
-          });
+        console.log("📥 Fetching Executive Sales Summary...");
+        const execRows = await fetchCustomReport("https://billing.petpooja.com/reports/executive_sales_summary/all", "Executive Sales Summary", cycle);
+        const execResult = parseExecutiveOrderTypes(execRows);
+        if (execResult.ok) {
+          console.log("  📊 Executive Sales breakdown:", JSON.stringify(execResult.data));
+          await saveMetric("rev_dine_in", execResult.data.dine_in, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+          await saveMetric("rev_delivery", execResult.data.delivery, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+          await saveMetric("rev_pick_up", execResult.data.pick_up, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
           successfulReports++;
         }
-      } catch (we) {
+      } catch (e) {
         failedReports++;
-        console.error('⚠️ Could not sync Wastage List:', we.message);
+        console.error("⚠️ Could not sync Executive Sales Summary:", e.message);
       }
-
-      // Purchase returns download
+    }
+    if (reportEnabled('kot')) {
       try {
-        const returnRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/purchase_return_list/', 'Purchase Returns', cycle);
-        const returnsResult = parsePurchaseReturns(returnRows, cycle);
-        if (returnsResult.ok) {
-          console.log(`  📊 Total Purchase Returns: ₹${returnsResult.total} across ${returnsResult.entries} debit notes`);
-          if (returnsResult.skippedCancelled > 0) {
-            console.log(`  ℹ️ Skipped ${returnsResult.skippedCancelled} cancelled return entries`);
+        console.log('📥 Fetching Kitchen Prep Time Report...');
+  
+        // Base Menu cache directory
+        const cacheDir = join(__dirname, '../.claude/base-menu-cache');
+        const cacheFile = join(cacheDir, 'base-menu.json');
+        const CACHE_DAYS = 15; // Refresh Base Menu every 15 days
+  
+        let baseMenuRows = null;
+        let usedCache = false;
+  
+        // Check if cached Base Menu exists and is fresh
+        if (existsSync(cacheFile)) {
+          try {
+            const cache = JSON.parse(readFileSync(cacheFile, 'utf8'));
+            const cacheAge = Math.floor((Date.now() - new Date(cache.timestamp)) / (1000 * 60 * 60 * 24));
+  
+            if (cacheAge < CACHE_DAYS) {
+              baseMenuRows = cache.rows;
+              usedCache = true;
+              console.log(`  ✓ Using cached Base Menu (${cacheAge} days old, ${baseMenuRows.length} rows)`);
+            } else {
+              console.log(`  ℹ️ Base Menu cache is ${cacheAge} days old (>${CACHE_DAYS} days), will refresh...`);
+            }
+          } catch (e) {
+            console.log('  ⚠️ Could not read Base Menu cache, will download fresh:', e.message);
           }
-          await saveMetric('b2b_returns', returnsResult.total, 'petpooja', 'Purchase Return Report', {
-            scheme_name: 'b2b_counter',
-            entries: returnsResult.entries,
-            skippedCancelled: returnsResult.skippedCancelled
-          });
-          successfulReports++;
+        }
+  
+        // Download Base Menu if not cached or cache is stale
+        if (!baseMenuRows) {
+          try {
+            console.log('  📥 Fetching Base Menu export from menu.petpooja.com...');
+            await page.goto('https://menu.petpooja.com/menus/menu_item_list_new', { waitUntil: 'load', timeout: 30000 });
+            await page.waitForTimeout(3000);
+  
+            // Step 1: Click "Quick Actions" button
+            const quickActionsBtn = page.locator('button:visible:has-text("Quick Actions"), a:visible:has-text("Quick Actions"), .btn:visible:has-text("Quick Actions")').first();
+            await quickActionsBtn.waitFor({ state: 'visible', timeout: 15000 });
+            await quickActionsBtn.click({ force: true });
+            console.log('  ✓ Clicked Quick Actions button');
+            await page.waitForTimeout(2000);
+  
+            // Step 2: Click "Download Base Menu [Backup]"
+            const downloadMenuBtn = page.locator('a:visible:has-text("Download Base Menu"), button:visible:has-text("Download Base Menu"), li:visible:has-text("Download Base Menu")').first();
+            await downloadMenuBtn.waitFor({ state: 'visible', timeout: 15000 });
+            await downloadMenuBtn.click({ force: true });
+            console.log('  ✓ Clicked Download Base Menu [Backup]');
+            await page.waitForTimeout(3000);
+  
+            // Step 3: Select all Group Categories - CRITICAL STEP
+            // Look for "Select All" checkbox or link
+            const selectAllOptions = [
+              'input[type="checkbox"][id*="select" i][id*="all" i]:visible',
+              'input[type="checkbox"]:visible[value*="all" i]',
+              'label:visible:has-text("Select All")',
+              'a:visible:has-text("Select All")',
+              'button:visible:has-text("Select All")',
+              '.select-all:visible',
+              '#select_all:visible',
+              'input[name="select_all"]:visible'
+            ];
+  
+            let selectAllClicked = false;
+            for (const selector of selectAllOptions) {
+              const elem = page.locator(selector).first();
+              if (await elem.count() > 0 && await elem.isVisible().catch(() => false)) {
+                await elem.click({ force: true });
+                console.log(`  ✓ Selected all Group Categories using selector: ${selector}`);
+                selectAllClicked = true;
+                await page.waitForTimeout(1000);
+                break;
+              }
+            }
+  
+            if (!selectAllClicked) {
+              // Fallback: find all checkboxes and click them individually
+              const allCheckboxes = page.locator('input[type="checkbox"]:visible');
+              const checkboxCount = await allCheckboxes.count();
+              if (checkboxCount > 0) {
+                console.log(`  ℹ️ Select All not found, clicking ${checkboxCount} checkboxes individually...`);
+                for (let i = 0; i < checkboxCount; i++) {
+                  await allCheckboxes.nth(i).click({ force: true }).catch(() => {});
+                }
+                console.log('  ✓ Clicked all category checkboxes');
+              }
+            }
+  
+            // Step 4: Click Save/Submit to download the zip
+            const saveBtn = page.locator('button:visible:has-text("Save"), button:visible:has-text("Download"), button[type="submit"]:visible, input[type="submit"]:visible[value*="Save"]').first();
+  
+            // Set up download listener before clicking
+            const menuZipPromise = page.waitForEvent('download', { timeout: 45000 });
+  
+            console.log('  ✓ Clicking Save button, waiting for download...');
+            await saveBtn.click({ force: true });
+            await page.waitForTimeout(2000);
+  
+            const menuZipDownload = await menuZipPromise;
+            const menuZipPath = await menuZipDownload.path();
+            console.log(`  ✓ Downloaded Base Menu zip`);
+  
+            // Step 5: Unzip and find the "items" file
+            const AdmZip = await import('adm-zip').then(m => m.default);
+            const zip = new AdmZip(menuZipPath);
+            const zipEntries = zip.getEntries();
+  
+            let itemsFile = null;
+            for (const entry of zipEntries) {
+              if (entry.entryName.toLowerCase().startsWith('items') && !entry.isDirectory) {
+                itemsFile = entry;
+                break;
+              }
+            }
+  
+            if (itemsFile) {
+              const itemsBuffer = itemsFile.getData();
+              console.log(`  ✓ Found items file: ${itemsFile.entryName} (${itemsBuffer.length} bytes)`);
+              baseMenuRows = parseWorkbookBuffer(itemsBuffer);
+              console.log(`  ✓ Parsed Base Menu: ${baseMenuRows.length} rows`);
+  
+              // Cache the Base Menu for future runs
+              const { mkdirSync } = await import('node:fs');
+              mkdirSync(cacheDir, { recursive: true });
+              const cacheData = {
+                timestamp: new Date().toISOString(),
+                rows: baseMenuRows
+              };
+              const { writeFileSync } = await import('node:fs');
+              writeFileSync(cacheFile, JSON.stringify(cacheData));
+              console.log(`  💾 Cached Base Menu for next ${CACHE_DAYS} days`);
+            } else {
+              console.log('  ⚠️ Could not find "items" file in Base Menu zip');
+            }
+          } catch (menuErr) {
+            console.log('  ⚠️ Could not fetch Base Menu, will skip kitchen prep time:', menuErr.message);
+          }
+        }
+  
+        if (baseMenuRows && baseMenuRows.length > 0) {
+          // Now fetch the KOT report #78
+          const kotRows = await fetchCustomReport('https://billing.petpooja.com/custom_reports/view_report/78', 'KOT Preparation Time Report', cycle);
+          const prepResult = parseKitchenPrepTime(kotRows, baseMenuRows, { ...cycle, kitchenCategories });
+          if (prepResult.ok && prepResult.averageMinutes !== null) {
+            console.log(`  📊 Kitchen Prep Time: ${prepResult.averageMinutes} minutes average across ${prepResult.itemsCounted} items`);
+            console.log(`  📊 Breakdown by category:`, JSON.stringify(prepResult.byCategory));
+            if (prepResult.skipped.notOnMenu > 0) console.log(`  ℹ️ Skipped ${prepResult.skipped.notOnMenu} items not found in Base Menu`);
+            if (prepResult.skipped.nonKitchen > 0) console.log(`  ℹ️ Skipped ${prepResult.skipped.nonKitchen} items not in approved kitchen categories`);
+  
+            await saveMetric('kit_prep_time', prepResult.averageMinutes, 'petpooja', 'KOT Preparation Time Report', {
+              scheme_name: 'kitchen',
+              itemsCounted: prepResult.itemsCounted,
+              byCategory: prepResult.byCategory,
+              skipped: prepResult.skipped,
+              usedCachedMenu: usedCache
+            });
+            successfulReports++;
+          }
+        }
+      } catch (e) {
+        failedReports++;
+        console.error('⚠️ Could not sync Kitchen Prep Time Report:', e.message);
+      }
+    }
+
+    if (reportEnabled('inventory')) {
+      try {
+        console.log('🔐 Navigating to Petpooja Inventory via SSO...');
+        await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
+        await page.waitForTimeout(2000);
+  
+        // Navigate to Inventory module (opens in same page or new tab)
+        const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
+        if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
+          console.log('  ✓ Clicking Inventory in sidebar navigation...');
+          const [newPage] = await Promise.all([
+            context.waitForEvent('page', { timeout: 8000 }).catch(() => null),
+            invLink.click({ force: true })
+          ]);
+          if (newPage) {
+            await newPage.waitForLoadState('load').catch(() => {});
+            await newPage.waitForTimeout(3000);
+          } else {
+            await page.waitForURL(/inventory\.petpooja\.com/, { timeout: 15000 }).catch(() => {});
+            await page.waitForTimeout(3000);
+          }
+        }
+  
+        // Wastage download
+        try {
+          const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report', cycle);
+          const wastageResult = parseWastage(wastageRows, cycle);
+          if (wastageResult.ok) {
+            console.log(`  📊 Total Kitchen Wastage: ₹${wastageResult.total} across ${wastageResult.entries} entries`);
+            if (wastageResult.skippedCancelled > 0) {
+              console.log(`  ℹ️ Skipped ${wastageResult.skippedCancelled} cancelled wastage entries`);
+            }
+            await saveMetric('kit_wastage', wastageResult.total, 'petpooja', 'Wastage Report', {
+              scheme_name: 'kitchen',
+              entries: wastageResult.entries,
+              skippedCancelled: wastageResult.skippedCancelled
+            });
+            successfulReports++;
+          }
+        } catch (we) {
+          failedReports++;
+          console.error('⚠️ Could not sync Wastage List:', we.message);
+        }
+  
+        // Purchase returns download
+        try {
+          const returnRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/purchase_return_list/', 'Purchase Returns', cycle);
+          const returnsResult = parsePurchaseReturns(returnRows, cycle);
+          if (returnsResult.ok) {
+            console.log(`  📊 Total Purchase Returns: ₹${returnsResult.total} across ${returnsResult.entries} debit notes`);
+            if (returnsResult.skippedCancelled > 0) {
+              console.log(`  ℹ️ Skipped ${returnsResult.skippedCancelled} cancelled return entries`);
+            }
+            await saveMetric('b2b_returns', returnsResult.total, 'petpooja', 'Purchase Return Report', {
+              scheme_name: 'b2b_counter',
+              entries: returnsResult.entries,
+              skippedCancelled: returnsResult.skippedCancelled
+            });
+            successfulReports++;
+          }
+        } catch (re) {
+          failedReports++;
+          console.error('⚠️ Could not sync Purchase Returns:', re.message);
+        }
+      } catch (ie) {
+        failedReports++;
+        console.error('⚠️ Could not access Petpooja Inventory:', ie.message);
+      }
+    }
+
+    if (reportEnabled('purchase_invoices')) {
+      try {
+        console.log('\n📥 Fetching Purchase Invoices from Petpooja Inventory...');
+  
+        // Try to navigate to purchase invoices
+        const purchaseInvoiceUrl = 'https://inventory.petpooja.com/inventories/purchase_invoice_list/';
+        const purchaseRows = await fetchCustomReport(purchaseInvoiceUrl, 'Purchase Invoices', cycle);
+  
+        if (purchaseRows && purchaseRows.length > 0) {
+          const purchaseResult = parsePurchaseInvoices(purchaseRows, cycle);
+          if (purchaseResult.ok && purchaseResult.invoices.length > 0) {
+            console.log(`  📊 Found ${purchaseResult.invoices.length} purchase invoices`);
+  
+            // Sync each invoice to expenses table
+            for (const invoice of purchaseResult.invoices) {
+              try {
+                const payload = {
+                  category: 'Vendor',
+                  cost_type: 'variable',
+                  entry_type: 'actual',
+                  status: 'approved', // Petpooja data is auto-approved
+                  amount: invoice.total_amount,
+                  debit_note: 0,
+                  vendor_name: invoice.vendor_name,
+                  invoice_number: invoice.invoice_number,
+                  invoice_date: invoice.invoice_date,
+                  description: invoice.description || 'Petpooja purchase invoice',
+                  payment_status: invoice.payment_status || 'due',
+                  payment_date: invoice.payment_date || null,
+                  payment_mode: invoice.payment_mode || null,
+                  bank_reference: invoice.bank_reference || null,
+                  created_by: null, // System-generated
+                  approved_by: null
+                };
+  
+                const { error } = await supabase
+                  .from('expenses')
+                  .upsert([payload], {
+                    onConflict: 'vendor_name,invoice_number',
+                    ignoreDuplicates: false
+                  });
+  
+                if (error) {
+                  console.error(`  ❌ Failed to sync invoice ${invoice.invoice_number}:`, error.message);
+                } else {
+                  console.log(`  ✓ Synced invoice ${invoice.invoice_number} (₹${invoice.total_amount})`);
+                }
+              } catch (syncErr) {
+                console.error(`  ❌ Error syncing invoice ${invoice.invoice_number}:`, syncErr.message);
+              }
+            }
+  
+            successfulReports++;
+          } else {
+            console.log('  ℹ️ No purchase invoices found for this period');
+          }
+        }
+      } catch (pe) {
+        failedReports++;
+        console.error('⚠️ Could not sync Purchase Invoices:', pe.message);
+      }
+    }
+
+    if (reportEnabled('purchase_returns')) {
+      try {
+        console.log('\n📥 Fetching Purchase Returns / Debit Notes from Petpooja Inventory...');
+  
+        const purchaseReturnUrl = 'https://inventory.petpooja.com/inventories/purchase_return_list/';
+        const returnRows = await fetchCustomReport(purchaseReturnUrl, 'Purchase Returns', cycle);
+  
+        if (returnRows && returnRows.length > 0) {
+          const returnsResult = parsePurchaseReturns(returnRows, cycle);
+          if (returnsResult.ok && returnsResult.returns.length > 0) {
+            console.log(`  📊 Found ${returnsResult.returns.length} purchase returns (debit notes)`);
+  
+            // Sync each debit note to expenses table
+            for (const ret of returnsResult.returns) {
+              try {
+                // Create debit note entry (negative amount) or update existing vendor expense
+                const payload = {
+                  category: 'Vendor',
+                  cost_type: 'variable',
+                  entry_type: 'actual',
+                  status: 'approved',
+                  amount: ret.total_amount, // Store as positive, debit_note field handles reduction
+                  debit_note: ret.total_amount,
+                  vendor_name: ret.vendor_name,
+                  invoice_number: ret.return_number,
+                  invoice_date: ret.return_date,
+                  description: `Debit Note: ${ret.description || 'Purchase return'}`,
+                  payment_status: 'due',
+                  payment_date: null,
+                  payment_mode: null,
+                  bank_reference: null,
+                  created_by: null,
+                  approved_by: null
+                };
+  
+                const { error } = await supabase
+                  .from('expenses')
+                  .upsert([payload], {
+                    onConflict: 'vendor_name,invoice_number',
+                    ignoreDuplicates: false
+                  });
+  
+                if (error) {
+                  console.error(`  ❌ Failed to sync debit note ${ret.return_number}:`, error.message);
+                } else {
+                  console.log(`  ✓ Synced debit note ${ret.return_number} (₹${ret.total_amount})`);
+                }
+              } catch (syncErr) {
+                console.error(`  ❌ Error syncing debit note ${ret.return_number}:`, syncErr.message);
+              }
+            }
+  
+            successfulReports++;
+          } else {
+            console.log('  ℹ️ No purchase returns found for this period');
+          }
         }
       } catch (re) {
         failedReports++;
         console.error('⚠️ Could not sync Purchase Returns:', re.message);
       }
-    } catch (ie) {
-      failedReports++;
-      console.error('⚠️ Could not access Petpooja Inventory:', ie.message);
-    }
-
-    // REPORT 10: Petpooja Purchase Invoices (Expense Sync)
-    try {
-      console.log('\n📥 Fetching Purchase Invoices from Petpooja Inventory...');
-
-      // Try to navigate to purchase invoices
-      const purchaseInvoiceUrl = 'https://inventory.petpooja.com/inventories/purchase_invoice_list/';
-      const purchaseRows = await fetchCustomReport(purchaseInvoiceUrl, 'Purchase Invoices', cycle);
-
-      if (purchaseRows && purchaseRows.length > 0) {
-        const purchaseResult = parsePurchaseInvoices(purchaseRows, cycle);
-        if (purchaseResult.ok && purchaseResult.invoices.length > 0) {
-          console.log(`  📊 Found ${purchaseResult.invoices.length} purchase invoices`);
-
-          // Sync each invoice to expenses table
-          for (const invoice of purchaseResult.invoices) {
-            try {
-              const payload = {
-                category: 'Vendor',
-                cost_type: 'variable',
-                entry_type: 'actual',
-                status: 'approved', // Petpooja data is auto-approved
-                amount: invoice.total_amount,
-                debit_note: 0,
-                vendor_name: invoice.vendor_name,
-                invoice_number: invoice.invoice_number,
-                invoice_date: invoice.invoice_date,
-                description: invoice.description || 'Petpooja purchase invoice',
-                payment_status: invoice.payment_status || 'due',
-                payment_date: invoice.payment_date || null,
-                payment_mode: invoice.payment_mode || null,
-                bank_reference: invoice.bank_reference || null,
-                created_by: null, // System-generated
-                approved_by: null
-              };
-
-              const { error } = await supabase
-                .from('expenses')
-                .upsert([payload], {
-                  onConflict: 'vendor_name,invoice_number',
-                  ignoreDuplicates: false
-                });
-
-              if (error) {
-                console.error(`  ❌ Failed to sync invoice ${invoice.invoice_number}:`, error.message);
-              } else {
-                console.log(`  ✓ Synced invoice ${invoice.invoice_number} (₹${invoice.total_amount})`);
-              }
-            } catch (syncErr) {
-              console.error(`  ❌ Error syncing invoice ${invoice.invoice_number}:`, syncErr.message);
-            }
-          }
-
-          successfulReports++;
-        } else {
-          console.log('  ℹ️ No purchase invoices found for this period');
-        }
-      }
-    } catch (pe) {
-      failedReports++;
-      console.error('⚠️ Could not sync Purchase Invoices:', pe.message);
-    }
-
-    // REPORT 11: Petpooja Purchase Returns / Debit Notes (Expense Sync)
-    try {
-      console.log('\n📥 Fetching Purchase Returns / Debit Notes from Petpooja Inventory...');
-
-      const purchaseReturnUrl = 'https://inventory.petpooja.com/inventories/purchase_return_list/';
-      const returnRows = await fetchCustomReport(purchaseReturnUrl, 'Purchase Returns', cycle);
-
-      if (returnRows && returnRows.length > 0) {
-        const returnsResult = parsePurchaseReturns(returnRows, cycle);
-        if (returnsResult.ok && returnsResult.returns.length > 0) {
-          console.log(`  📊 Found ${returnsResult.returns.length} purchase returns (debit notes)`);
-
-          // Sync each debit note to expenses table
-          for (const ret of returnsResult.returns) {
-            try {
-              // Create debit note entry (negative amount) or update existing vendor expense
-              const payload = {
-                category: 'Vendor',
-                cost_type: 'variable',
-                entry_type: 'actual',
-                status: 'approved',
-                amount: ret.total_amount, // Store as positive, debit_note field handles reduction
-                debit_note: ret.total_amount,
-                vendor_name: ret.vendor_name,
-                invoice_number: ret.return_number,
-                invoice_date: ret.return_date,
-                description: `Debit Note: ${ret.description || 'Purchase return'}`,
-                payment_status: 'due',
-                payment_date: null,
-                payment_mode: null,
-                bank_reference: null,
-                created_by: null,
-                approved_by: null
-              };
-
-              const { error } = await supabase
-                .from('expenses')
-                .upsert([payload], {
-                  onConflict: 'vendor_name,invoice_number',
-                  ignoreDuplicates: false
-                });
-
-              if (error) {
-                console.error(`  ❌ Failed to sync debit note ${ret.return_number}:`, error.message);
-              } else {
-                console.log(`  ✓ Synced debit note ${ret.return_number} (₹${ret.total_amount})`);
-              }
-            } catch (syncErr) {
-              console.error(`  ❌ Error syncing debit note ${ret.return_number}:`, syncErr.message);
-            }
-          }
-
-          successfulReports++;
-        } else {
-          console.log('  ℹ️ No purchase returns found for this period');
-        }
-      }
-    } catch (re) {
-      failedReports++;
-      console.error('⚠️ Could not sync Purchase Returns:', re.message);
     }
 
     console.log('\n=============================================================');
@@ -1228,60 +1290,63 @@ export async function runPetpoojaSync(options = {}) {
   }
 
   // REPORT 9: Customer Feedback Integration (Google Sheets)
-  // Runs after browser closes; uses its own success/failure counters
-  let feedbackSuccess = false;
-  try {
-    console.log('\n📊 Fetching Customer Feedback from Google Sheets...');
+  // Runs after the browser closes. When the run is split into groups this
+  // runs once only — in the last group — so the same values are not written
+  // three times over.
+  if (!feedbackEnabled()) {
+    console.log('\n📊 Skipping Customer Feedback for this group (it runs once, in the last group).');
+  } else {
+    try {
+      console.log('\n📊 Fetching Customer Feedback from Google Sheets...');
 
-    const feedbackRows = await fetchGoogleSheetsData({
-      spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU',
-      sheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1',
-      range: process.env.GOOGLE_SHEETS_RANGE || 'A:K'
-    });
+      const feedbackRows = await fetchGoogleSheetsData({
+        spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || '1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU',
+        sheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1',
+        range: process.env.GOOGLE_SHEETS_RANGE || 'A:K'
+      });
 
-    const feedbackResult = parseCustomerFeedback(feedbackRows, { start: cycle.start, end: cycle.end });
-    if (feedbackResult.ok) {
-      console.log(`  📊 Customer Feedback: Processed ${feedbackResult.totalResponses} responses in period`);
+      const feedbackResult = parseCustomerFeedback(feedbackRows, { start: cycle.start, end: cycle.end });
+      if (feedbackResult.ok) {
+        console.log(`  📊 Customer Feedback: Processed ${feedbackResult.totalResponses} responses in period`);
 
-      // 1. Kitchen Food Quality & Consistency (Team Target: >= 80% / 0.80)
-      if (feedbackResult.kitFoodPercent !== null) {
-        await saveMetric('kit_food_quality', feedbackResult.kitFoodPercent, 'feedback_form', 'Guest Feedback Google Sheet', {
-          scheme_name: 'kitchen',
-          responses: feedbackResult.totalResponses,
-          percent: feedbackResult.kitFoodPercent
-        });
-      }
+        // 1. Kitchen Food Quality & Consistency (Team Target: >= 80% / 0.80)
+        if (feedbackResult.kitFoodPercent !== null) {
+          await saveMetric('kit_food_quality', feedbackResult.kitFoodPercent, 'feedback_form', 'Guest Feedback Google Sheet', {
+            scheme_name: 'kitchen',
+            responses: feedbackResult.totalResponses,
+            percent: feedbackResult.kitFoodPercent
+          });
+        }
 
-      // 2. Service Helper Quality Feedback (Team Target: >= 80% / 0.80)
-      if (feedbackResult.hlpServicePercent !== null) {
-        await saveMetric('hlp_quality', feedbackResult.hlpServicePercent, 'feedback_form', 'Guest Feedback Google Sheet', {
-          scheme_name: 'service_helpers',
-          responses: feedbackResult.totalResponses,
-          percent: feedbackResult.hlpServicePercent
-        });
-      }
+        // 2. Service Helper Quality Feedback (Team Target: >= 80% / 0.80)
+        if (feedbackResult.hlpServicePercent !== null) {
+          await saveMetric('hlp_quality', feedbackResult.hlpServicePercent, 'feedback_form', 'Guest Feedback Google Sheet', {
+            scheme_name: 'service_helpers',
+            responses: feedbackResult.totalResponses,
+            percent: feedbackResult.hlpServicePercent
+          });
+        }
 
-      // 3. Service Captain Quality Feedback (Individual Target: >= 80% / 0.80)
-      if (feedbackResult.captains) {
-        for (const [capName, cData] of Object.entries(feedbackResult.captains)) {
-          const emp = findEmployeeByName(capName, employees);
-          if (emp) {
-            await saveMetric('cap_quality', cData.percent, 'feedback_form', 'Guest Feedback Google Sheet', {
-              scheme_name: 'service_captain',
-              captain_name: capName,
-              score_avg: cData.scoreAvg,
-              entries: cData.entries
-            }, emp.employee_id);
-          } else {
-            console.log(`  ℹ️ Feedback recorded for captain "${capName}" (${cData.percent * 100}%) — no exact employee match.`);
+        // 3. Service Captain Quality Feedback (Individual Target: >= 80% / 0.80)
+        if (feedbackResult.captains) {
+          for (const [capName, cData] of Object.entries(feedbackResult.captains)) {
+            const emp = findEmployeeByName(capName, employees);
+            if (emp) {
+              await saveMetric('cap_quality', cData.percent, 'feedback_form', 'Guest Feedback Google Sheet', {
+                scheme_name: 'service_captain',
+                captain_name: capName,
+                score_avg: cData.scoreAvg,
+                entries: cData.entries
+              }, emp.employee_id);
+            } else {
+              console.log(`  ℹ️ Feedback recorded for captain "${capName}" (${cData.percent * 100}%) — no exact employee match.`);
+            }
           }
         }
       }
-
-      feedbackSuccess = true;
+    } catch (e) {
+      console.error('⚠️ Could not sync Customer Feedback:', e.message);
     }
-  } catch (e) {
-    console.error('⚠️ Could not sync Customer Feedback:', e.message);
   }
 
   console.log('\n=============================================================');

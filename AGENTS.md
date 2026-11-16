@@ -86,15 +86,21 @@ All four connections are live and verified. Re-verify with
 - Remote: `github.com/jackshcn1/atelier-hr`. Branch per feature, never commit to main.
 
 ### Petpooja
-- Attendance/sales data is pulled by **browser automation**, not an API:
-  `node scripts/petpooja-sync.mjs` drives Chrome via Playwright against
-  `billing.petpooja.com`. It runs headed (`PETPOOJA_HEADLESS=false`) because
-  Petpooja challenges headless browsers.
-- Credentials live in `scripts/petpooja-config.json` (gitignored).
-- **Known gap:** `GOOGLE_PRIVATE_KEY_PATH` in that config points at a Windows path
-  (`C:\Users\LENOVO\...`). The Google service-account key is not on this machine, so
-  the Customer Feedback (Google Sheets) sync is inactive until the key is provided.
-- SMTP is not configured, so email alerts are silently skipped.
+- The daily sync is **hosted on Vercel**, not the office computer. Petpooja blocks
+  datacenter IP ranges at the edge with a raw nginx 403, so a GitHub Actions runner
+  cannot reach it at all; Vercel (AWS) can. See `memory/petpooja-hosted-sync.md`.
+- Entry point: `app/api/sync/route.js`. Scheduler: `.github/workflows/petpooja-sync.yml`,
+  daily 23:30 UTC = **05:00 IST**. GitHub Actions only schedules and collects the result.
+- The endpoint requires a shared secret (`SYNC_SECRET` on Vercel,
+  `VERCEL_SYNC_SECRET` in GitHub). Never widen access to it.
+- Data is pulled by **browser automation**, not an API: `runPetpoojaSync()` drives
+  Chrome via Playwright against `billing.petpooja.com`.
+- The local computer workflow still works as a manual fallback:
+  `node scripts/petpooja-sync.mjs` (headed Chrome).
+- **Known gaps:** the Google service-account key is not on the server, so the
+  Customer Feedback (Google Sheets) sync is inactive in the hosted run; SMTP is
+  not configured, so email alerts are skipped (GitHub's own failure notification
+  still fires).
 
 ---
 
