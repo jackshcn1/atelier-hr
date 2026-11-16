@@ -112,39 +112,45 @@ Three layers now stop that class of failure:
 3. The workflow fails the job when a group reports "ok" but fetched no
    reports, completed only some of them, or refused to write a metric.
 
-## Petpooja throttles the serverless IP — this is the biggest operational risk
+## The session must be closed, or the next login is refused
 
-On 16 Nov, after a morning of testing, the hosted function suddenly could not
-reach Petpooja at all. Every group failed with:
-
-```
-Current Page URL: chrome-error://chromewebdata/
-Total input tags found on page: 0
-```
-
-and the same report failed from a fresh instance, while the very same page
-loaded in 0.36 s from a laptop. The pattern was unmistakable:
-
-- 10:10 — four groups in a row succeeded (each ~1.5 min).
-- 10:17 — every group after that failed, including groups that had just passed.
-- 11:03 — one single request succeeded again (75 s).
-- 11:05 — one more succeeded; the next one was blocked again.
-
-That is a **token bucket that refills slowly**, not a permanent ban and not a
-code fault. Petpooja's edge counts sessions per source IP, and the serverless
-host burns them fast. The failures look exactly like a broken script, so the
-error message now carries a probe:
+On 16 Nov the hosted run failed from **group 5 onwards**, every group, with:
 
 ```
-Petpooja login did not complete. Probe: direct fetch got HTTP 403. Last page said: ...
+✓ Filled email address.
+⚠️ Password box never appeared.
 ```
 
-**How to apply:** never debug the code first when the page will not load at
-all — run the probe. A blocked IP needs time and fewer requests, not a
-rewrite. The daily 05:00 run is the first burst of the day, so it starts with
-a full bucket; a long debugging session can drain it and make the night look
-broken when it is not. When a run is blocked, **stop calling the endpoint**,
-wait for the bucket to refill, and re-run once.
+The email step was accepted and the password step never came. That is
+Petpooja's own "a session is already open for this account" behaviour. It
+looked like three different problems all day — a dead browser, a page that
+never painted, an HTTP 504 — and none of those was the cause.
+
+**Closing the browser does not end the Petpooja session.** The session
+(`user_id` + `user_key`) stays live on Petpooja's side. From the serverless
+host each group can come from a different egress IP, so each one looks like a
+new device and leaves another live session behind, until the next login is
+turned away. The symptom is always the same: the email field appears, the
+password field never does.
+
+The fix is to log out, not to close the browser:
+
+```js
+await page.goto('https://billing.petpooja.com/users/logout', {
+  waitUntil: 'domcontentloaded',
+  timeout: 20000,
+});
+```
+
+It runs in the `finally` block, so it happens even when a group fails. After
+it, three groups in a row passed back to back on the server (73 s, 72 s,
+81 s) where before the second group was already being refused.
+
+**How to apply:** when a login is refused on the serverless host, log out at
+the end of every run — do not go looking for a throttle or a network block.
+A plain `fetch` of the login page from the same host returning HTTP 200 while
+the browser is refused is the tell: the site is answering, the *session* is
+the problem. The probe is in the error message for exactly this reason.
 
 ## A dead browser must not cost the day
 
