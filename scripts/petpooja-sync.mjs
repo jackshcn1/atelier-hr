@@ -122,6 +122,24 @@ export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
 // On a laptop there is no /proc and no cgroup, so the numbers simply are not
 // there. Nothing depends on them; they only explain a crash.
 // ---------------------------------------------------------------------------
+
+// How much the browser process is using right now, while it is still alive.
+//
+// This is the number that matters and that Node cannot give: the browser is
+// a separate process. A browser killed for want of memory is reported by the
+// kernel with SIGKILL; a browser that crashed reports SIGSEGV. Knowing which
+// one it was is the difference between "give it less to do" and "give it more
+// room".
+function browserMemory(browserPid) {
+  if (!browserPid) return 'unknown';
+  try {
+    const statm = readFileSync(`/proc/${browserPid}/statm`, 'utf8').trim().split(/\s+/);
+    return `${Math.round((Number(statm[1]) || 0) * 4096 / 1048576)}MB`;
+  } catch {
+    return 'gone';
+  }
+}
+
 function memorySnapshot() {
   const parts = [];
 
@@ -518,6 +536,7 @@ export async function runPetpoojaSync(options = {}) {
   let browser = null;
   let context = null;
   let page = null;
+  let browserPid = null;
 
   // Set while the browser is being closed on purpose, so the "the browser
   // died" message is only printed when it really did.
@@ -538,17 +557,23 @@ export async function runPetpoojaSync(options = {}) {
     // The browser's own process id, so that anything it leaves behind can be
     // recognised and cleared. Playwright does not hand this over officially,
     // so it is read defensively — a null id only costs the extra cleanup.
-    const browserPid = browser?._process?.pid ?? null;
+    const browserProc = browser?._process ?? null;
+    browserPid = browserProc?.pid ?? null;
     browser.on('disconnected', () => {
       // The same event fires when the browser is closed on purpose, so it is
       // only worth reporting when the browser died on its own.
       if (closingOnPurpose) return;
-      console.error(`  ⚠️ The browser went away. ${memorySnapshot()}`);
+      const exit = browserProc
+        ? ` (exit code ${browserProc.exitCode}, signal ${browserProc.signalCode})`
+        : '';
+      console.error(`  ⚠️ The browser went away${exit}. ${memorySnapshot()}`);
       const killed = killOrphanBrowsers(browserPid);
       if (killed > 0) {
         console.error(`  🧹 Cleared ${killed} leftover browser process(es).`);
       }
     });
+
+    console.log(`  🧠 Browser memory after launch: ${browserMemory(browserPid)}`);
 
     context = await browser.newContext({
       acceptDownloads: true,
@@ -1037,6 +1062,7 @@ export async function runPetpoojaSync(options = {}) {
       };
       const startedAt = Date.now();
       console.log(`📥 Fetching ${reportName} (${url})...`);
+      console.log(`  🧠 Browser memory before the page load: ${browserMemory(browserPid)}`);
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
 
