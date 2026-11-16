@@ -127,7 +127,10 @@ All four connections are live and verified. Re-verify with
   Customer Feedback (Google Sheets) sync is inactive in the hosted run — the
   owner chose to leave it off for now; it is skipped gracefully and does not
   fail the run. SMTP is not configured yet, so email alerts are skipped (the
-  GitHub workflow-failure notification still fires).
+  GitHub workflow-failure notification still fires). `scripts/setup-smtp-alerts.sh`
+  turns the email alerts on: it reads the Google app password from a file and
+  hands it to Vercel through stdin, so the password never reaches a command
+  line.
 
 ---
 
