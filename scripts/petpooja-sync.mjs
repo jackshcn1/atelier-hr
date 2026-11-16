@@ -56,13 +56,18 @@ function loadLocalConfig() {
 
 // Report selection. A full sync takes longer than a serverless function's
 // maximum duration, so the reports are split into groups that each fit.
-// Set SYNC_GROUP=1|2|3|4, or SYNC_REPORTS=captain,pax for an explicit set.
+// Set SYNC_GROUP=1|2|3|4|5, or SYNC_REPORTS=captain,pax for an explicit set.
 // With neither set, every report runs — the local computer path is unchanged.
+//
+// The groups are sized for a *slow* day, not a fast one: Petpooja's pages can
+// take twice as long to load, and a group that fits on a good day but not on a
+// bad one fails the whole nightly run.
 export const REPORT_GROUPS = {
   1: ['captain', 'pax', 'item'],
-  2: ['gstn', 'due_payment', 'executive', 'kot'],
-  3: ['inventory', 'purchase_invoices'],
-  4: ['purchase_returns'],
+  2: ['gstn', 'due_payment'],
+  3: ['executive', 'kot'],
+  4: ['inventory', 'purchase_invoices'],
+  5: ['purchase_returns'],
 };
 
 // Every report the engine knows about, used to reject a bad group or report
@@ -90,7 +95,8 @@ function feedbackEnabled() {
   if (process.env.SYNC_REPORTS) return false; // an explicit report list means Petpooja only
   const group = process.env.SYNC_GROUP;
   if (!group) return true;
-  return Number(group) === 3;
+  const lastGroup = Math.max(...Object.keys(REPORT_GROUPS).map(Number));
+  return Number(group) === lastGroup;
 }
 
 // Download timeout for report files. The default suits a local desktop; a
@@ -885,13 +891,20 @@ export async function runPetpoojaSync(options = {}) {
       let targetBtn = null;
       let matchedSelector = '';
 
-      for (const sel of excelPrioritySelectors) {
-        const loc = page.locator(sel).first();
-        if (await loc.count() > 0 && await loc.isVisible().catch(() => false)) {
-          targetBtn = loc;
-          matchedSelector = sel;
-          break;
+      // Petpooja renders these report pages slowly at times, so the button is
+      // looked for over a period rather than just once — a single immediate
+      // check loses the export of a whole report on a slow day.
+      const buttonDeadline = Date.now() + 30000;
+      while (!targetBtn && Date.now() < buttonDeadline) {
+        for (const sel of excelPrioritySelectors) {
+          const loc = page.locator(sel).first();
+          if (await loc.count() > 0 && await loc.isVisible().catch(() => false)) {
+            targetBtn = loc;
+            matchedSelector = sel;
+            break;
+          }
         }
+        if (!targetBtn) await page.waitForTimeout(2000);
       }
 
       if (!targetBtn || (await targetBtn.count()) === 0) {
@@ -1283,13 +1296,29 @@ export async function runPetpoojaSync(options = {}) {
     }
 
     // The Inventory module lives behind a single sign-on from the billing
-    // dashboard, so every group that needs it has to open it first.
+    // dashboard, so every group that needs it has to open it first. The
+    // dashboard is slow to load at times, so it is retried rather than
+    // failing the report.
     let inventorySessionReady = false;
     async function openInventoryModule() {
       if (inventorySessionReady) return;
-      console.log('🔐 Navigating to Petpooja Inventory via SSO...');
-      await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
-      await page.waitForTimeout(2000);
+
+      let lastError = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await page.goto('https://billing.petpooja.com/users/dashboard', {
+            waitUntil: 'domcontentloaded',
+            timeout: 45000
+          });
+          lastError = null;
+          break;
+        } catch (e) {
+          lastError = e;
+          console.log(`  ℹ️ Dashboard load failed (attempt ${attempt}/3): ${e.message}`);
+          await page.waitForTimeout(3000);
+        }
+      }
+      if (lastError) throw lastError;
 
       const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
       if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
@@ -1448,7 +1477,23 @@ export async function runPetpoojaSync(options = {}) {
           } else {
             console.log('  ℹ️ No purchase returns found for this period');
             dumpReportRows('purchase-returns', returnRows);
+            // No debit notes is worth zero, not missing.
+            await saveMetric('b2b_returns', 0, 'petpooja', 'Purchase Return Report', {
+              scheme_name: 'b2b_counter',
+              entries: 0,
+              skippedCancelled: 0
+            });
+            successfulReports++;
           }
+        } else {
+          // Nothing was recorded for this period — the honest value is zero.
+          console.log('  📊 No debit notes recorded for this period — recording 0.');
+          await saveMetric('b2b_returns', 0, 'petpooja', 'Purchase Return Report', {
+            scheme_name: 'b2b_counter',
+            entries: 0,
+            skippedCancelled: 0
+          });
+          successfulReports++;
         }
       } catch (re) {
         failedReports++;

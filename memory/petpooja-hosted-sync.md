@@ -47,28 +47,60 @@ architecture, not an obstacle to it.
 
 A full sync runs **240–285 s**, right against Vercel Hobby's `maxDuration: 300`,
 and the first hosted attempt died with `FUNCTION_INVOCATION_TIMEOUT`. So the
-reports are split into four groups and the workflow calls them one after the
+reports are split into five groups and the workflow calls them one after the
 other (never in parallel — they write the same metric rows):
 
-| Group | Reports | Measured |
+| Group | Reports | Measured (fast day / slow day) |
 |---|---|---|
-| 1 | `captain`, `pax`, `item` (the heaviest — ~7.4 MB Item Report) | ~160 s |
-| 2 | `gstn`, `due_payment`, `executive`, `kot` | ~183 s |
-| 3 | `inventory` (wastage), `purchase_invoices` | ~120 s |
-| 4 | `purchase_returns` (debit notes) | ~60 s |
+| 1 | `captain`, `pax`, `item` (the heaviest — 8.3 MB Item Report) | 163 s / 187 s |
+| 2 | `gstn`, `due_payment` | ~100 s |
+| 3 | `executive`, `kot` (KOT needs the Base Menu download too) | ~110 s |
+| 4 | `inventory` (wastage), `purchase_invoices` | ~143 s |
+| 5 | `purchase_returns` (debit notes) | ~93 s |
 
-- `?group=1|2|3|4` selects one group; `?reports=a,b` selects an explicit set;
+**The groups are sized for a slow day, not a fast one.** Petpooja's pages can
+take twice as long to load; a group that fits on a good day but not on a bad
+one fails the whole nightly run. The first four-group layout put gstn +
+due_payment + executive + kot together, which measured 188 s on a fast day and
+went past 300 s on a slow day.
+
+- `?group=1|2|3|4|5` selects one group; `?reports=a,b` selects an explicit set;
   **no parameter runs everything** — that is the local-computer path and it is
   unchanged.
 - `SYNC_GROUP` / `SYNC_REPORTS` (env) are the underlying switches, read by
   `reportEnabled()` in `scripts/petpooja-sync.mjs`.
 - The Google Sheets customer-feedback pull is not a Petpooja report but writes
-  to the same metric rows, so `feedbackEnabled()` runs it **once only, in group 3**.
+  to the same metric rows, so `feedbackEnabled()` runs it **once only, in the
+  last group**.
 - The serverless runner is slower than the desktop, so report downloads get a
   longer timeout via `PETPOOJA_DOWNLOAD_TIMEOUT` (120000 ms on Vercel; 35 s
   locally).
 - Each report download logs how long it took, so a slow day is visible in the
   log rather than showing up as a timeout.
+
+**Petpooja is slower than you think on a bad day.** Two report steps failed
+only under load and had to be made patient:
+- the Excel/Export button on a report page is now looked for over 30 s
+  instead of once — a single immediate check lost the whole Item Report;
+- the billing dashboard that mints the inventory session is now loaded with
+  `domcontentloaded` and retried three times, because a slow load used to
+  fail the whole report.
+
+## A green run must mean the work happened
+
+The first version of the workflow assigned the group list to a shell variable
+called `GROUPS` — which is a **Bash built-in array** holding the current user's
+group ids, so the assignment was silently ignored. On the GitHub runner
+`$GROUPS` expanded to `1001`, the workflow requested report group "1001", the
+engine matched no reports, ran nothing, and still answered HTTP 200. The daily
+job reported success every morning while fetching nothing.
+
+Three layers now stop that class of failure:
+
+1. The endpoint rejects an unknown group or report name with **400**.
+2. The engine refuses an unknown `SYNC_GROUP` / `SYNC_REPORTS` value.
+3. The workflow fails the job when a group reports "ok" but fetched no
+   reports, completed only some of them, or refused to write a metric.
 
 ## Two syncs must never overlap
 
