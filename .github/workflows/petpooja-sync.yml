@@ -97,7 +97,9 @@ jobs:
                 --max-time 600) || STATUS="000"
 
               echo "HTTP $STATUS"
-              head -c 4000 "response-group-$G.json" || true
+              # The tail, not the head: the error and the log lines that say
+              # which report failed are at the end of the JSON.
+              tail -c 4000 "response-group-$G.json" || true
               echo ""
 
               if [ "$STATUS" != "200" ]; then
@@ -155,7 +157,7 @@ jobs:
               echo ""
               echo "#### ${f%.json}"
               echo '```json'
-              head -c 2000 "$f"
+              tail -c 2000 "$f"
               echo '```'
             done
           } >> "$GITHUB_STEP_SUMMARY"
