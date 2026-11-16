@@ -117,7 +117,7 @@ async function handle(req) {
     }
 
     // A full sync is longer than a serverless function may run, so the
-    // reports are split into groups that each fit. ?group=1..5 runs one
+    // reports are split into groups that each fit. ?group=1..6 runs one
     // group; ?reports=captain,pax runs an explicit set; no parameter runs
     // everything (the local-computer path).
     const group = params.get('group');
