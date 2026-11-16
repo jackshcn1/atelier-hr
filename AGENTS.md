@@ -93,6 +93,13 @@ All four connections are live and verified. Re-verify with
   daily 23:30 UTC = **05:00 IST**. GitHub Actions only schedules and collects the result.
 - The endpoint requires a shared secret (`SYNC_SECRET` on Vercel,
   `VERCEL_SYNC_SECRET` in GitHub). Never widen access to it.
+- The run is split into **three report groups** because a full sync is longer
+  than a serverless function may run. `?group=1|2|3` runs one group
+  (1 = captain/pax/item, 2 = gstn/due_payment/executive/kot,
+  3 = inventory/purchase_invoices/purchase_returns); no parameter runs
+  everything, which is the local-computer path. The workflow calls the three
+  groups one after the other. The Google Sheets feedback pull runs once, in
+  group 3.
 - Data is pulled by **browser automation**, not an API: `runPetpoojaSync()` drives
   Chrome via Playwright against `billing.petpooja.com`.
 - The local computer workflow still works as a manual fallback:

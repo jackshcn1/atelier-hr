@@ -45,11 +45,35 @@ async function handle(req) {
   }
 
   const logs = [];
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+
   const push = (...args) => {
     const line = args.join(' ');
     logs.push(line);
-    console.log(line);
+    originalLog(line);
   };
+
+  // The sync engine writes its progress straight to the console. Tee it into
+  // the response so the scheduler's summary shows which reports were fetched,
+  // instead of only "ok: true".
+  const stringify = (a) => {
+    if (typeof a === 'string') return a;
+    try {
+      return JSON.stringify(a);
+    } catch {
+      return String(a);
+    }
+  };
+  const tee = (sink) => (...args) => {
+    const line = args.map(stringify).join(' ');
+    logs.push(line);
+    sink(line);
+  };
+  console.log = tee(originalLog);
+  console.warn = tee(originalWarn);
+  console.error = tee(originalError);
 
   try {
     // Serverless has no bundled browser and no display.
@@ -92,7 +116,7 @@ async function handle(req) {
       ok: true,
       durationMs: Date.now() - started,
       result,
-      logs: logs.slice(-80),
+      logs: logs.slice(-200),
     });
   } catch (err) {
     console.error('Sync failed:', err);
@@ -101,10 +125,14 @@ async function handle(req) {
         ok: false,
         durationMs: Date.now() - started,
         error: err?.message || String(err),
-        logs: logs.slice(-80),
+        logs: logs.slice(-200),
       },
       { status: 500 },
     );
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+    console.error = originalError;
   }
 }
 

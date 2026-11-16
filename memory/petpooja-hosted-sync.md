@@ -43,6 +43,30 @@ architecture, not an obstacle to it.
   `SUPABASE_SERVICE_ROLE_KEY`) and GitHub Actions secrets (`VERCEL_SYNC_URL`,
   `VERCEL_SYNC_SECRET`). Both must exist or the job fails silently.
 
+## Report groups (the 300 s ceiling)
+
+A full sync runs **240–285 s**, right against Vercel Hobby's `maxDuration: 300`,
+and the last hosted attempt died with `FUNCTION_INVOCATION_TIMEOUT`. So the
+reports are split into three groups and the workflow calls them one after the
+other (never in parallel — they write the same metric rows):
+
+| Group | Reports |
+|---|---|
+| 1 | `captain`, `pax`, `item` (the heaviest — ~7.4 MB Item Report) |
+| 2 | `gstn`, `due_payment`, `executive`, `kot` |
+| 3 | `inventory`, `purchase_invoices`, `purchase_returns` + the Google Sheets feedback pull |
+
+- `?group=1|2|3` selects one group; `?reports=a,b` selects an explicit set;
+  **no parameter runs everything** — that is the local-computer path and it is
+  unchanged.
+- `SYNC_GROUP` / `SYNC_REPORTS` (env) are the underlying switches, read by
+  `reportEnabled()` in `scripts/petpooja-sync.mjs`.
+- The Google Sheets customer-feedback pull is not a Petpooja report but writes
+  to the same metric rows, so `feedbackEnabled()` runs it **once only, in group 3**.
+- The serverless runner is slower than the desktop, so report downloads get a
+  longer timeout via `PETPOOJA_DOWNLOAD_TIMEOUT` (120000 ms on Vercel; 35 s
+  locally).
+
 ## Constraints that must not be broken
 
 1. **`middleware.js` gates every path to `/login`.** `/api/sync` is excluded with an
