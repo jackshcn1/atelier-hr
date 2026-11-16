@@ -31,6 +31,47 @@ function isAuthorized(req) {
   return bearer === expected || header === expected;
 }
 
+// Console capture.
+//
+// The sync engine reports its progress with plain console.log calls, and
+// those lines are the only record of which reports were fetched. They are
+// teed into the response so a scheduled run's summary is meaningful.
+//
+// This is patched ONCE at module scope, not per request. A serverless
+// instance can be serving two requests at the same time (a manual trigger
+// while the schedule fires), and a per-request patch would have the second
+// request hijack the first one's capture — one request's log lines landing
+// in the other's response. One shared slot is safe: in the worst case two
+// overlapping runs share a log array, which is harmless, instead of one
+// run's output being silently lost or the console left permanently patched.
+const capture = { logs: null };
+
+const originalLog = console.log;
+
+const stringify = (a) => {
+  if (typeof a === 'string') return a;
+  try {
+    return JSON.stringify(a);
+  } catch {
+    return String(a);
+  }
+};
+
+const tee = (sink) => (...args) => {
+  const line = args.map(stringify).join(' ');
+  const target = capture.logs;
+  if (target) {
+    target.push(line);
+    // Keep the array bounded — a long run can log a lot.
+    if (target.length > 1000) target.splice(0, target.length - 1000);
+  }
+  sink(line);
+};
+
+console.log = tee(console.log);
+console.warn = tee(console.warn);
+console.error = tee(console.error);
+
 async function handle(req) {
   const started = Date.now();
 
@@ -45,10 +86,6 @@ async function handle(req) {
   }
 
   const logs = [];
-  const originalLog = console.log;
-  const originalWarn = console.warn;
-  const originalError = console.error;
-
   const push = (...args) => {
     const line = args.join(' ');
     logs.push(line);
@@ -58,23 +95,7 @@ async function handle(req) {
   // The sync engine writes its progress straight to the console. Tee it into
   // the response so the scheduler's summary shows which reports were fetched,
   // instead of only "ok: true".
-  const stringify = (a) => {
-    if (typeof a === 'string') return a;
-    try {
-      return JSON.stringify(a);
-    } catch {
-      return String(a);
-    }
-  };
-  const tee = (sink) => (...args) => {
-    const line = args.map(stringify).join(' ');
-    logs.push(line);
-    sink(line);
-  };
-  console.log = tee(originalLog);
-  console.warn = tee(originalWarn);
-  console.error = tee(originalError);
-
+  capture.logs = logs;
   try {
     // Serverless has no bundled browser and no display.
     process.env.PETPOOJA_HEADLESS = 'true';
@@ -130,9 +151,7 @@ async function handle(req) {
       { status: 500 },
     );
   } finally {
-    console.log = originalLog;
-    console.warn = originalWarn;
-    console.error = originalError;
+    capture.logs = null;
   }
 }
 

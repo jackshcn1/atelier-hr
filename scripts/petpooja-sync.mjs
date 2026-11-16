@@ -4,7 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
-import { existsSync, readFileSync, appendFileSync } from 'node:fs';
+import { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -110,6 +110,28 @@ async function saveDebugScreenshot(page, name, options = {}) {
   }
 }
 
+// When a downloaded report cannot be parsed, save the raw rows so the parser
+// can be fixed against the real file instead of guessing at its shape.
+function dumpReportRows(name, rows) {
+  const file = join(process.cwd(), 'scripts', `debug-rows-${name.replace(/[^a-zA-Z0-9]/g, '_')}.json`);
+  try {
+    // A report may carry the interesting table on a sheet other than the
+    // first one, so the whole workbook is saved alongside the used rows.
+    const sheets = {};
+    if (lastWorkbook) {
+      for (const sheetName of lastWorkbook.SheetNames) {
+        sheets[sheetName] = XLSX.utils.sheet_to_json(lastWorkbook.Sheets[sheetName], {
+          header: 1, defval: '', raw: false, blankrows: true
+        });
+      }
+    }
+    writeFileSync(file, JSON.stringify({ sheets, usedRows: rows }, null, 2));
+    console.log(`  🧾 Saved raw report rows to ${file}`);
+  } catch (e) {
+    console.warn(`  🧾 Could not save raw report rows: ${e.message}`);
+  }
+}
+
 // Calculate active 20th–19th payroll cycle (e.g. 2026-09-20 to 2026-10-19 when today is Sep 29)
 function getActivePayrollCycle() {
   if (process.env.SYNC_START_DATE && process.env.SYNC_END_DATE) {
@@ -155,7 +177,14 @@ function getActivePayrollCycle() {
   };
 }
 
-function parseWorkbookBuffer(buffer) {
+// The workbook of the most recently downloaded report, kept so a failed parse
+// can be diagnosed against every sheet the file contains.
+let lastWorkbook = null;
+
+// Read every sheet of a downloaded report. Petpooja's Executive Sales Report,
+// for example, spreads its sections over 17 sheets and the interesting table
+// is not the first one.
+function parseWorkbookSheets(buffer) {
   if (!buffer || buffer.length === 0) return [];
   let wb;
   try {
@@ -169,15 +198,20 @@ function parseWorkbookBuffer(buffer) {
       return [];
     }
   }
-  const sheetName = wb?.SheetNames?.[0];
-  if (!sheetName || !wb.Sheets[sheetName]) return [];
-  const sheet = wb.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json(sheet, {
-    header: 1,
-    defval: '',
-    raw: false,
-    blankrows: true
-  });
+  lastWorkbook = wb;
+  return wb.SheetNames.map((name) => ({
+    name,
+    rows: XLSX.utils.sheet_to_json(wb.Sheets[name], {
+      header: 1,
+      defval: '',
+      raw: false,
+      blankrows: true
+    })
+  }));
+}
+
+function parseWorkbookBuffer(buffer) {
+  return parseWorkbookSheets(buffer)[0]?.rows || [];
 }
 
 export async function runPetpoojaSync(options = {}) {
@@ -421,7 +455,22 @@ export async function runPetpoojaSync(options = {}) {
     console.log(`✓ Post-login URL: ${page.url()} ("${await page.title()}")`);
 
     // Helper: download custom report and return sheet rows
-    async function fetchCustomReport(url, reportName, queryCycle = cycle) {
+    // `sheetMatch` picks the sheet to read when a report spreads its sections
+    // over several sheets (matched against the sheet's first cell).
+    async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch = null) {
+      const readRows = (buffer) => {
+        const sheets = parseWorkbookSheets(buffer);
+        if (sheetMatch) {
+          const wanted = sheetMatch.toLowerCase();
+          const hit = sheets.find((s) => String(s.rows?.[0]?.[0] ?? '').toLowerCase().includes(wanted));
+          if (hit) {
+            console.log(`  ℹ️ Using sheet "${hit.name}" of ${sheets.length} for ${reportName}`);
+            return hit.rows;
+          }
+          console.log(`  ⚠️ No sheet starting with "${sheetMatch}" in ${reportName} — using the first sheet.`);
+        }
+        return sheets[0]?.rows || [];
+      };
       console.log(`📥 Fetching ${reportName} (${url})...`);
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
@@ -565,7 +614,7 @@ export async function runPetpoojaSync(options = {}) {
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
         console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
-        return parseWorkbookBuffer(buffer);
+        return readRows(buffer);
       }
 
       // Special Handler B: Corporate GSTN Summary (/reports/all_restaurant_orders/all)
@@ -600,7 +649,7 @@ export async function runPetpoojaSync(options = {}) {
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
         console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
-        return parseWorkbookBuffer(buffer);
+        return readRows(buffer);
       }
 
       // Special Handler C: Petpooja Inventory Exports (Wastage & Purchase Returns)
@@ -658,7 +707,7 @@ export async function runPetpoojaSync(options = {}) {
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
         console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
-        return parseWorkbookBuffer(buffer);
+        return readRows(buffer);
       }
 
       // 2. General Case: Locate and trigger "Excel" button / Export Dropdown
@@ -733,7 +782,7 @@ export async function runPetpoojaSync(options = {}) {
       }
       const buffer = Buffer.concat(chunks);
       console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
-      return parseWorkbookBuffer(buffer);
+      return readRows(buffer);
     }
 
     let successfulReports = 0;
@@ -885,7 +934,9 @@ export async function runPetpoojaSync(options = {}) {
     if (reportEnabled('executive')) {
       try {
         console.log("📥 Fetching Executive Sales Summary...");
-        const execRows = await fetchCustomReport("https://billing.petpooja.com/reports/executive_sales_summary/all", "Executive Sales Summary", cycle);
+        // The Executive Sales Report spreads its sections over 17 sheets;
+        // the Order Type table is the one we need.
+        const execRows = await fetchCustomReport("https://billing.petpooja.com/reports/executive_sales_summary/all", "Executive Sales Summary", cycle, 'order type');
         const execResult = parseExecutiveOrderTypes(execRows);
         if (execResult.ok) {
           console.log("  📊 Executive Sales breakdown:", JSON.stringify(execResult.data));
@@ -893,6 +944,12 @@ export async function runPetpoojaSync(options = {}) {
           await saveMetric("rev_delivery", execResult.data.delivery, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
           await saveMetric("rev_pick_up", execResult.data.pick_up, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
           successfulReports++;
+        } else {
+          // Never fail silently: the report downloaded but its shape was not
+          // understood, so the revenue breakdown metrics were not written.
+          console.error(`⚠️ Could not parse Executive Sales Summary: ${execResult.error || 'unknown reason'}`);
+          dumpReportRows('executive-sales', execRows);
+          failedReports++;
         }
       } catch (e) {
         failedReports++;
@@ -903,8 +960,21 @@ export async function runPetpoojaSync(options = {}) {
       try {
         console.log('📥 Fetching Kitchen Prep Time Report...');
   
-        // Base Menu cache directory
-        const cacheDir = join(__dirname, '../.claude/base-menu-cache');
+        // Base Menu cache directory.
+        // On a serverless runtime the bundle directory is read-only, so fall
+        // back to the temp directory — otherwise writing the cache throws and
+        // the kitchen prep-time metric is silently skipped.
+        const cacheDir = (() => {
+          const preferred = join(__dirname, '../.claude/base-menu-cache');
+          try {
+            mkdirSync(preferred, { recursive: true });
+            return preferred;
+          } catch {
+            const fallback = join(tmpdir(), 'atelier-base-menu-cache');
+            mkdirSync(fallback, { recursive: true });
+            return fallback;
+          }
+        })();
         const cacheFile = join(cacheDir, 'base-menu.json');
         const CACHE_DAYS = 15; // Refresh Base Menu every 15 days
   
@@ -1022,15 +1092,17 @@ export async function runPetpoojaSync(options = {}) {
               console.log(`  ✓ Parsed Base Menu: ${baseMenuRows.length} rows`);
   
               // Cache the Base Menu for future runs
-              const { mkdirSync } = await import('node:fs');
-              mkdirSync(cacheDir, { recursive: true });
               const cacheData = {
                 timestamp: new Date().toISOString(),
                 rows: baseMenuRows
               };
-              const { writeFileSync } = await import('node:fs');
-              writeFileSync(cacheFile, JSON.stringify(cacheData));
-              console.log(`  💾 Cached Base Menu for next ${CACHE_DAYS} days`);
+              try {
+                writeFileSync(cacheFile, JSON.stringify(cacheData));
+                console.log(`  💾 Cached Base Menu for next ${CACHE_DAYS} days`);
+              } catch (cacheErr) {
+                // A cache that cannot be written is not a reason to fail the report.
+                console.log(`  ℹ️ Could not cache Base Menu (${cacheErr.message}) — continuing.`);
+              }
             } else {
               console.log('  ⚠️ Could not find "items" file in Base Menu zip');
             }

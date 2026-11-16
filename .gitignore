@@ -34,6 +34,7 @@ scripts/petpooja-sync.log
 scripts/last-successful-sync.json
 scripts/startup-sync.log
 scripts/debug-*.png
+scripts/debug-rows-*.json
 .claude/base-menu-cache/
 
 # vercel
