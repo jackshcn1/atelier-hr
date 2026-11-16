@@ -97,12 +97,18 @@ const DOWNLOAD_TIMEOUT = Number(process.env.PETPOOJA_DOWNLOAD_TIMEOUT || 35000);
 // on a serverless runtime, so fall back to a temp directory — and never let a
 // failed screenshot mask the real error it was meant to capture.
 async function saveDebugScreenshot(page, name, options = {}) {
+  // On the serverless runtime there is nowhere to write the file, so skip it
+  // rather than spend the time limit on a screenshot that cannot be saved.
+  if (process.env.VERCEL) return null;
+
   const file = `debug-${name.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
   const dir = process.env.PETPOOJA_DEBUG_DIR
     || (existsSync(join(process.cwd(), 'scripts')) ? 'scripts' : tmpdir());
   const filePath = join(dir, file);
   try {
-    await page.screenshot({ path: filePath, fullPage: true, ...options });
+    // A busy page can take a long time to render; the screenshot must never
+    // hold up the report it is meant to document.
+    await page.screenshot({ path: filePath, fullPage: false, timeout: 5000, ...options });
     console.log(`  📸 Saved screenshot to ${filePath}`);
     return filePath;
   } catch (e) {
@@ -425,26 +431,34 @@ export async function runPetpoojaSync(options = {}) {
     if (vendorNames.length > 0) {
       const { data } = await supabase
         .from('expenses')
-        .select('id, vendor_name, invoice_number')
+        .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note')
         .in('vendor_name', vendorNames);
       existing = data || [];
     }
-    const existingByKey = new Map(existing.map(e => [keyOf(e.vendor_name, e.invoice_number), e.id]));
+    const existingByKey = new Map(existing.map(e => [keyOf(e.vendor_name, e.invoice_number), e]));
 
     const toInsert = new Map();
     const toUpdate = [];
     for (const row of rows) {
       const key = keyOf(row.vendor_name, row.invoice_number);
-      const id = existingByKey.get(key);
-      if (id) {
-        toUpdate.push({ id, row });
-      } else if (!toInsert.has(key)) {
-        toInsert.set(key, row);
+      const found = existingByKey.get(key);
+      if (!found) {
+        if (!toInsert.has(key)) toInsert.set(key, row);
+        continue;
       }
+      // Only write the row again when something actually changed. A daily run
+      // over the same bills must not spend a request per bill every morning.
+      const changed =
+        Number(found.amount || 0) !== Number(row.amount || 0) ||
+        (found.invoice_date || null) !== (row.invoice_date || null) ||
+        (found.payment_status || null) !== (row.payment_status || null) ||
+        Number(found.debit_note || 0) !== Number(row.debit_note || 0);
+      if (changed) toUpdate.push({ id: found.id, row });
     }
 
     let inserted = 0;
     let updated = 0;
+    let unchanged = 0;
 
     if (toInsert.size > 0) {
       const batch = [...toInsert.values()];
@@ -467,8 +481,9 @@ export async function runPetpoojaSync(options = {}) {
       }
     }
 
-    console.log(`  ✓ ${label}: ${inserted} new, ${updated} updated`);
-    return { inserted, updated };
+    unchanged = rows.length - inserted - updated;
+    console.log(`  ✓ ${label}: ${inserted} new, ${updated} updated, ${unchanged} unchanged`);
+    return { inserted, updated, unchanged };
   }
 
   function findEmployeeByName(name, empList) {    if (!name) return null;
@@ -758,13 +773,21 @@ export async function runPetpoojaSync(options = {}) {
         console.log('  ✓ Clicked Export dropdown button');
         await page.waitForTimeout(1500);
 
-        const downloadPromise = new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Download timeout')), DOWNLOAD_TIMEOUT);
-          page.once('download', dl => { clearTimeout(timer); resolve(dl); });
-          context.once('page', async p => {
-            p.once('download', dl => { clearTimeout(timer); resolve(dl); });
-          });
+        const waitForDownload = (waitMs) => new Promise((resolve, reject) => {
+          let timer = null;
+          const cleanup = () => {
+            clearTimeout(timer);
+            page.off('download', onDownload);
+            context.off('page', onNewPage);
+          };
+          const onDownload = (dl) => { cleanup(); resolve(dl); };
+          const onNewPage = (p) => { p.once('download', onDownload); };
+          timer = setTimeout(() => { cleanup(); reject(new Error('Download timeout')); }, waitMs);
+          page.on('download', onDownload);
+          context.on('page', onNewPage);
         });
+
+        const downloadPromise = waitForDownload(DOWNLOAD_TIMEOUT);
 
         // Click "Export All" in dropdown menu - try multiple selectors
         const subOption = page.locator('.dropdown-menu:visible a:has-text("Export all"), .dropdown-menu:visible a:has-text("Export All"), .dropdown-menu:visible li:has-text("Export all"), ul.dropdown-menu:visible a:has-text("all")').first();
@@ -780,7 +803,28 @@ export async function runPetpoojaSync(options = {}) {
           }
         }
 
-        const download = await downloadPromise;
+        let download;
+        try {
+          download = await downloadPromise;
+        } catch (err) {
+          // Petpooja does not always stream the export straight to the browser.
+          // Sometimes it queues the export and offers a "Download" link in a
+          // table on the same page — wait for that link and use it instead.
+          console.log('  ℹ️ No direct download — waiting for a queued export to become available...');
+          const queuedLink = page.locator('table a:visible:has-text("Download"), a:visible:has-text("Download")').first();
+          let found = false;
+          for (let i = 0; i < 20 && !found; i++) {
+            await page.waitForTimeout(3000);
+            found = await queuedLink.count() > 0 && await queuedLink.isVisible().catch(() => false);
+          }
+          if (!found) throw err;
+
+          console.log('  ✓ Found the queued export — clicking its Download link...');
+          const queuedDownload = waitForDownload(DOWNLOAD_TIMEOUT);
+          await queuedLink.click({ force: true });
+          download = await queuedDownload;
+        }
+
         const downloadStream = await download.createReadStream();
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);

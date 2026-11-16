@@ -46,17 +46,18 @@ architecture, not an obstacle to it.
 ## Report groups (the 300 s ceiling)
 
 A full sync runs **240–285 s**, right against Vercel Hobby's `maxDuration: 300`,
-and the last hosted attempt died with `FUNCTION_INVOCATION_TIMEOUT`. So the
-reports are split into three groups and the workflow calls them one after the
+and the first hosted attempt died with `FUNCTION_INVOCATION_TIMEOUT`. So the
+reports are split into four groups and the workflow calls them one after the
 other (never in parallel — they write the same metric rows):
 
-| Group | Reports |
-|---|---|
-| 1 | `captain`, `pax`, `item` (the heaviest — ~7.4 MB Item Report) |
-| 2 | `gstn`, `due_payment`, `executive`, `kot` |
-| 3 | `inventory`, `purchase_invoices`, `purchase_returns` + the Google Sheets feedback pull |
+| Group | Reports | Measured |
+|---|---|---|
+| 1 | `captain`, `pax`, `item` (the heaviest — ~7.4 MB Item Report) | ~160 s |
+| 2 | `gstn`, `due_payment`, `executive`, `kot` | ~183 s |
+| 3 | `inventory` (wastage), `purchase_invoices` | ~120 s |
+| 4 | `purchase_returns` (debit notes) | ~60 s |
 
-- `?group=1|2|3` selects one group; `?reports=a,b` selects an explicit set;
+- `?group=1|2|3|4` selects one group; `?reports=a,b` selects an explicit set;
   **no parameter runs everything** — that is the local-computer path and it is
   unchanged.
 - `SYNC_GROUP` / `SYNC_REPORTS` (env) are the underlying switches, read by
@@ -66,6 +67,27 @@ other (never in parallel — they write the same metric rows):
 - The serverless runner is slower than the desktop, so report downloads get a
   longer timeout via `PETPOOJA_DOWNLOAD_TIMEOUT` (120000 ms on Vercel; 35 s
   locally).
+- Each report download logs how long it took, so a slow day is visible in the
+  log rather than showing up as a timeout.
+
+## Two syncs must never overlap
+
+Petpooja refuses a second login while another session is active: the second
+run gets the login page's email step but never the password field, and fails
+with `locator.waitFor: Timeout 20000ms exceeded` on
+`#UserPassword`. This is easy to trigger by hand — cancelling a local `curl`
+does **not** stop the server-side function, which keeps running for its full
+300 s. GitHub's `concurrency: petpooja-sync` group stops two *workflow runs*
+from overlapping, but nothing stops a manual endpoint call from racing the
+schedule. Let a previous call finish before starting another.
+
+## Console capture
+
+The endpoint tees the sync engine's `console.log` output into its JSON
+response so a scheduled run's summary shows which reports were fetched. The
+patch is applied **once at module scope**, not per request: a serverless
+instance can serve two requests at once, and a per-request patch lets the
+second request hijack the first one's capture.
 
 ## Constraints that must not be broken
 
