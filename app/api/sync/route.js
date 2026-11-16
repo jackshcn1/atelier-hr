@@ -120,34 +120,41 @@ async function handle(req) {
 
     // Chromium flags.
     //
-    // `--single-process` and `--no-zygote` together make Chromium run the
-    // browser, the GPU and the renderer in ONE process. That is the
-    // @sparticuz/chromium default, and it is why the browser used to die at
-    // random: a fault in any part of it takes the whole thing down, and the
-    // sync sees "Target page, context or browser has been closed".
+    // The @sparticuz/chromium default is `--single-process` + `--no-zygote`:
+    // the browser, the GPU and the renderer all run in ONE process, so a
+    // fault anywhere in it takes the whole browser down ("Target page,
+    // context or browser has been closed").
     //
-    // Removing `--single-process` on its own is not enough — `--no-zygote`
-    // without a zygote leaves Chromium unable to fork a renderer, which is
-    // the "Target crashed" on newPage this project hit before. Both have to
-    // go together.
+    // Removing `--single-process` is NOT an option here: this is a headless
+    // *shell* build, and without it the renderer cannot start at all
+    // ("browserContext.newPage: Target crashed"). The two have to go
+    // together, and this build cannot do without the single process.
     //
-    // `--disable-dev-shm-usage` is added as well: the serverless container
-    // has a tiny /dev/shm, and Chromium crashes when it runs out. The local
-    // run has always passed this flag; the serverless one did not.
+    // `--disable-dev-shm-usage` was missing from the serverless args (the
+    // local run has always passed it). The serverless container has a tiny
+    // /dev/shm, and Chromium is unhappy when it runs out.
     //
-    // `?chromium=single` keeps the old flags, as an escape hatch if the
-    // normal ones ever stop working.
-    const useSingleProcess = params.get('chromium') === 'single';
-    const baseArgs = useSingleProcess
-      ? chromium.args
-      : chromium.args.filter((a) => a !== '--single-process' && a !== '--no-zygote');
+    // The modes below exist so the flags can be measured on the server
+    // rather than argued about. `?chromium=<mode>` picks one.
+    const chromiumMode = params.get('chromium') || 'default';
+    const args = chromium.args.slice();
+    if (chromiumMode === 'zygote') {
+      // Both process flags removed — the "normal" Chromium process model.
+      const i = args.indexOf('--single-process');
+      if (i !== -1) args.splice(i, 1);
+      const j = args.indexOf('--no-zygote');
+      if (j !== -1) args.splice(j, 1);
+    }
+    if (chromiumMode !== 'no-shm') {
+      args.push('--disable-dev-shm-usage');
+    }
 
     process.env.PETPOOJA_CHROMIUM_ARGS = JSON.stringify([
-      ...baseArgs,
+      ...args,
       '--disable-gpu',
-      '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
     ]);
+    push(`🧭 Chromium mode: ${chromiumMode}`);
 
     // A full sync is longer than a serverless function may run, so the
     // reports are split into groups that each fit. ?group=1..10 runs one
