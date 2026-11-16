@@ -1251,7 +1251,18 @@ export async function runPetpoojaSync(options = {}) {
         try {
           const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report', cycle);
           const wastageResult = parseWastage(wastageRows, cycle);
-          if (wastageResult.ok) {
+          if (!wastageRows || wastageRows.length === 0) {
+            // Nothing was recorded for this period. The honest value is zero —
+            // a missing metric would leave the kitchen scheme with no wastage
+            // figure at all.
+            console.log('  📊 No wastage recorded for this period — recording 0.');
+            await saveMetric('kit_wastage', 0, 'petpooja', 'Wastage Report', {
+              scheme_name: 'kitchen',
+              entries: 0,
+              skippedCancelled: 0
+            });
+            successfulReports++;
+          } else if (wastageResult.ok) {
             console.log(`  📊 Total Kitchen Wastage: ₹${wastageResult.total} across ${wastageResult.entries} entries`);
             if (wastageResult.skippedCancelled > 0) {
               console.log(`  ℹ️ Skipped ${wastageResult.skippedCancelled} cancelled wastage entries`);
