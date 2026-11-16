@@ -1087,6 +1087,11 @@ export async function runPetpoojaSync(options = {}) {
   // report group can pick it up instead of logging in again.
   let sessionOut = null;
 
+  // What the run actually fetched. It carries no secret - only counts - and
+  // it lets the caller answer with an honest status instead of a cheerful
+  // 200 for a group that fetched nothing.
+  let reportOutcome = null;
+
   try {
     // A session handed over by the previous group is restored first; only if
     // that fails does this group spend a login of its own. The session is
@@ -1949,45 +1954,36 @@ export async function runPetpoojaSync(options = {}) {
     }
 
     // The Inventory module lives behind a single sign-on from the billing
-    // dashboard, so every group that needs it has to open it first. The
-    // dashboard is slow to load at times, so it is retried rather than
-    // failing the report.
+    // dashboard, so every group that needs it has to open it first.
+    //
+    // The hand-off is a COOKIE, not a page. Loading the dashboard in the
+    // browser is the single heaviest thing this run does, and on the
+    // serverless host it is what kills the browser: the three inventory
+    // groups were the only ones still failing, every one of them dying on
+    // that dashboard load.
+    //
+    // So the dashboard is never rendered. A plain request to it is enough,
+    // because that request refreshes the single-sign-on cookie (PETPOOJA_CO)
+    // that the inventory subdomain accepts, and the inventory pages then
+    // open directly. Verified both ways: with the cookie refreshed by a
+    // request the inventory pages open, and without it they bounce straight
+    // back to the billing dashboard.
     let inventorySessionReady = false;
     async function openInventoryModule() {
       if (inventorySessionReady) return;
 
-      let lastError = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          await page.goto('https://billing.petpooja.com/users/dashboard', {
-            waitUntil: 'domcontentloaded',
-            timeout: 45000
-          });
-          lastError = null;
-          break;
-        } catch (e) {
-          lastError = e;
-          console.log(`  ℹ️ Dashboard load failed (attempt ${attempt}/3): ${e.message}`);
-          await page.waitForTimeout(3000);
-        }
+      const response = await context.request.get(DASHBOARD_URL, {
+        timeout: 25000,
+        maxRedirects: 5,
+      });
+      const landedOn = response.url();
+      if (!/dashboard/i.test(landedOn)) {
+        throw new Error(`The Petpooja hand-off to the Inventory module did not reach the dashboard (landed on ${landedOn}).`);
       }
-      if (lastError) throw lastError;
-
-      const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
-      if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
-        console.log('  ✓ Clicking Inventory in sidebar navigation...');
-        const [newPage] = await Promise.all([
-          context.waitForEvent('page', { timeout: 8000 }).catch(() => null),
-          invLink.click({ force: true })
-        ]);
-        if (newPage) {
-          await newPage.waitForLoadState('load').catch(() => {});
-          await newPage.waitForTimeout(3000);
-        } else {
-          await page.waitForURL(/inventory\.petpooja\.com/, { timeout: 15000 }).catch(() => {});
-          await page.waitForTimeout(3000);
-        }
+      if (!response.ok()) {
+        throw new Error(`The Petpooja hand-off to the Inventory module answered HTTP ${response.status()}.`);
       }
+      console.log('  ✓ Refreshed the Petpooja single-sign-on for the Inventory module (no page loaded).');
       inventorySessionReady = true;
     }
 
@@ -2171,6 +2167,8 @@ export async function runPetpoojaSync(options = {}) {
         errorDetails: `Successful reports: ${successfulReports}, Failed reports: ${failedReports}`
       });
     }
+
+    reportOutcome = { successfulReports, failedReports };
   } catch (fatal) {
     runFailed = true;
     console.error('❌ Sync failed:', fatal.message);
@@ -2316,8 +2314,10 @@ export async function runPetpoojaSync(options = {}) {
     }, null, 2));
   } catch {}
 
-  // Nothing is returned to the caller: the live session is a credential, and
-  // the response body of this endpoint is printed in the workflow log.
+  // Only counts come back: what the run fetched and what it could not. The
+  // live session is a credential and never travels in a response body, which
+  // the workflow prints into its log.
+  return reportOutcome;
 }
 
 // Direct execution from CLI — also mirrors output to a rotating log file so a

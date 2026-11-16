@@ -218,10 +218,10 @@ async function handle(req) {
     }
 
     push('🌐 Starting Petpooja sync on Vercel...');
-    // The engine returns nothing that could be sensitive: the live session
+    // The engine returns only counts of what it fetched. The live session
     // stays in the database and never travels in the response, which the
     // workflow prints into its log.
-    await runPetpoojaSync({ keepSession });
+    const outcome = await runPetpoojaSync({ keepSession });
 
     // A pay cycle that has ended must be locked with its figures frozen.
     // The office-computer runner did this after every sync; the hosted run
@@ -236,6 +236,22 @@ async function handle(req) {
       // The figures synced fine — a cycle that could not be closed can be
       // closed by hand from the attainment dashboard.
       console.error(`⚠️ Could not close finished pay cycles: ${closeErr.message}`);
+    }
+
+    // A group that fetched nothing must not look like a success. The
+    // scheduler retries on a failing status, so the answer has to be
+    // truthful about what actually happened.
+    if (outcome && outcome.successfulReports === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          durationMs: Date.now() - started,
+          error: `No report could be fetched (${outcome.failedReports} failed).`,
+          closedCycles: closed?.closed ?? 0,
+          logs: logs.slice(-200),
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
