@@ -247,6 +247,41 @@ session was in that body, so the login cookies were being written into the
 build log. The engine now returns nothing at all, and the session never
 leaves the database.
 
+## The dashboard page is what kills the browser (16 Nov 2026)
+
+The single most useful fact found on 16 Nov: **the bundled Chromium does not
+die at random — it dies on the billing dashboard page.** That page is a heavy
+single-page app, and rendering it in a single-process headless shell on a
+one-vCPU serverless box is what takes the browser down. Every failure in
+every failed run traces back to it:
+
+- the session restore loaded the dashboard, just to see whether the saved
+  session was still good — the browser died there;
+- the inventory module loaded the dashboard to start the single sign-on to
+  `inventory.petpooja.com` — the browser died there.
+
+Both of those need a **cookie**, not a picture of a page, and both can be
+done with a plain HTTP request (`context.request.get`) that never draws
+anything:
+
+- **Checking the session**: a plain `GET /users/dashboard` with the saved
+  cookies answers the same question — the response lands on the dashboard
+  when the session is live and on `/users/login` when it is not. The report
+  page then becomes the only page the browser ever loads.
+- **The inventory single sign-on**: the hand-off to the inventory subdomain
+  is the `PETPOOJA_CO` cookie, and a plain request to the dashboard
+  **rotates** it. With the fresh cookie the inventory pages open directly;
+  without it they bounce straight back to the billing dashboard. Verified
+  both ways.
+
+With those two changes groups 1–8 of the run passed in a row for the first
+time, and the crash rate dropped from roughly one group in three to one in
+twenty.
+
+**How to apply:** on this host, do not put a heavy page in front of a cookie
+that a plain request can fetch. If a report page still needs something, ask
+whether the browser has to see it at all.
+
 ## Two separate problems on the serverless host
 
 Do not confuse these — they have different causes and different fixes:
