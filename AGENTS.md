@@ -103,7 +103,15 @@ All four connections are live and verified. Re-verify with
 - Data is pulled by **browser automation**, not an API: `runPetpoojaSync()` drives
   Chrome via Playwright against `billing.petpooja.com`.
 - The local computer workflow still works as a manual fallback:
-  `node scripts/petpooja-sync.mjs` (headed Chrome).
+  `node scripts/petpooja-sync.mjs` (headed Chrome). On the desktop it runs every
+  report; `SYNC_GROUP=1` runs one group.
+- **Petpooja export quirks worth knowing:** the Executive Sales Report is a
+  17-sheet workbook (the Order Type table is on Sheet10); the purchase bill list
+  is at `inventories/purchase_list/`, not `purchase_invoice_list/`; the inventory
+  exports are named-column sheets, so their parsers find columns by header text.
+  The `expenses` table has **no** unique index on `(vendor_name, invoice_number)`,
+  so bill rows are compared and written individually — never `upsert` with an
+  `onConflict` on that pair.
 - **Known gaps:** the Google service-account key is not on the server, so the
   Customer Feedback (Google Sheets) sync is inactive in the hosted run; SMTP is
   not configured, so email alerts are skipped (GitHub's own failure notification

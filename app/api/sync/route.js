@@ -17,7 +17,7 @@
  */
 import { NextResponse } from 'next/server';
 import chromium from '@sparticuz/chromium';
-import { runPetpoojaSync } from '../../../scripts/petpooja-sync.mjs';
+import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -121,9 +121,38 @@ async function handle(req) {
     // everything (the local-computer path).
     const group = params.get('group');
     const reports = params.get('reports');
+
+    // An unknown group or report name is rejected outright. Silently running
+    // nothing would answer 200 with "0 reports" — a scheduler would call that
+    // a successful run while no metric was ever fetched.
+    if (group && !REPORT_GROUPS[Number(group)]) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Unknown report group "${group}".`,
+          knownGroups: Object.keys(REPORT_GROUPS),
+        },
+        { status: 400 },
+      );
+    }
+    if (reports) {
+      const unknown = reports.split(',').map((s) => s.trim()).filter(Boolean)
+        .filter((name) => !REPORT_NAMES.includes(name));
+      if (unknown.length > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Unknown report(s): ${unknown.join(', ')}.`,
+            knownReports: REPORT_NAMES,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     if (group) {
       process.env.SYNC_GROUP = group;
-      push(`📦 Report group: ${group}`);
+      push(`📦 Report group: ${group} (${REPORT_GROUPS[Number(group)].join(', ')})`);
     }
     if (reports) {
       process.env.SYNC_REPORTS = reports;
