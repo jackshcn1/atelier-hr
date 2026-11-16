@@ -47,26 +47,27 @@ architecture, not an obstacle to it.
 
 A full sync runs **240–285 s**, right against Vercel Hobby's `maxDuration: 300`,
 and the first hosted attempt died with `FUNCTION_INVOCATION_TIMEOUT`. So the
-reports are split into five groups and the workflow calls them one after the
+reports are split into six groups and the workflow calls them one after the
 other (never in parallel — they write the same metric rows):
 
-| Group | Reports | Measured (fast day / slow day) |
+| Group | Reports | Measured |
 |---|---|---|
-| 1 | `captain`, `pax`, `item` (the heaviest — 8.3 MB Item Report) | 163 s / 187 s |
-| 2 | `gstn`, `due_payment` | ~100 s |
-| 3 | `executive`, `kot` (KOT needs the Base Menu download too) | ~110 s |
-| 4 | `inventory` (wastage), `purchase_invoices` | ~143 s |
-| 5 | `purchase_returns` (debit notes) | ~93 s |
+| 1 | `captain`, `pax` | ~110 s |
+| 2 | `item` (8.4 MB Item Report) | ~75 s |
+| 3 | `gstn`, `due_payment` | ~128 s |
+| 4 | `executive`, `kot` (KOT needs the Base Menu too) | ~146 s |
+| 5 | `inventory` (wastage), `purchase_invoices` | ~143 s |
+| 6 | `purchase_returns` (debit notes) | ~109 s |
 
 **The groups are sized for a slow day, not a fast one.** Petpooja's pages can
 take twice as long to load; a group that fits on a good day but not on a bad
-one fails the whole nightly run. The first four-group layout put gstn +
+one fails the whole nightly run. An earlier four-group layout put gstn +
 due_payment + executive + kot together, which measured 188 s on a fast day and
 went past 300 s on a slow day.
 
-- `?group=1|2|3|4|5` selects one group; `?reports=a,b` selects an explicit set;
-  **no parameter runs everything** — that is the local-computer path and it is
-  unchanged.
+- `?group=1|2|3|4|5|6` selects one group; `?reports=a,b` selects an explicit
+  set; **no parameter runs everything** — that is the local-computer path and
+  it is unchanged.
 - `SYNC_GROUP` / `SYNC_REPORTS` (env) are the underlying switches, read by
   `reportEnabled()` in `scripts/petpooja-sync.mjs`.
 - The Google Sheets customer-feedback pull is not a Petpooja report but writes
@@ -78,13 +79,15 @@ went past 300 s on a slow day.
 - Each report download logs how long it took, so a slow day is visible in the
   log rather than showing up as a timeout.
 
-**Petpooja is slower than you think on a bad day.** Two report steps failed
-only under load and had to be made patient:
-- the Excel/Export button on a report page is now looked for over 30 s
-  instead of once — a single immediate check lost the whole Item Report;
-- the billing dashboard that mints the inventory session is now loaded with
-  `domcontentloaded` and retried three times, because a slow load used to
-  fail the whole report.
+**Petpooja is slower than you think on a bad day.** Three report steps had to
+be made patient:
+- the page is now **waited for** before it is used — it must have its date
+  fields before the export button is looked for, because a page exported
+  without a date filter covers the wrong period, not just no report at all.
+  The page is reloaded once if it never becomes usable.
+- the Excel/Export button is looked for over 30 s instead of once.
+- the billing dashboard that mints the inventory session is loaded with
+  `domcontentloaded` and retried three times.
 
 ## A green run must mean the work happened
 
@@ -152,7 +155,23 @@ second request hijack the first one's capture.
   path and is not on this machine, so the **Customer Feedback (Google Sheets) sync
   is inactive** in the hosted run. The engine skips it gracefully.
 - SMTP is not configured, so failure email alerts are skipped. GitHub's own
-  workflow-failure notification still fires.
+  workflow-failure notification still fires — and it is the only alert, because
+  the workflow now goes red when a group does not complete all its reports.
+
+## The office computer's own schedule
+
+The office PC registers two Windows tasks (`REGISTER-WINDOWS-SCHEDULE.bat`):
+`Atelier_Petpooja_Startup_Sync` (on every boot) and
+`Atelier_Petpooja_Noon_Failsafe_Sync` (daily at 12:00). Both must be switched
+off now that the sync runs in the cloud — two Petpooja logins at once break
+each other. `scripts/DISABLE-WINDOWS-SCHEDULE.bat` removes both; the local run
+stays available by hand with `node scripts\smart-daily-sync.mjs`.
+
+The local runner also **closes finished pay cycles** after a sync (locking the
+cycle and freezing its figures into a snapshot). The hosted endpoint does the
+same — `closeFinishedCycles()` now reads the Supabase environment variables
+when there is no local config file, which there never is on the serverless
+runtime.
 
 ## Useful limits (measured, not guessed)
 
