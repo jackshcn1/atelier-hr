@@ -149,6 +149,16 @@ async function handle(req) {
       args.push('--disable-dev-shm-usage');
     }
 
+    // The disk cache is the biggest thing a browser leaves behind. The
+    // bundled default is 32MB, and the serverless host gives the whole
+    // temporary folder 512MB — so ten report groups' worth of profiles fill
+    // the disk, and then the browser cannot even start. Two megabytes is
+    // plenty for reading a report.
+    const cacheArg = args.findIndex((a) => a.startsWith('--disk-cache-size='));
+    const smallCache = '--disk-cache-size=2097152';
+    if (cacheArg !== -1) args[cacheArg] = smallCache;
+    else args.push(smallCache);
+
     process.env.PETPOOJA_CHROMIUM_ARGS = JSON.stringify([
       ...args,
       '--disable-gpu',

@@ -360,16 +360,20 @@ function tempFolders() {
 }
 
 // Remove what the browser left behind.
-function clearRunTemp() {
+//
+// The disk on the serverless host is small, and every browser leaves a
+// profile and an artifacts folder behind. `force` is used when the disk is
+// low: at that point nothing may be left.
+function clearRunTemp(force = false) {
   for (const folder of tempFolders()) {
     try {
       for (const name of readdirSync(folder)) {
         if (!name.startsWith('playwright')) continue;
         const path = join(folder, name);
         try {
-          // A folder that was touched in the last minute may belong to a
-          // browser that is running right now, in another request.
-          if (Date.now() - statSync(path).mtimeMs < 60000) continue;
+          // A folder that was touched in the last half-minute may belong to
+          // a browser that is running right now, in another request.
+          if (!force && Date.now() - statSync(path).mtimeMs < 30000) continue;
           rmSync(path, { recursive: true, force: true });
         } catch {
           // Still in use, or already gone.
@@ -378,6 +382,16 @@ function clearRunTemp() {
     } catch {
       // Nothing to clear.
     }
+  }
+}
+
+// How much room is left in the temporary folder, in megabytes.
+function freeTempMb() {
+  try {
+    const s = statfsSync('/tmp');
+    return Math.round((s.bavail * s.bsize) / 1048576);
+  } catch {
+    return -1;
   }
 }
 
@@ -801,6 +815,17 @@ export async function runPetpoojaSync(options = {}) {
     // fill it — after which the browser dies in ways that look like anything
     // but a full disk.
     useOwnTempFolder();
+
+    // The disk is checked before the browser starts, not after it dies: when
+    // the disk is full the browser cannot even begin, and that is a different
+    // failure from a browser that dies later.
+    const free = freeTempMb();
+    console.log(`  💽 ${tempSpace()}`);
+    if (free >= 0 && free < 150) {
+      console.log(`  ⚠️ Only ${free}MB left — clearing everything the browser has left behind.`);
+      clearRunTemp(true);
+    }
+
     // A browser that died leaves its profile and cache behind in /tmp, and
     // the serverless host reuses the same instance for the next group. Those
     // leftovers are cleared first, because a full /tmp makes the next
