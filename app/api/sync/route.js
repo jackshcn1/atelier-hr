@@ -190,7 +190,10 @@ async function handle(req) {
     }
 
     push('🌐 Starting Petpooja sync on Vercel...');
-    const result = await runPetpoojaSync({ keepSession });
+    // The engine returns nothing that could be sensitive: the live session
+    // stays in the database and never travels in the response, which the
+    // workflow prints into its log.
+    await runPetpoojaSync({ keepSession });
 
     // A pay cycle that has ended must be locked with its figures frozen.
     // The office-computer runner did this after every sync; the hosted run
@@ -207,14 +210,12 @@ async function handle(req) {
       console.error(`⚠️ Could not close finished pay cycles: ${closeErr.message}`);
     }
 
-    const response = NextResponse.json({
+    return NextResponse.json({
       ok: true,
       durationMs: Date.now() - started,
-      result: result || {},
       closedCycles: closed?.closed ?? 0,
       logs: logs.slice(-200),
     });
-    return response;
   } catch (err) {
     console.error('Sync failed:', err);
     return NextResponse.json(

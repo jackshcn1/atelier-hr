@@ -1957,24 +1957,19 @@ export async function runPetpoojaSync(options = {}) {
     });
     throw fatal;
   } finally {
-    // Hand the session on to the next report group.
+    // Read the live session before the browser closes.
     //
-    // The cookies are read before the browser closes, and only the three that
-    // make up the login are kept — the analytics cookies are noise. They are
-    // never written to the log, and they are kept in the database so that any
-    // group can pick them up — including the first group of a run that was
-    // interrupted and left a live session behind.
-    if (keepSession && !runFailed) {
-      try {
-        const all = await context?.cookies();
-        sessionOut = (all || []).filter((c) => SESSION_COOKIE_NAMES.includes(c.name));
-        if (sessionOut.length) {
-          await saveStoredSession(sessionOut);
-          console.log(`  🔑 Session kept for the next group (${sessionOut.length} cookies).`);
-        }
-      } catch {
-        // A browser that already died has no session to hand on.
-      }
+    // Only the three cookies that make up the login are kept — the analytics
+    // cookies are noise. They are never written to the log, and they are kept
+    // in the database so that any group can pick them up — including the
+    // first group of a run that was interrupted and left a live session
+    // behind.
+    try {
+      const all = await context?.cookies();
+      sessionOut = (all || []).filter((c) => SESSION_COOKIE_NAMES.includes(c.name));
+    } catch {
+      // A browser that already died has no session to hand on.
+      sessionOut = null;
     }
 
     // End the Petpooja session properly before the browser goes away.
@@ -1989,6 +1984,7 @@ export async function runPetpoojaSync(options = {}) {
     // session afterwards) and on any group that failed (so the next group
     // starts clean). Every other group keeps the session alive and hands it
     // to its successor.
+    let loggedOut = false;
     try {
       if (page && !page.isClosed() && (!keepSession || runFailed)) {
         await page.goto(LOGOUT_URL, {
@@ -1996,14 +1992,25 @@ export async function runPetpoojaSync(options = {}) {
           timeout: 20000,
         }).catch(() => {});
         console.log('  🔓 Logged out of Petpooja.');
+        loggedOut = true;
       }
     } catch {
       // A browser that already died needs no logout.
     }
 
-    // The stored session goes with the session it points at.
-    if (!keepSession || runFailed) {
+    // The stored session goes with the session it points at — but only when
+    // the session was really ended.
+    //
+    // A browser that died leaves the Petpooja session ALIVE. Deleting the
+    // stored copy then would leave the next group with nothing to restore,
+    // and its fresh login would be turned away — a deadlock that only a
+    // human could break. So the copy is kept whenever the session is still
+    // live, and the next group picks it up and carries on.
+    if (loggedOut) {
       await clearStoredSession();
+    } else if (sessionOut?.length) {
+      await saveStoredSession(sessionOut);
+      console.log(`  🔑 Session kept for the next group (${sessionOut.length} cookies).`);
     }
 
     await closeBrowser();
@@ -2086,9 +2093,8 @@ export async function runPetpoojaSync(options = {}) {
     }, null, 2));
   } catch {}
 
-  // The session (when there is one) is handed back to the caller. It is
-  // returned, never logged — the caller passes it on in a request header.
-  return { sessionCookies: sessionOut };
+  // Nothing is returned to the caller: the live session is a credential, and
+  // the response body of this endpoint is printed in the workflow log.
 }
 
 // Direct execution from CLI — also mirrors output to a rotating log file so a
