@@ -1705,6 +1705,26 @@ export async function runPetpoojaSync(options = {}) {
     });
     throw fatal;
   } finally {
+    // End the Petpooja session properly before the browser goes away.
+    //
+    // Closing the browser does NOT end it: the session (`user_id` +
+    // `user_key`) stays live on Petpooja's side. Petpooja then refuses the
+    // next login — the email step is accepted but the password box never
+    // appears — because the account already has a session. From the
+    // serverless host each group can come from a different IP, so the
+    // account collects one dead session per group until the next login is
+    // turned away. Logging out releases it, so the next group starts clean.
+    try {
+      if (page && !page.isClosed()) {
+        await page.goto('https://billing.petpooja.com/users/logout', {
+          waitUntil: 'domcontentloaded',
+          timeout: 20000,
+        }).catch(() => {});
+        console.log('  🔓 Logged out of Petpooja.');
+      }
+    } catch {
+      // A browser that already died needs no logout.
+    }
     await closeBrowser();
   }
 
