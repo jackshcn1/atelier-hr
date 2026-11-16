@@ -101,6 +101,12 @@ const SESSION_COOKIE_NAMES = ['user_id', 'user_key', 'PETPOOJA_CO'];
 const DASHBOARD_URL = 'https://billing.petpooja.com/users/dashboard';
 const LOGOUT_URL = 'https://billing.petpooja.com/users/logout';
 
+// Analytics and advertising hosts. Their scripts are never needed to read a
+// report, and they are expensive: on the serverless CPU they are part of
+// what makes a page too slow to finish, and a page that never finishes is a
+// browser that gets killed.
+const TRACKING_HOSTS = /google-analytics\.com|googletagmanager\.com|doubleclick\.net|facebook\.net|facebook\.com|hotjar|clarity\.ms|mixpanel|intercom\.io|hotjar\.com|optimizely|segment\.(io|com)|clarity\.ms/i;
+
 // The live session is kept in a one-row table, so any report group can pick
 // it up and a run that is killed half way does not leave the account holding
 // a session that turns away the next run.
@@ -208,9 +214,11 @@ function tempSpace() {
 // full and the next browser starts misbehaving. Only profiles that have been
 // idle for a while are removed, so a run happening at the same time is never
 // disturbed.
+// A live browser writes to its profile all the time, so a profile that has
+// not been touched for two minutes belongs to a browser that is gone.
 function cleanStaleProfiles() {
   try {
-    const cutoff = Date.now() - 10 * 60 * 1000;
+    const cutoff = Date.now() - 2 * 60 * 1000;
     let removed = 0;
     for (const name of readdirSync('/tmp')) {
       if (!name.startsWith('playwright_chromiumdev_profile')) continue;
@@ -294,6 +302,7 @@ function memorySnapshot() {
 
   const mem = process.memoryUsage();
   parts.push(`node rss ${Math.round(mem.rss / 1048576)}MB heap ${Math.round(mem.heapUsed / 1048576)}MB`);
+  parts.push(`tmp ${tempSpace()}`);
   return parts.join(' | ');
 }
 
@@ -706,6 +715,14 @@ export async function runPetpoojaSync(options = {}) {
     await context.route('**/*', (route) => {
       const type = route.request().resourceType();
       if (type === 'image' || type === 'font' || type === 'media') {
+        return route.abort();
+      }
+      // Analytics and advertising scripts are pure overhead. They run a lot
+      // of code on every single page, for numbers nobody in the payroll ever
+      // looks at — and on a one-vCPU serverless box that work is part of
+      // what tips the browser over. The pages work perfectly well without
+      // them.
+      if (TRACKING_HOSTS.test(route.request().url())) {
         return route.abort();
       }
       return route.continue();
@@ -1134,6 +1151,16 @@ export async function runPetpoojaSync(options = {}) {
         console.error(`  ⚠️ Login did not reach the dashboard. Page says: ${await pageText()}`);
         continue;
       }
+
+      // Remember the session this login just bought, so that a browser that
+      // dies later can be replaced and carry on with it.
+      try {
+        const all = await context.cookies();
+        const live = (all || []).filter((c) => SESSION_COOKIE_NAMES.includes(c.name));
+        if (live.length) carriedCookies = live;
+      } catch {
+        // Nothing to remember — the browser will have to log in again.
+      }
       return;
     }
 
@@ -1165,7 +1192,32 @@ export async function runPetpoojaSync(options = {}) {
     // Helper: download custom report and return sheet rows
     // `sheetMatch` picks the sheet to read when a report spreads its sections
     // over several sheets (matched against the sheet's first cell).
-    async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch = null) {
+    // Fetch one report.
+//
+// A report is fetched with the browser, and on the serverless host the
+// browser still dies now and then on the heavier pages. A dead browser is
+// not a failed report: the report is tried again with a fresh browser that
+// comes up with the same session, which turns most of those deaths into a
+// report that is simply fetched a moment later.
+//
+// A download that times out is NOT retried here — that is a different
+// problem, and repeating it would only burn the time the function has.
+async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch = null) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          return await fetchCustomReportOnce(url, reportName, queryCycle, sheetMatch);
+        } catch (err) {
+          const browserDied = /closed|Target closed|browser has been closed/i.test(err.message || '');
+          if (attempt === 2 || !browserDied) throw err;
+          console.log(`  ⚠️ The browser died during ${reportName} — starting a fresh one and trying again.`);
+          await closeBrowser();
+          await new Promise((r) => setTimeout(r, 5000));
+          await openBrowser();
+        }
+      }
+    }
+
+    async function fetchCustomReportOnce(url, reportName, queryCycle = cycle, sheetMatch = null) {
       const readRows = (buffer) => {
         const sheets = parseWorkbookSheets(buffer);
         if (sheetMatch) {
