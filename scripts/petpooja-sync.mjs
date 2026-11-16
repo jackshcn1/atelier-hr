@@ -101,6 +101,11 @@ const SESSION_COOKIE_NAMES = ['user_id', 'user_key', 'PETPOOJA_CO'];
 const DASHBOARD_URL = 'https://billing.petpooja.com/users/dashboard';
 const LOGOUT_URL = 'https://billing.petpooja.com/users/logout';
 
+// The live session is kept in a one-row table, so any report group can pick
+// it up and a run that is killed half way does not leave the account holding
+// a session that turns away the next run.
+const SESSION_TABLE = 'petpooja_sync_session';
+
 // Every report the engine knows about, used to reject a bad group or report
 // name instead of quietly running nothing.
 export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
@@ -413,6 +418,12 @@ export async function runPetpoojaSync(options = {}) {
   let context = null;
   let page = null;
 
+  // The session cookies this run was given, if any.
+  //
+  // They are put back into every new context, so a browser that dies and is
+  // replaced does not lose the session with it.
+  let carriedCookies = null;
+
   async function openBrowser() {
     console.log(`🌐 Launching browser (headless=${headless})...`);
     browser = await chromium.launch(launchOptions);
@@ -439,6 +450,11 @@ export async function runPetpoojaSync(options = {}) {
     });
 
     page = await context.newPage();
+
+    // A replacement browser starts with the session this run was given.
+    if (carriedCookies?.length) {
+      await context.addCookies(carriedCookies).catch(() => {});
+    }
   }
 
   async function closeBrowser() {
@@ -650,20 +666,25 @@ export async function runPetpoojaSync(options = {}) {
   // Restore a Petpooja session that a previous group left alive.
   //
   // The whole nightly run is split into ten serverless calls, and Petpooja
-  // refuses a second login while a session is live. So instead of ten logins
-  // (ten chances to be refused) the run does ONE: the first group logs in
-  // and hands its session cookies to the next group, which restores them
-  // and goes straight to the dashboard.
+  // turns away a login from an address it does not recognise as the one
+  // holding the live session. So instead of ten logins (ten chances to be
+  // turned away) the run does ONE: the first group logs in and leaves its
+  // session behind, and the next group picks it up and goes straight to the
+  // dashboard.
   //
   // Returns true when the session was restored, false when the caller has to
   // log in instead.
-  async function tryReuseSession(cookies) {
+  async function tryReuseSession(cookies, alreadyRetried = false) {
     if (!Array.isArray(cookies) || cookies.length === 0) return false;
 
     const usable = cookies.filter(
       (c) => c && SESSION_COOKIE_NAMES.includes(c.name) && c.value && c.domain
     );
     if (usable.length === 0) return false;
+
+    // Remember them: a browser that dies and is replaced gets them back, and
+    // a login that is turned away can release the session they point at.
+    carriedCookies = usable;
 
     try {
       await context.addCookies(usable.map((c) => ({
@@ -684,16 +705,62 @@ export async function runPetpoojaSync(options = {}) {
       // back to the login page instead.
       if (!/dashboard/i.test(page.url())) {
         console.log(`  ℹ️ The saved session was refused (landed on ${page.url()}) — logging in instead.`);
-        await context.clearCookies();
         return false;
       }
 
       console.log('  🔑 Restored the Petpooja session — no second login needed.');
       return true;
     } catch (err) {
+      // A browser that died takes the session with it. Start a fresh one —
+      // it comes up with the session already in it — and try again.
+      if (/closed|Target closed/i.test(err.message) && !alreadyRetried) {
+        console.log('  ⚠️ The browser died while restoring the session — starting a fresh one.');
+        await closeBrowser();
+        await new Promise(r => setTimeout(r, 5000));
+        await openBrowser();
+        return tryReuseSession(cookies, true);
+      }
       console.log(`  ℹ️ Could not restore the session (${err.message}) — logging in instead.`);
-      try { await context.clearCookies(); } catch { /* nothing to clear */ }
       return false;
+    }
+  }
+
+  // The live session, kept in the database so any group can pick it up.
+  async function loadStoredSession() {
+    try {
+      const { data } = await supabase
+        .from(SESSION_TABLE)
+        .select('cookies')
+        .eq('id', 1)
+        .maybeSingle();
+      const cookies = data?.cookies;
+      if (!Array.isArray(cookies) || cookies.length === 0) return null;
+      return cookies;
+    } catch (err) {
+      console.log(`  ℹ️ Could not read the saved session (${err.message}).`);
+      return null;
+    }
+  }
+
+  async function saveStoredSession(cookies) {
+    if (!Array.isArray(cookies) || cookies.length === 0) return;
+    try {
+      const { error } = await supabase
+        .from(SESSION_TABLE)
+        .upsert({ id: 1, cookies, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (err) {
+      // The run itself is fine; the session just will not survive to the next
+      // group, and that group will log in for itself.
+      console.log(`  ⚠️ Could not save the session for the next group: ${err.message}`);
+    }
+  }
+
+  async function clearStoredSession() {
+    try {
+      await supabase.from(SESSION_TABLE).delete().eq('id', 1);
+    } catch (err) {
+      console.log(`  ⚠️ Could not clear the saved session: ${err.message}`);
     }
   }
 
@@ -752,6 +819,19 @@ export async function runPetpoojaSync(options = {}) {
         .then(() => true).catch(() => false);
       if (!passReady) {
         console.error(`  ⚠️ Password box never appeared (attempt ${attempt}/5). Page says: ${await pageText()}`);
+
+        // Petpooja turns a login away while another session is alive, and it
+        // will not accept a login from an address it does not recognise as
+        // the one holding that session. The session this run was given may be
+        // exactly that session — release it, so the next attempt starts on a
+        // free account.
+        if (attempt === 1 && carriedCookies?.length) {
+          console.log('  ℹ️ Releasing the session this run was given, then logging in again...');
+          await page.goto(LOGOUT_URL, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+          await page.waitForTimeout(3000);
+          carriedCookies = null;
+          await clearStoredSession();
+        }
         continue;
       }
 
@@ -787,8 +867,10 @@ export async function runPetpoojaSync(options = {}) {
 
   try {
     // A session handed over by the previous group is restored first; only if
-    // that fails does this group spend a login of its own.
-    const reused = await tryReuseSession(sessionCookies);
+    // that fails does this group spend a login of its own. The session is
+    // taken from the database, so a run that was killed half way still finds
+    // the live session and does not get turned away.
+    const reused = await tryReuseSession(sessionCookies || await loadStoredSession());
     if (!reused) {
       await loginToPetpooja();
     }
@@ -1879,12 +1961,15 @@ export async function runPetpoojaSync(options = {}) {
     //
     // The cookies are read before the browser closes, and only the three that
     // make up the login are kept — the analytics cookies are noise. They are
-    // never written to the log.
+    // never written to the log, and they are kept in the database so that any
+    // group can pick them up — including the first group of a run that was
+    // interrupted and left a live session behind.
     if (keepSession && !runFailed) {
       try {
         const all = await context?.cookies();
         sessionOut = (all || []).filter((c) => SESSION_COOKIE_NAMES.includes(c.name));
         if (sessionOut.length) {
+          await saveStoredSession(sessionOut);
           console.log(`  🔑 Session kept for the next group (${sessionOut.length} cookies).`);
         }
       } catch {
@@ -1915,6 +2000,12 @@ export async function runPetpoojaSync(options = {}) {
     } catch {
       // A browser that already died needs no logout.
     }
+
+    // The stored session goes with the session it points at.
+    if (!keepSession || runFailed) {
+      await clearStoredSession();
+    }
+
     await closeBrowser();
   }
 
