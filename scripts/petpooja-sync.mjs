@@ -4,7 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
-import { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, readdirSync, rmSync, statfsSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -172,7 +172,61 @@ function environmentReport() {
   } catch {
     lines.push('meminfo: not readable');
   }
+  lines.push(`tmp: ${tempSpace()}`);
   return lines.join(' | ');
+}
+
+// How much room is left where the browser keeps its temporary files.
+//
+// The browser is unpacked into /tmp, keeps its profile and its cache there,
+// and the serverless host gives it very little room. When /tmp fills up the
+// browser starts failing in confusing ways — pages whose scripts arrive out
+// of order, exports that silently do nothing — and the warning it prints
+// says almost nothing.
+function tempSpace() {
+  try {
+    const s = statfsSync('/tmp');
+    const free = Math.round((s.bavail * s.bsize) / 1048576);
+    const total = Math.round((s.blocks * s.bsize) / 1048576);
+    let profiles = 0;
+    try {
+      profiles = readdirSync('/tmp').filter((n) => n.startsWith('playwright_chromiumdev_profile')).length;
+    } catch {
+      // No listing — the space is what matters.
+    }
+    return `${free}MB free of ${total}MB (${profiles} leftover browser profile(s))`;
+  } catch {
+    return 'unknown';
+  }
+}
+
+// Clear the browser profiles left behind by a browser that died.
+//
+// A profile is a folder in /tmp with the browser's cache in it. When the
+// browser dies, nobody removes it, and the serverless host reuses the same
+// instance for the next group — so the dead profiles pile up until /tmp is
+// full and the next browser starts misbehaving. Only profiles that have been
+// idle for a while are removed, so a run happening at the same time is never
+// disturbed.
+function cleanStaleProfiles() {
+  try {
+    const cutoff = Date.now() - 10 * 60 * 1000;
+    let removed = 0;
+    for (const name of readdirSync('/tmp')) {
+      if (!name.startsWith('playwright_chromiumdev_profile')) continue;
+      const path = join('/tmp', name);
+      try {
+        if (statSync(path).mtimeMs > cutoff) continue;
+        rmSync(path, { recursive: true, force: true });
+        removed++;
+      } catch {
+        // Still in use, or already gone.
+      }
+    }
+    return removed;
+  } catch {
+    return 0;
+  }
 }
 
 // How much the browser process is using right now, while it is still alive.
@@ -602,6 +656,12 @@ export async function runPetpoojaSync(options = {}) {
 
   async function openBrowser() {
     console.log(`🌐 Launching browser (headless=${headless})...`);
+    // A browser that died leaves its profile and cache behind in /tmp, and
+    // the serverless host reuses the same instance for the next group. Those
+    // leftovers are cleared first, because a full /tmp makes the next
+    // browser behave in ways that look like nothing to do with the disk.
+    const cleared = cleanStaleProfiles();
+    if (cleared > 0) console.log(`  🧹 Cleared ${cleared} leftover browser profile(s) from /tmp.`);
     browser = await chromium.launch(launchOptions);
 
     // When the browser dies, the reason matters: out of memory looks exactly
@@ -1124,6 +1184,16 @@ export async function runPetpoojaSync(options = {}) {
       console.log(`  🧠 Browser memory before the page load: ${browserMemory(browserPid)}`);
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
+
+      // The page must be FINISHED before it is used, not merely loaded.
+      //
+      // On the serverless CPU these pages' scripts arrive out of order: the
+      // grid library ran before jQuery, and the page's own plugins were not
+      // defined yet, so the export button did nothing and the download
+      // never came. Waiting for the network to go quiet is what makes the
+      // page usable. The wait is capped, because a page that keeps a
+      // connection open would otherwise hold the report up for ever.
+      await page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
 
       // Petpooja's report pages sometimes render slowly or partially. Working
       // on a half-rendered page means the date fields and the export button
