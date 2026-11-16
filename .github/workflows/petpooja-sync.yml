@@ -63,14 +63,19 @@ jobs:
           fi
 
           # A manual run may target a single group; the scheduled run does all four.
+          #
+          # NOTE: do not name this variable GROUPS — `GROUPS` is a Bash
+          # built-in array holding the current user's group ids, so assigning
+          # to it is silently ignored and the loop would run whatever groups
+          # the runner user happens to belong to.
           if [ -n "$ONLY_GROUP" ]; then
-            GROUPS="$ONLY_GROUP"
+            SYNC_GROUPS="$ONLY_GROUP"
           else
-            GROUPS="1 2 3 4"
+            SYNC_GROUPS="1 2 3 4"
           fi
 
           FAILED=""
-          for G in $GROUPS; do
+          for G in $SYNC_GROUPS; do
             echo ""
             echo "=== Report group $G ==="
             URL="$SYNC_URL?group=$G"
@@ -88,6 +93,31 @@ jobs:
             if [ "$STATUS" != "200" ]; then
               echo "::error::Report group $G failed with HTTP $STATUS"
               FAILED="$FAILED $G"
+              continue
+            fi
+
+            # A 200 is not enough: the endpoint must say it actually fetched
+            # reports. A group that matched nothing would otherwise look like
+            # a successful run.
+            if ! grep -q '"ok":true' "response-group-$G.json"; then
+              echo "::error::Report group $G did not report ok:true"
+              FAILED="$FAILED $G"
+              continue
+            fi
+            if grep -q 'All 0 reports downloaded' "response-group-$G.json"; then
+              echo "::error::Report group $G fetched no reports at all"
+              FAILED="$FAILED $G"
+              continue
+            fi
+            if grep -qE 'PARTIALLY COMPLETED|Petpooja Sync FAILED' "response-group-$G.json"; then
+              echo "::error::Report group $G did not complete all its reports"
+              FAILED="$FAILED $G"
+              continue
+            fi
+            if grep -q 'Refusing to save metric' "response-group-$G.json"; then
+              echo "::error::Report group $G refused to write a metric (bad value in a report)"
+              FAILED="$FAILED $G"
+              continue
             fi
           done
 

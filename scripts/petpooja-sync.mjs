@@ -56,14 +56,18 @@ function loadLocalConfig() {
 
 // Report selection. A full sync takes longer than a serverless function's
 // maximum duration, so the reports are split into groups that each fit.
-// Set SYNC_GROUP=1|2|3, or SYNC_REPORTS=captain,pax for an explicit set.
+// Set SYNC_GROUP=1|2|3|4, or SYNC_REPORTS=captain,pax for an explicit set.
 // With neither set, every report runs — the local computer path is unchanged.
-const REPORT_GROUPS = {
+export const REPORT_GROUPS = {
   1: ['captain', 'pax', 'item'],
   2: ['gstn', 'due_payment', 'executive', 'kot'],
   3: ['inventory', 'purchase_invoices'],
   4: ['purchase_returns'],
 };
+
+// Every report the engine knows about, used to reject a bad group or report
+// name instead of quietly running nothing.
+export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
 
 function reportEnabled(name) {
   const explicit = process.env.SYNC_REPORTS;
@@ -223,6 +227,24 @@ function parseWorkbookBuffer(buffer) {
 
 export async function runPetpoojaSync(options = {}) {
   const cfg = loadLocalConfig();
+
+  // An unknown group or report name must fail loudly. Running nothing and
+  // reporting success would look like a working sync while no metric was
+  // ever fetched.
+  if (process.env.SYNC_GROUP && !REPORT_GROUPS[Number(process.env.SYNC_GROUP)]) {
+    throw new Error(
+      `Unknown SYNC_GROUP "${process.env.SYNC_GROUP}". Known groups: ${Object.keys(REPORT_GROUPS).join(', ')}.`
+    );
+  }
+  if (process.env.SYNC_REPORTS) {
+    const unknown = process.env.SYNC_REPORTS.split(',').map(s => s.trim()).filter(Boolean)
+      .filter(name => !REPORT_NAMES.includes(name));
+    if (unknown.length > 0) {
+      throw new Error(
+        `Unknown report(s) in SYNC_REPORTS: ${unknown.join(', ')}. Known reports: ${REPORT_NAMES.join(', ')}.`
+      );
+    }
+  }
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wzxswmopfxnucmeygqeg.supabase.co';
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
