@@ -427,6 +427,17 @@ export async function runPetpoojaSync(options = {}) {
   async function openBrowser() {
     console.log(`🌐 Launching browser (headless=${headless})...`);
     browser = await chromium.launch(launchOptions);
+
+    // When the browser dies, the reason matters: out of memory looks exactly
+    // like a crash and tells you nothing. This is the only clue there is.
+    browser.on('disconnected', () => {
+      const mem = process.memoryUsage();
+      console.error(
+        `  ⚠️ The browser went away. Memory: rss ${Math.round(mem.rss / 1048576)} MB, ` +
+        `heap ${Math.round(mem.heapUsed / 1048576)} MB, external ${Math.round(mem.external / 1048576)} MB.`
+      );
+    });
+
     context = await browser.newContext({
       acceptDownloads: true,
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
