@@ -4,7 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
-import { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -109,6 +109,104 @@ const SESSION_TABLE = 'petpooja_sync_session';
 // Every report the engine knows about, used to reject a bad group or report
 // name instead of quietly running nothing.
 export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
+
+// ---------------------------------------------------------------------------
+// What the machine is actually doing when the browser dies.
+//
+// The browser on the serverless host dies at random, and the reason changes
+// the fix: a browser killed for want of memory looks exactly like one that
+// crashed. Node's own numbers say nothing about the browser — the browser is
+// a separate process — so this reads the container's own limit and the real
+// footprint of every browser process straight from the kernel.
+//
+// On a laptop there is no /proc and no cgroup, so the numbers simply are not
+// there. Nothing depends on them; they only explain a crash.
+// ---------------------------------------------------------------------------
+function memorySnapshot() {
+  const parts = [];
+
+  // The container's limit and how much of it is in use.
+  const cgroups = [
+    ['/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory.current'],
+    ['/sys/fs/cgroup/memory/memory.limit_in_bytes', '/sys/fs/cgroup/memory/memory.usage_in_bytes'],
+  ];
+  for (const [limitPath, usagePath] of cgroups) {
+    try {
+      const limit = readFileSync(limitPath, 'utf8').trim();
+      const usage = readFileSync(usagePath, 'utf8').trim();
+      if (/^\d+$/.test(limit)) {
+        parts.push(`container ${Math.round(Number(usage) / 1048576)}MB of ${Math.round(Number(limit) / 1048576)}MB`);
+      }
+      break;
+    } catch {
+      // Not this layout — try the next one.
+    }
+  }
+
+  // Every browser process and what it is really using.
+  try {
+    const pids = readdirSync('/proc').filter((n) => /^\d+$/.test(n));
+    let total = 0;
+    const each = [];
+    for (const pid of pids) {
+      if (Number(pid) === process.pid) continue;
+      try {
+        const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+        if (!/chromium|chrome|headless_shell/i.test(cmd)) continue;
+        const pages = Number(readFileSync(`/proc/${pid}/statm`, 'utf8').trim().split(/\s+/)[1] || 0);
+        const rss = pages * 4096;
+        total += rss;
+        each.push(`${pid}:${Math.round(rss / 1048576)}MB`);
+      } catch {
+        // The process ended while we were looking at it.
+      }
+    }
+    if (each.length) {
+      parts.push(`browser ${each.join(' ')} (total ${Math.round(total / 1048576)}MB)`);
+    }
+  } catch {
+    // No /proc — not a Linux box.
+  }
+
+  const mem = process.memoryUsage();
+  parts.push(`node rss ${Math.round(mem.rss / 1048576)}MB heap ${Math.round(mem.heapUsed / 1048576)}MB`);
+  return parts.join(' | ');
+}
+
+// A browser that dies can leave its helper processes behind. On the serverless
+// host the same instance serves the next request, and those orphans keep
+// holding the memory the next browser needs — which turns one death into a
+// run of deaths, exactly as the logs show.
+//
+// Only processes belonging to THIS browser are touched: the dead browser's
+// own pid, anything the kernel re-parented to init after it died (PPid 1),
+// and anything still parented to it. A browser belonging to another request
+// running at the same time is left alone.
+function killOrphanBrowsers(browserPid) {
+  let killed = 0;
+  try {
+    const pids = readdirSync('/proc').filter((n) => /^\d+$/.test(n));
+    for (const pid of pids) {
+      if (Number(pid) === process.pid) continue;
+      try {
+        const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+        if (!/chromium|chrome|headless_shell/i.test(cmd)) continue;
+        // Field 4 of /proc/<pid>/stat is the parent pid.
+        const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+        const ppid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
+        const isOurs = Number(pid) === browserPid || ppid === browserPid || ppid === 1;
+        if (!isOurs) continue;
+        process.kill(Number(pid), 'SIGKILL');
+        killed++;
+      } catch {
+        // Already gone, or not ours to kill.
+      }
+    }
+  } catch {
+    // No /proc — nothing to clean up.
+  }
+  return killed;
+}
 
 function reportEnabled(name) {
   const explicit = process.env.SYNC_REPORTS;
@@ -274,7 +372,10 @@ export async function runPetpoojaSync(options = {}) {
   // `keepSession` says to leave the session alive and hand it on, instead of
   // logging out at the end of this group.
   const sessionCookies = options.sessionCookies || null;
-  const keepSession = options.keepSession === true;
+  // SYNC_KEEP_SESSION lets a command-line run leave the session alive for a
+  // follow-up run — the same hand-over the serverless groups use.
+  const keepSession = options.keepSession === true
+    || String(process.env.SYNC_KEEP_SESSION ?? '').toLowerCase() === 'true';
 
   // An unknown group or report name must fail loudly. Running nothing and
   // reporting success would look like a working sync while no metric was
@@ -418,6 +519,10 @@ export async function runPetpoojaSync(options = {}) {
   let context = null;
   let page = null;
 
+  // Set while the browser is being closed on purpose, so the "the browser
+  // died" message is only printed when it really did.
+  let closingOnPurpose = false;
+
   // The session cookies this run was given, if any.
   //
   // They are put back into every new context, so a browser that dies and is
@@ -430,12 +535,19 @@ export async function runPetpoojaSync(options = {}) {
 
     // When the browser dies, the reason matters: out of memory looks exactly
     // like a crash and tells you nothing. This is the only clue there is.
+    // The browser's own process id, so that anything it leaves behind can be
+    // recognised and cleared. Playwright does not hand this over officially,
+    // so it is read defensively — a null id only costs the extra cleanup.
+    const browserPid = browser?._process?.pid ?? null;
     browser.on('disconnected', () => {
-      const mem = process.memoryUsage();
-      console.error(
-        `  ⚠️ The browser went away. Memory: rss ${Math.round(mem.rss / 1048576)} MB, ` +
-        `heap ${Math.round(mem.heapUsed / 1048576)} MB, external ${Math.round(mem.external / 1048576)} MB.`
-      );
+      // The same event fires when the browser is closed on purpose, so it is
+      // only worth reporting when the browser died on its own.
+      if (closingOnPurpose) return;
+      console.error(`  ⚠️ The browser went away. ${memorySnapshot()}`);
+      const killed = killOrphanBrowsers(browserPid);
+      if (killed > 0) {
+        console.error(`  🧹 Cleared ${killed} leftover browser process(es).`);
+      }
     });
 
     context = await browser.newContext({
@@ -469,11 +581,13 @@ export async function runPetpoojaSync(options = {}) {
   }
 
   async function closeBrowser() {
+    closingOnPurpose = true;
     try {
       await browser?.close();
     } catch {
       // A browser that already died needs no closing.
     }
+    closingOnPurpose = false;
     browser = null;
     context = null;
     page = null;
@@ -683,6 +797,13 @@ export async function runPetpoojaSync(options = {}) {
   // session behind, and the next group picks it up and goes straight to the
   // dashboard.
   //
+  // The session is checked with a plain HTTP request rather than by loading
+  // the page. The dashboard is a heavy single-page app, and rendering it in
+  // the bundled Chromium is the most common thing that kills the browser on
+  // the serverless host. A request carries the same cookies and answers the
+  // same question — is this session still logged in? — without drawing
+  // anything.
+  //
   // Returns true when the session was restored, false when the caller has to
   // log in instead.
   async function tryReuseSession(cookies, alreadyRetried = false) {
@@ -709,17 +830,28 @@ export async function runPetpoojaSync(options = {}) {
         ...(c.expires && c.expires > 0 ? { expires: Math.floor(c.expires) } : {}),
       })));
 
-      await page.goto(DASHBOARD_URL, { waitUntil: 'load', timeout: 45000 });
-      await page.waitForTimeout(4000);
+      // A request, not a page. Same cookies, no rendering.
+      const response = await context.request.get(DASHBOARD_URL, {
+        timeout: 25000,
+        maxRedirects: 5,
+      });
+      const landedOn = response.url();
+      const body = await response.text().catch(() => '');
 
-      // The dashboard is the proof. A refused or expired session sends us
-      // back to the login page instead.
-      if (!/dashboard/i.test(page.url())) {
-        console.log(`  ℹ️ The saved session was refused (landed on ${page.url()}) — logging in instead.`);
+      // The dashboard is the proof. A refused or expired session answers with
+      // the login form instead — either by being sent to the login page, or by
+      // serving the form where the dashboard should be.
+      const showsLoginForm = /data\[User\]\[password\]|UserPassword/i.test(body);
+      if (!/dashboard/i.test(landedOn) || showsLoginForm) {
+        console.log(`  ℹ️ The saved session was refused (landed on ${landedOn}) — logging in instead.`);
+        return false;
+      }
+      if (!response.ok()) {
+        console.log(`  ℹ️ The session check answered HTTP ${response.status()} — logging in instead.`);
         return false;
       }
 
-      console.log('  🔑 Restored the Petpooja session — no second login needed.');
+      console.log(`  🔑 Restored the Petpooja session — no second login needed (HTTP ${response.status()}).`);
       return true;
     } catch (err) {
       // A browser that died takes the session with it. Start a fresh one —
