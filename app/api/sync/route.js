@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server';
 import chromium from '@sparticuz/chromium';
 import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
+import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.mjs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -116,7 +117,7 @@ async function handle(req) {
     }
 
     // A full sync is longer than a serverless function may run, so the
-    // reports are split into groups that each fit. ?group=1..5 runs one
+    // reports are split into groups that each fit. ?group=1..6 runs one
     // group; ?reports=captain,pax runs an explicit set; no parameter runs
     // everything (the local-computer path).
     const group = params.get('group');
@@ -162,10 +163,26 @@ async function handle(req) {
     push('🌐 Starting Petpooja sync on Vercel...');
     const result = await runPetpoojaSync();
 
+    // A pay cycle that has ended must be locked with its figures frozen.
+    // The office-computer runner did this after every sync; the hosted run
+    // has to do it too, or the closed cycles would never get a snapshot.
+    let closed = null;
+    try {
+      closed = await closeFinishedCycles({ generatedBy: 'hosted-sync' });
+      if (closed?.closed > 0) {
+        push(`🔒 Closed ${closed.closed} finished pay cycle(s).`);
+      }
+    } catch (closeErr) {
+      // The figures synced fine — a cycle that could not be closed can be
+      // closed by hand from the attainment dashboard.
+      console.error(`⚠️ Could not close finished pay cycles: ${closeErr.message}`);
+    }
+
     return NextResponse.json({
       ok: true,
       durationMs: Date.now() - started,
       result,
+      closedCycles: closed?.closed ?? 0,
       logs: logs.slice(-200),
     });
   } catch (err) {

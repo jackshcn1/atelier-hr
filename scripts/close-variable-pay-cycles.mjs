@@ -17,16 +17,22 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function loadLocalConfig() {
+  const cfg = {};
   const cfgPath = join(__dirname, 'petpooja-config.json');
   if (!existsSync(cfgPath)) {
-    console.error('❌ Missing scripts/petpooja-config.json');
+    // No local file on a CI runner or a serverless function — the
+    // environment has to supply everything.
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return cfg;
+    }
+    console.error('❌ Missing scripts/petpooja-config.json and Supabase environment variables.');
     process.exit(1);
   }
-  const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
-  for (const [k, v] of Object.entries(cfg)) {
+  const fileCfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+  for (const [k, v] of Object.entries(fileCfg)) {
     if (process.env[k] === undefined) process.env[k] = String(v ?? '');
   }
-  return cfg;
+  return fileCfg;
 }
 
 // The 19th is the last day of a cycle, so a period may be closed once today is

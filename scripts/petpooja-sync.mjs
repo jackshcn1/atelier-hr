@@ -63,11 +63,12 @@ function loadLocalConfig() {
 // take twice as long to load, and a group that fits on a good day but not on a
 // bad one fails the whole nightly run.
 export const REPORT_GROUPS = {
-  1: ['captain', 'pax', 'item'],
-  2: ['gstn', 'due_payment'],
-  3: ['executive', 'kot'],
-  4: ['inventory', 'purchase_invoices'],
-  5: ['purchase_returns'],
+  1: ['captain', 'pax'],
+  2: ['item'],
+  3: ['gstn', 'due_payment'],
+  4: ['executive', 'kot'],
+  5: ['inventory', 'purchase_invoices'],
+  6: ['purchase_returns'],
 };
 
 // Every report the engine knows about, used to reject a bad group or report
@@ -514,7 +515,8 @@ export async function runPetpoojaSync(options = {}) {
     return { inserted, updated, unchanged };
   }
 
-  function findEmployeeByName(name, empList) {    if (!name) return null;
+  function findEmployeeByName(name, empList) {
+    if (!name) return null;
     const n = name.trim().toLowerCase();
     // 1. Exact match
     let match = empList.find(e => e.name.toLowerCase() === n);
@@ -591,6 +593,45 @@ export async function runPetpoojaSync(options = {}) {
       console.log(`📥 Fetching ${reportName} (${url})...`);
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
+
+      // Petpooja's report pages sometimes render slowly or partially. Working
+      // on a half-rendered page means the date fields and the export button
+      // are both missing, and the report is lost — or, worse, it is exported
+      // without a date filter and covers the wrong period. Wait for the date
+      // fields to be there, and reload the page once if they never arrive.
+      const dateFieldSelector =
+        'input.start_fromdate:visible, input.set-calendar:visible, input.reportsatrtdate:visible, input[name*="date" i]:visible, input[id*="date" i]:visible';
+      const exportButtonSelector =
+        'button:visible:has-text("Excel"), a:visible:has-text("Excel"), button:visible:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export")';
+
+      let pageReady = false;
+      for (let attempt = 1; attempt <= 2 && !pageReady; attempt++) {
+        const deadline = Date.now() + 30000;
+        while (!pageReady && Date.now() < deadline) {
+          const dateFields = await page.locator(dateFieldSelector).count().catch(() => 0);
+          if (dateFields >= 2) {
+            pageReady = true;
+            break;
+          }
+          // A page with an export button but still no date fields probably has
+          // no date filter at all. Give the fields a moment more, then carry
+          // on without one.
+          if (await page.locator(exportButtonSelector).count().catch(() => 0) > 0) {
+            await page.waitForTimeout(12000);
+            pageReady = (await page.locator(dateFieldSelector).count().catch(() => 0)) < 2;
+            break;
+          }
+          await page.waitForTimeout(2000);
+        }
+        if (!pageReady && attempt < 2) {
+          console.log(`  ℹ️ ${reportName} page was not ready — reloading it...`);
+          await page.reload({ waitUntil: 'load', timeout: 45000 }).catch(() => {});
+          await page.waitForTimeout(4000);
+        }
+      }
+      if (!pageReady) {
+        console.log(`  ⚠️ ${reportName} page still looks incomplete after a reload.`);
+      }
 
       // Helper to format date in DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, or DD MMM YYYY
       function formatDates(isoDate) {
