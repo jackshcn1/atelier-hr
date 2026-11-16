@@ -349,7 +349,6 @@ export async function runPetpoojaSync(options = {}) {
   // Set PETPOOJA_HEADLESS=true in the config to run without a visible window.
   const headless = String(process.env.PETPOOJA_HEADLESS ?? 'false').toLowerCase() === 'true';
 
-  console.log(`🌐 Launching browser (headless=${headless})...`);
   const launchOptions = {
     headless,
     channel: headless ? undefined : 'chrome', // use installed Chrome when headed
@@ -368,18 +367,43 @@ export async function runPetpoojaSync(options = {}) {
       launchOptions.args = JSON.parse(process.env.PETPOOJA_CHROMIUM_ARGS);
     }
   }
-  const browser = await chromium.launch(launchOptions);
 
-  const context = await browser.newContext({
-    acceptDownloads: true,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-    viewport: { width: 1366, height: 768 },
-    locale: 'en-US',
-    extraHTTPHeaders: {
-      'Accept-Language': 'en-US,en;q=0.9'
+  // The browser can die on us mid-run — Chromium crashing under memory
+  // pressure on the serverless host, or Petpooja dropping the session. That
+  // is not a report failure, it is a dead browser, so the browser, its
+  // context and its page are created through openBrowser() and can be
+  // replaced with a fresh set when the login has to be retried.
+  let browser = null;
+  let context = null;
+  let page = null;
+
+  async function openBrowser() {
+    console.log(`🌐 Launching browser (headless=${headless})...`);
+    browser = await chromium.launch(launchOptions);
+    context = await browser.newContext({
+      acceptDownloads: true,
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      viewport: { width: 1366, height: 768 },
+      locale: 'en-US',
+      extraHTTPHeaders: {
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    page = await context.newPage();
+  }
+
+  async function closeBrowser() {
+    try {
+      await browser?.close();
+    } catch {
+      // A browser that already died needs no closing.
     }
-  });
-  const page = await context.newPage();
+    browser = null;
+    context = null;
+    page = null;
+  }
+
+  await openBrowser();
 
   async function saveMetric(metricId, actual, sourceType, filename, detail, employeeId = null) {
     // A metric that is not a real number is never written. A report that
@@ -535,8 +559,8 @@ export async function runPetpoojaSync(options = {}) {
     return match || null;
   }
 
-  try {
-    // 3. Login to Petpooja Billing (2-Step Form)
+  // 3. Login to Petpooja Billing (2-Step Form)
+  async function loginToPetpooja() {
     console.log('🔐 Navigating to Petpooja Billing (https://billing.petpooja.com/)...');
     await page.goto('https://billing.petpooja.com/', { waitUntil: 'load', timeout: 45000 });
     await page.waitForTimeout(3000);
@@ -571,6 +595,28 @@ export async function runPetpoojaSync(options = {}) {
     await page.waitForNavigation({ timeout: 35000 }).catch(() => {});
     await page.waitForTimeout(5000);
     console.log(`✓ Post-login URL: ${page.url()} ("${await page.title()}")`);
+  }
+
+  // A closed browser or page means the session died, not that the report is
+  // broken. Start a fresh browser and try again before failing the whole
+  // group — a group that restarts costs one login, while a failed group
+  // costs the whole daily sync.
+  const isDeadBrowser = (err) => /has been closed|Target closed|Connection closed|browser.*closed/i.test(err?.message || '');
+
+  try {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await loginToPetpooja();
+        break;
+      } catch (err) {
+        if (!isDeadBrowser(err) || attempt >= 3) throw err;
+        console.error(`  ⚠️ Browser closed during login (attempt ${attempt}/3): ${err.message}`);
+        console.error('  ⚠️ Starting a fresh browser and retrying in 10s...');
+        await closeBrowser();
+        await new Promise(r => setTimeout(r, 10000));
+        await openBrowser();
+      }
+    }
 
     // Helper: download custom report and return sheet rows
     // `sheetMatch` picks the sheet to read when a report spreads its sections
@@ -1567,7 +1613,7 @@ export async function runPetpoojaSync(options = {}) {
     });
     throw fatal;
   } finally {
-    await browser.close();
+    await closeBrowser();
   }
 
   // REPORT 9: Customer Feedback Integration (Google Sheets)

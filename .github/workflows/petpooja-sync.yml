@@ -81,44 +81,61 @@ jobs:
             URL="$SYNC_URL?group=$G"
             [ -n "$PERIOD" ] && URL="$URL&$PERIOD"
 
-            STATUS=$(curl -sS -o "response-group-$G.json" -w '%{http_code}' -X POST "$URL" \
-              -H "x-sync-secret: $SYNC_SECRET" \
-              -H 'Content-Type: application/json' \
-              --max-time 600) || STATUS="000"
+            # A group gets two attempts. The first failure is usually a dead
+            # browser or a Petpooja session that had not lapsed yet; both
+            # clear up on their own within a minute.
+            GROUP_OK=0
+            for ATTEMPT in 1 2; do
+              if [ "$ATTEMPT" = "2" ]; then
+                echo "::warning::Report group $G did not pass on the first attempt — waiting 30s and retrying once."
+                sleep 30
+              fi
 
-            echo "HTTP $STATUS"
-            head -c 4000 "response-group-$G.json" || true
-            echo ""
+              STATUS=$(curl -sS -o "response-group-$G.json" -w '%{http_code}' -X POST "$URL" \
+                -H "x-sync-secret: $SYNC_SECRET" \
+                -H 'Content-Type: application/json' \
+                --max-time 600) || STATUS="000"
 
-            if [ "$STATUS" != "200" ]; then
-              echo "::error::Report group $G failed with HTTP $STATUS"
+              echo "HTTP $STATUS"
+              head -c 4000 "response-group-$G.json" || true
+              echo ""
+
+              if [ "$STATUS" != "200" ]; then
+                echo "::error::Report group $G failed with HTTP $STATUS"
+                continue
+              fi
+
+              # A 200 is not enough: the endpoint must say it actually fetched
+              # reports. A group that matched nothing would otherwise look like
+              # a successful run.
+              if ! grep -q '"ok":true' "response-group-$G.json"; then
+                echo "::error::Report group $G did not report ok:true"
+                continue
+              fi
+              if grep -q 'All 0 reports downloaded' "response-group-$G.json"; then
+                echo "::error::Report group $G fetched no reports at all"
+                continue
+              fi
+              if grep -qE 'PARTIALLY COMPLETED|Petpooja Sync FAILED' "response-group-$G.json"; then
+                echo "::error::Report group $G did not complete all its reports"
+                continue
+              fi
+              if grep -q 'Refusing to save metric' "response-group-$G.json"; then
+                echo "::error::Report group $G refused to write a metric (bad value in a report)"
+                continue
+              fi
+
+              GROUP_OK=1
+              break
+            done
+
+            if [ "$GROUP_OK" != "1" ]; then
               FAILED="$FAILED $G"
-              continue
             fi
 
-            # A 200 is not enough: the endpoint must say it actually fetched
-            # reports. A group that matched nothing would otherwise look like
-            # a successful run.
-            if ! grep -q '"ok":true' "response-group-$G.json"; then
-              echo "::error::Report group $G did not report ok:true"
-              FAILED="$FAILED $G"
-              continue
-            fi
-            if grep -q 'All 0 reports downloaded' "response-group-$G.json"; then
-              echo "::error::Report group $G fetched no reports at all"
-              FAILED="$FAILED $G"
-              continue
-            fi
-            if grep -qE 'PARTIALLY COMPLETED|Petpooja Sync FAILED' "response-group-$G.json"; then
-              echo "::error::Report group $G did not complete all its reports"
-              FAILED="$FAILED $G"
-              continue
-            fi
-            if grep -q 'Refusing to save metric' "response-group-$G.json"; then
-              echo "::error::Report group $G refused to write a metric (bad value in a report)"
-              FAILED="$FAILED $G"
-              continue
-            fi
+            # Let the finished session lapse before the next group logs in, so
+            # Petpooja never sees two logins at once.
+            sleep 10
           done
 
           if [ -n "$FAILED" ]; then
