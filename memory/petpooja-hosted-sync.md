@@ -112,6 +112,40 @@ Three layers now stop that class of failure:
 3. The workflow fails the job when a group reports "ok" but fetched no
    reports, completed only some of them, or refused to write a metric.
 
+## Petpooja throttles the serverless IP — this is the biggest operational risk
+
+On 16 Nov, after a morning of testing, the hosted function suddenly could not
+reach Petpooja at all. Every group failed with:
+
+```
+Current Page URL: chrome-error://chromewebdata/
+Total input tags found on page: 0
+```
+
+and the same report failed from a fresh instance, while the very same page
+loaded in 0.36 s from a laptop. The pattern was unmistakable:
+
+- 10:10 — four groups in a row succeeded (each ~1.5 min).
+- 10:17 — every group after that failed, including groups that had just passed.
+- 11:03 — one single request succeeded again (75 s).
+- 11:05 — one more succeeded; the next one was blocked again.
+
+That is a **token bucket that refills slowly**, not a permanent ban and not a
+code fault. Petpooja's edge counts sessions per source IP, and the serverless
+host burns them fast. The failures look exactly like a broken script, so the
+error message now carries a probe:
+
+```
+Petpooja login did not complete. Probe: direct fetch got HTTP 403. Last page said: ...
+```
+
+**How to apply:** never debug the code first when the page will not load at
+all — run the probe. A blocked IP needs time and fewer requests, not a
+rewrite. The daily 05:00 run is the first burst of the day, so it starts with
+a full bucket; a long debugging session can drain it and make the night look
+broken when it is not. When a run is blocked, **stop calling the endpoint**,
+wait for the bucket to refill, and re-run once.
+
 ## A dead browser must not cost the day
 
 On 16 Nov the hosted run failed at **group 5** with:
