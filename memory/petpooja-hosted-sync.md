@@ -182,7 +182,10 @@ second request hijack the first one's capture.
 - SMTP is not configured, so failure email alerts are skipped. GitHub's own
   workflow-failure notification still fires. The owner asked for email alerts to
   be switched on; it needs `SMTP_USER` / `SMTP_PASS` (a Google app password)
-  on the Vercel production environment.
+  on the Vercel production environment. `scripts/setup-smtp-alerts.sh` does it:
+  it reads the app password from a file and pipes it into `vercel env add`, so
+  the password never appears in a command line, in shell history, or in a
+  screenshot of the terminal.
 
 ## The office computer's own schedule
 
