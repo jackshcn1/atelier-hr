@@ -23,6 +23,7 @@ import { parseCustomerFeedback } from '../lib/feedbackParsers.js';
 import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
 import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
+import { monthKeyOf, previousMonthKey, petpoojaMonthWindow } from '../lib/financePeriod.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -1204,6 +1205,88 @@ export async function runPetpoojaSync(options = {}) {
       return readRows(buffer);
     }
 
+    // Revenue for a plain calendar month, for the finance dashboards.
+    //
+    // The 20-19 pay cycle is the basis for salary processing and variable pay.
+    // The finance dashboards ask a different question — "how is this month
+    // going?" — so they need the calendar month. The Executive Sales Summary
+    // is the only report that splits revenue into Dine In / Pick Up /
+    // Delivery, so it is pulled a second time for the calendar month and
+    // written to its own table. The pay-cycle metrics above are untouched.
+    //
+    // The month that has just ended is pulled as well, until a pull has
+    // covered its last day — that is what makes a completed month final.
+    async function syncCalendarMonthRevenue() {
+      const currentKey = monthKeyOf();
+      const targets = [];
+
+      const currentWindow = petpoojaMonthWindow(currentKey);
+      if (currentWindow) targets.push(currentWindow);
+
+      const previousKey = previousMonthKey(currentKey);
+      const previousWindow = petpoojaMonthWindow(previousKey);
+      if (previousWindow) {
+        const { data: existing } = await supabase
+          .from('finance_monthly_revenue')
+          .select('is_complete')
+          .eq('month', previousKey)
+          .maybeSingle();
+        if (existing?.is_complete !== true) targets.push(previousWindow);
+      }
+
+      for (const window of targets) {
+        const isComplete = window.through >= window.end;
+        const queryCycle = { start: window.start, end: window.end, queryEnd: window.through };
+        try {
+          const rows = await fetchCustomReport(
+            'https://billing.petpooja.com/reports/executive_sales_summary/all',
+            `Executive Sales Summary (${window.key})`,
+            queryCycle,
+            'order type'
+          );
+          const parsed = parseExecutiveOrderTypes(rows);
+          if (!parsed.ok) {
+            console.error(`  ⚠️ Could not parse the calendar-month revenue for ${window.key}: ${parsed.error || 'unknown reason'}`);
+            continue;
+          }
+
+          // The parser keeps the grand total beside the split, not inside it.
+          // It is added up here so the stored total can never disagree with
+          // the three numbers next to it.
+          const revenueTotal = Number(parsed.data.dine_in || 0)
+            + Number(parsed.data.pick_up || 0)
+            + Number(parsed.data.delivery || 0);
+
+          const payload = {
+            month: window.key,
+            dine_in: parsed.data.dine_in,
+            pick_up: parsed.data.pick_up,
+            delivery: parsed.data.delivery,
+            total: revenueTotal,
+            window_start: window.start,
+            window_end: window.through,
+            is_complete: isComplete,
+            source: 'petpooja:executive_sales_summary',
+            synced_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          const { error } = await supabase
+            .from('finance_monthly_revenue')
+            .upsert(payload, { onConflict: 'month' });
+          if (error) throw error;
+
+          console.log(
+            `  📅 Calendar month ${window.key}: total ${revenueTotal} ` +
+            `(dine-in ${parsed.data.dine_in}, pick-up ${parsed.data.pick_up}, delivery ${parsed.data.delivery}) ` +
+            `covering ${window.start} → ${window.through}${isComplete ? ' — complete' : ' — month so far'}`
+          );
+        } catch (e) {
+          // A failed calendar-month pull must never fail the pay-cycle sync.
+          console.error(`  ⚠️ Could not sync the calendar-month revenue for ${window.key}: ${e.message}`);
+        }
+      }
+    }
+
     let successfulReports = 0;
     let failedReports = 0;
 
@@ -1370,6 +1453,10 @@ export async function runPetpoojaSync(options = {}) {
           dumpReportRows('executive-sales', execRows);
           failedReports++;
         }
+
+        // The same report, pulled again for the plain calendar month, so the
+        // finance dashboards have a month to report on.
+        await syncCalendarMonthRevenue();
       } catch (e) {
         failedReports++;
         console.error("⚠️ Could not sync Executive Sales Summary:", e.message);

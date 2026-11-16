@@ -1,33 +1,41 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import FinanceMonthPicker, { monthFromLocation, setMonthInLocation } from '../../components/FinanceMonthPicker';
 
 export default function CashflowPage() {
   const [transactions, setTransactions] = useState([]);
+  const [totals, setTotals] = useState({ inflow: 0, outflow: 0, net: 0 });
+  const [period, setPeriod] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchCashflow = async () => {
-      try {
-        const response = await fetch('/api/finance/cashflow');
-        const data = await response.json();
-        if (data.success) {
-          setTransactions(data.data);
-        }
-      } catch (error) {
-        console.error('Error fetching cashflow:', error);
-      } finally {
-        setIsLoading(false);
+  const load = useCallback(async (target) => {
+    setIsLoading(true);
+    try {
+      const query = target ? `?month=${encodeURIComponent(target)}` : '';
+      const response = await fetch(`/api/finance/cashflow${query}`);
+      const data = await response.json();
+      if (data.success) {
+        setTransactions(data.data.transactions);
+        setTotals(data.data.totals);
+        setPeriod(data.data.period);
+        setMonthInLocation(data.data.period.key);
       }
-    };
-
-    fetchCashflow();
+    } catch (error) {
+      console.error('Error fetching cashflow:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const totalInflow = transactions.reduce((sum, t) => t.type === 'inflow' ? sum + Number(t.amount || 0) : sum, 0);
-  const totalOutflow = transactions.reduce((sum, t) => t.type === 'outflow' ? sum + Number(t.amount || 0) : sum, 0);
-  const netCashflow = totalInflow - totalOutflow;
+  useEffect(() => {
+    load(monthFromLocation());
+  }, [load]);
+
+  const totalInflow = totals.inflow;
+  const totalOutflow = totals.outflow;
+  const netCashflow = totals.net;
 
   if (isLoading) {
     return (
@@ -51,11 +59,18 @@ export default function CashflowPage() {
           <span className="text-[#8b6f4e] text-sm">Finance / Cashflow</span>
         </div>
 
-        <div className="page-head mb-8">
-          <h1 className="page-title font-serif text-4xl lg:text-5xl">Cashflow</h1>
-          <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">
-            Track daily cash inflows, outflows, and working capital
-          </p>
+        <div className="page-head mb-8 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <h1 className="page-title font-serif text-4xl lg:text-5xl">Cashflow</h1>
+            <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">
+              {period
+                ? `${period.label} — calendar month${period.isCurrentMonth ? `, month so far (1 – ${period.through})` : ''}`
+                : 'Calendar month cash inflows and outflows'}
+            </p>
+          </div>
+          {period && (
+            <FinanceMonthPicker month={period.key} currentMonth={period.key} onChange={(key) => load(key)} />
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -76,10 +91,12 @@ export default function CashflowPage() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-lg font-medium text-[#1e1812] mb-4">Recent Transactions</h2>
+          <h2 className="text-lg font-medium text-[#1e1812] mb-4">
+            {period ? `Transactions in ${period.label}` : 'Recent Transactions'}
+          </h2>
           <div className="space-y-3">
             {transactions.length === 0 ? (
-              <div className="text-center py-8 text-[#6b635c] text-sm">No cashflow transactions yet</div>
+              <div className="text-center py-8 text-[#6b635c] text-sm">No cashflow transactions in this month</div>
             ) : (
               transactions.map(tx => (
                 <div key={tx.id} className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-4">
