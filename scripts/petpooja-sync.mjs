@@ -61,7 +61,8 @@ function loadLocalConfig() {
 const REPORT_GROUPS = {
   1: ['captain', 'pax', 'item'],
   2: ['gstn', 'due_payment', 'executive', 'kot'],
-  3: ['inventory', 'purchase_invoices', 'purchase_returns'],
+  3: ['inventory', 'purchase_invoices'],
+  4: ['purchase_returns'],
 };
 
 function reportEnabled(name) {
@@ -346,6 +347,14 @@ export async function runPetpoojaSync(options = {}) {
   const page = await context.newPage();
 
   async function saveMetric(metricId, actual, sourceType, filename, detail, employeeId = null) {
+    // A metric that is not a real number is never written. A report that
+    // could not be understood must show up as a failure in the log, not as a
+    // NULL row that quietly drags the attainment down.
+    if (typeof actual !== 'number' || !Number.isFinite(actual)) {
+      console.error(`  ❌ Refusing to save metric ${metricId}: value is ${JSON.stringify(actual)}, not a number.`);
+      return;
+    }
+
     let query = supabase
       .from('variable_metric_inputs')
       .select('id')
@@ -397,8 +406,72 @@ export async function runPetpoojaSync(options = {}) {
     }
   }
 
-  function findEmployeeByName(name, empList) {
-    if (!name) return null;
+  // Write vendor expense rows.
+  //
+  // The expenses table has no unique index on (vendor_name, invoice_number),
+  // so an upsert with onConflict on that pair fails with
+  // "there is no unique or exclusion constraint matching the ON CONFLICT
+  // specification" — which is why no Petpooja invoice or debit note had ever
+  // reached the table. Compare against what is already there instead: rows
+  // that exist are updated, new ones are inserted. A unique index is not added
+  // because the manual expense entry form allows a repeated vendor/invoice.
+  async function syncExpenseRows(rows, label) {
+    if (!rows || rows.length === 0) return { inserted: 0, updated: 0 };
+
+    const keyOf = (vendor, invoice) => `${vendor ?? ''}\u0000${invoice ?? ''}`;
+    const vendorNames = [...new Set(rows.map(r => r.vendor_name).filter(Boolean))];
+
+    let existing = [];
+    if (vendorNames.length > 0) {
+      const { data } = await supabase
+        .from('expenses')
+        .select('id, vendor_name, invoice_number')
+        .in('vendor_name', vendorNames);
+      existing = data || [];
+    }
+    const existingByKey = new Map(existing.map(e => [keyOf(e.vendor_name, e.invoice_number), e.id]));
+
+    const toInsert = new Map();
+    const toUpdate = [];
+    for (const row of rows) {
+      const key = keyOf(row.vendor_name, row.invoice_number);
+      const id = existingByKey.get(key);
+      if (id) {
+        toUpdate.push({ id, row });
+      } else if (!toInsert.has(key)) {
+        toInsert.set(key, row);
+      }
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    if (toInsert.size > 0) {
+      const batch = [...toInsert.values()];
+      const { error } = await supabase.from('expenses').insert(batch);
+      if (error) {
+        console.error(`  ❌ Failed to insert ${batch.length} ${label}:`, error.message);
+      } else {
+        inserted = batch.length;
+      }
+    }
+
+    if (toUpdate.length > 0) {
+      const results = await Promise.all(toUpdate.map(({ id, row }) =>
+        supabase.from('expenses').update(row).eq('id', id).then(({ error }) => error)
+      ));
+      const failures = results.filter(Boolean);
+      updated = toUpdate.length - failures.length;
+      if (failures.length > 0) {
+        console.error(`  ❌ Failed to update ${failures.length} ${label}:`, failures[0].message);
+      }
+    }
+
+    console.log(`  ✓ ${label}: ${inserted} new, ${updated} updated`);
+    return { inserted, updated };
+  }
+
+  function findEmployeeByName(name, empList) {    if (!name) return null;
     const n = name.trim().toLowerCase();
     // 1. Exact match
     let match = empList.find(e => e.name.toLowerCase() === n);
@@ -471,6 +544,7 @@ export async function runPetpoojaSync(options = {}) {
         }
         return sheets[0]?.rows || [];
       };
+      const startedAt = Date.now();
       console.log(`📥 Fetching ${reportName} (${url})...`);
       await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(4000);
@@ -613,7 +687,7 @@ export async function runPetpoojaSync(options = {}) {
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
-        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
+        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
         return readRows(buffer);
       }
 
@@ -648,7 +722,7 @@ export async function runPetpoojaSync(options = {}) {
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
-        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
+        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
         return readRows(buffer);
       }
 
@@ -656,24 +730,29 @@ export async function runPetpoojaSync(options = {}) {
       if (url.includes('inventory.petpooja.com')) {
         console.log(`  Handling Inventory Export for ${reportName} (Export All)...`);
 
-        // For Wastage page specifically, we need to click Search first to load results
-        if (url.includes('wastage_list')) {
-          console.log('  Looking for Search button on Wastage page...');
-          const searchBtn = page.locator('button:visible:has-text("Search"), input[type="submit"]:visible[value*="Search"], .btn-primary:visible:has-text("Search"), button.btn-success:visible, input[type="submit"]:visible').first();
-          if (await searchBtn.count() > 0 && await searchBtn.isVisible().catch(() => false)) {
-            console.log('  ✓ Clicking Search button on Wastage page...');
-            await searchBtn.click({ force: true });
-            await page.waitForTimeout(4000);
-          } else {
-            console.log('  ℹ️ No Search button found, proceeding to look for Export...');
-          }
+        // Every inventory list has to be searched before it can be exported.
+        const searchBtn = page.locator('button:visible:has-text("Search"), input[type="submit"]:visible[value*="Search"], .btn-primary:visible:has-text("Search"), button.btn-success:visible, input[type="submit"]:visible').first();
+        if (await searchBtn.count() > 0 && await searchBtn.isVisible().catch(() => false)) {
+          console.log('  ✓ Clicking Search button to load the list...');
+          await searchBtn.click({ force: true });
+          await page.waitForTimeout(4000);
+        } else {
+          console.log('  ℹ️ No Search button found, proceeding to look for Export...');
+        }
 
-          // Take a debug screenshot before looking for Export
-          await saveDebugScreenshot(page, 'Wastage-before-export', { fullPage: false });
+        // Take a debug screenshot before looking for Export
+        await saveDebugScreenshot(page, `${reportName}-before-export`, { fullPage: false });
+
+        // An empty list has nothing to export, so no file is ever produced and
+        // waiting for the download would only burn the time limit.
+        const emptyList = page.locator('text=/no record found|no data found/i').first();
+        if (await emptyList.count() > 0 && await emptyList.isVisible().catch(() => false)) {
+          console.log(`  ℹ️ ${reportName}: no records for this period — nothing to export.`);
+          return [];
         }
 
         // Look for the Export button (it's a dropdown toggle)
-        const exportBtn = page.locator('button:visible:has-text("Export"), .btn-group:visible button:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export"), button.btn:visible:has-text("Export")').first();
+        const exportBtn = page.locator('button:visible:has-text("Export"), .btn-group:visible button:has-text("Export"), a:visible:has-text("Export"), .dropdown-toggle:visible:has-text("Export"), button.btn:visible:has-text("Export"), [role="button"]:visible:has-text("Export"), span:visible:has-text("Export")').first();
         await exportBtn.waitFor({ state: 'visible', timeout: 30000 });
         await exportBtn.click({ force: true });
         console.log('  ✓ Clicked Export dropdown button');
@@ -706,7 +785,7 @@ export async function runPetpoojaSync(options = {}) {
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
-        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
+        console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
         return readRows(buffer);
       }
 
@@ -781,7 +860,7 @@ export async function runPetpoojaSync(options = {}) {
         chunks.push(chunk);
       }
       const buffer = Buffer.concat(chunks);
-      console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes)`);
+      console.log(`  🎉 Downloaded ${reportName} (${buffer.length} bytes) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
       return readRows(buffer);
     }
 
@@ -1137,29 +1216,37 @@ export async function runPetpoojaSync(options = {}) {
       }
     }
 
+    // The Inventory module lives behind a single sign-on from the billing
+    // dashboard, so every group that needs it has to open it first.
+    let inventorySessionReady = false;
+    async function openInventoryModule() {
+      if (inventorySessionReady) return;
+      console.log('🔐 Navigating to Petpooja Inventory via SSO...');
+      await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
+      await page.waitForTimeout(2000);
+
+      const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
+      if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
+        console.log('  ✓ Clicking Inventory in sidebar navigation...');
+        const [newPage] = await Promise.all([
+          context.waitForEvent('page', { timeout: 8000 }).catch(() => null),
+          invLink.click({ force: true })
+        ]);
+        if (newPage) {
+          await newPage.waitForLoadState('load').catch(() => {});
+          await newPage.waitForTimeout(3000);
+        } else {
+          await page.waitForURL(/inventory\.petpooja\.com/, { timeout: 15000 }).catch(() => {});
+          await page.waitForTimeout(3000);
+        }
+      }
+      inventorySessionReady = true;
+    }
+
     if (reportEnabled('inventory')) {
       try {
-        console.log('🔐 Navigating to Petpooja Inventory via SSO...');
-        await page.goto('https://billing.petpooja.com/users/dashboard', { waitUntil: 'load', timeout: 30000 });
-        await page.waitForTimeout(2000);
-  
-        // Navigate to Inventory module (opens in same page or new tab)
-        const invLink = page.locator('a[href*="inventory"], a:has-text("Inventory"), .sidebar-menu a:has-text("Inventory")').first();
-        if (await invLink.count() > 0 && await invLink.isVisible().catch(() => false)) {
-          console.log('  ✓ Clicking Inventory in sidebar navigation...');
-          const [newPage] = await Promise.all([
-            context.waitForEvent('page', { timeout: 8000 }).catch(() => null),
-            invLink.click({ force: true })
-          ]);
-          if (newPage) {
-            await newPage.waitForLoadState('load').catch(() => {});
-            await newPage.waitForTimeout(3000);
-          } else {
-            await page.waitForURL(/inventory\.petpooja\.com/, { timeout: 15000 }).catch(() => {});
-            await page.waitForTimeout(3000);
-          }
-        }
-  
+        await openInventoryModule();
+
         // Wastage download
         try {
           const wastageRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/wastage_list/', 'Wastage Report', cycle);
@@ -1180,27 +1267,6 @@ export async function runPetpoojaSync(options = {}) {
           failedReports++;
           console.error('⚠️ Could not sync Wastage List:', we.message);
         }
-  
-        // Purchase returns download
-        try {
-          const returnRows = await fetchCustomReport('https://inventory.petpooja.com/inventories/purchase_return_list/', 'Purchase Returns', cycle);
-          const returnsResult = parsePurchaseReturns(returnRows, cycle);
-          if (returnsResult.ok) {
-            console.log(`  📊 Total Purchase Returns: ₹${returnsResult.total} across ${returnsResult.entries} debit notes`);
-            if (returnsResult.skippedCancelled > 0) {
-              console.log(`  ℹ️ Skipped ${returnsResult.skippedCancelled} cancelled return entries`);
-            }
-            await saveMetric('b2b_returns', returnsResult.total, 'petpooja', 'Purchase Return Report', {
-              scheme_name: 'b2b_counter',
-              entries: returnsResult.entries,
-              skippedCancelled: returnsResult.skippedCancelled
-            });
-            successfulReports++;
-          }
-        } catch (re) {
-          failedReports++;
-          console.error('⚠️ Could not sync Purchase Returns:', re.message);
-        }
       } catch (ie) {
         failedReports++;
         console.error('⚠️ Could not access Petpooja Inventory:', ie.message);
@@ -1210,9 +1276,13 @@ export async function runPetpoojaSync(options = {}) {
     if (reportEnabled('purchase_invoices')) {
       try {
         console.log('\n📥 Fetching Purchase Invoices from Petpooja Inventory...');
-  
-        // Try to navigate to purchase invoices
-        const purchaseInvoiceUrl = 'https://inventory.petpooja.com/inventories/purchase_invoice_list/';
+
+        await openInventoryModule();
+
+        // Petpooja's purchase bills live under "Stock Purchase". The old
+        // `purchase_invoice_list` address no longer exists and answers
+        // "Not found :(".
+        const purchaseInvoiceUrl = 'https://inventory.petpooja.com/inventories/purchase_list/';
         const purchaseRows = await fetchCustomReport(purchaseInvoiceUrl, 'Purchase Invoices', cycle);
   
         if (purchaseRows && purchaseRows.length > 0) {
@@ -1220,48 +1290,31 @@ export async function runPetpoojaSync(options = {}) {
           if (purchaseResult.ok && purchaseResult.invoices.length > 0) {
             console.log(`  📊 Found ${purchaseResult.invoices.length} purchase invoices`);
   
-            // Sync each invoice to expenses table
-            for (const invoice of purchaseResult.invoices) {
-              try {
-                const payload = {
-                  category: 'Vendor',
-                  cost_type: 'variable',
-                  entry_type: 'actual',
-                  status: 'approved', // Petpooja data is auto-approved
-                  amount: invoice.total_amount,
-                  debit_note: 0,
-                  vendor_name: invoice.vendor_name,
-                  invoice_number: invoice.invoice_number,
-                  invoice_date: invoice.invoice_date,
-                  description: invoice.description || 'Petpooja purchase invoice',
-                  payment_status: invoice.payment_status || 'due',
-                  payment_date: invoice.payment_date || null,
-                  payment_mode: invoice.payment_mode || null,
-                  bank_reference: invoice.bank_reference || null,
-                  created_by: null, // System-generated
-                  approved_by: null
-                };
-  
-                const { error } = await supabase
-                  .from('expenses')
-                  .upsert([payload], {
-                    onConflict: 'vendor_name,invoice_number',
-                    ignoreDuplicates: false
-                  });
-  
-                if (error) {
-                  console.error(`  ❌ Failed to sync invoice ${invoice.invoice_number}:`, error.message);
-                } else {
-                  console.log(`  ✓ Synced invoice ${invoice.invoice_number} (₹${invoice.total_amount})`);
-                }
-              } catch (syncErr) {
-                console.error(`  ❌ Error syncing invoice ${invoice.invoice_number}:`, syncErr.message);
-              }
-            }
-  
+            // Sync each invoice to expenses table.
+            const invoicePayloads = purchaseResult.invoices.map((invoice) => ({
+              category: 'Vendor',
+              cost_type: 'variable',
+              entry_type: 'actual',
+              status: 'approved', // Petpooja data is auto-approved
+              amount: invoice.total_amount,
+              debit_note: 0,
+              vendor_name: invoice.vendor_name,
+              invoice_number: invoice.invoice_number,
+              invoice_date: invoice.invoice_date,
+              description: invoice.description || 'Petpooja purchase invoice',
+              payment_status: invoice.payment_status || 'due',
+              payment_date: invoice.payment_date || null,
+              payment_mode: invoice.payment_mode || null,
+              bank_reference: invoice.bank_reference || null,
+              created_by: null, // System-generated
+              approved_by: null
+            }));
+            await syncExpenseRows(invoicePayloads, 'purchase invoice(s)');
+
             successfulReports++;
           } else {
             console.log('  ℹ️ No purchase invoices found for this period');
+            dumpReportRows('purchase-invoices', purchaseRows);
           }
         }
       } catch (pe) {
@@ -1273,58 +1326,51 @@ export async function runPetpoojaSync(options = {}) {
     if (reportEnabled('purchase_returns')) {
       try {
         console.log('\n📥 Fetching Purchase Returns / Debit Notes from Petpooja Inventory...');
-  
+
+        await openInventoryModule();
+
         const purchaseReturnUrl = 'https://inventory.petpooja.com/inventories/purchase_return_list/';
         const returnRows = await fetchCustomReport(purchaseReturnUrl, 'Purchase Returns', cycle);
-  
+
         if (returnRows && returnRows.length > 0) {
           const returnsResult = parsePurchaseReturns(returnRows, cycle);
           if (returnsResult.ok && returnsResult.returns.length > 0) {
             console.log(`  📊 Found ${returnsResult.returns.length} purchase returns (debit notes)`);
-  
-            // Sync each debit note to expenses table
-            for (const ret of returnsResult.returns) {
-              try {
-                // Create debit note entry (negative amount) or update existing vendor expense
-                const payload = {
-                  category: 'Vendor',
-                  cost_type: 'variable',
-                  entry_type: 'actual',
-                  status: 'approved',
-                  amount: ret.total_amount, // Store as positive, debit_note field handles reduction
-                  debit_note: ret.total_amount,
-                  vendor_name: ret.vendor_name,
-                  invoice_number: ret.return_number,
-                  invoice_date: ret.return_date,
-                  description: `Debit Note: ${ret.description || 'Purchase return'}`,
-                  payment_status: 'due',
-                  payment_date: null,
-                  payment_mode: null,
-                  bank_reference: null,
-                  created_by: null,
-                  approved_by: null
-                };
-  
-                const { error } = await supabase
-                  .from('expenses')
-                  .upsert([payload], {
-                    onConflict: 'vendor_name,invoice_number',
-                    ignoreDuplicates: false
-                  });
-  
-                if (error) {
-                  console.error(`  ❌ Failed to sync debit note ${ret.return_number}:`, error.message);
-                } else {
-                  console.log(`  ✓ Synced debit note ${ret.return_number} (₹${ret.total_amount})`);
-                }
-              } catch (syncErr) {
-                console.error(`  ❌ Error syncing debit note ${ret.return_number}:`, syncErr.message);
-              }
-            }
-  
+
+            // The `b2b_returns` metric comes from the same report.
+            const total = returnsResult.returns.reduce((s, r) => s + Number(r.total_amount || 0), 0);
+            console.log(`  📊 Total Purchase Returns: ₹${total} across ${returnsResult.returns.length} debit notes`);
+            await saveMetric('b2b_returns', total, 'petpooja', 'Purchase Return Report', {
+              scheme_name: 'b2b_counter',
+              entries: returnsResult.returns.length,
+              skippedCancelled: 0
+            });
+
+            // Sync each debit note to expenses table.
+            const returnPayloads = returnsResult.returns.map((ret) => ({
+              category: 'Vendor',
+              cost_type: 'variable',
+              entry_type: 'actual',
+              status: 'approved',
+              amount: ret.total_amount, // Store as positive, debit_note field handles reduction
+              debit_note: ret.total_amount,
+              vendor_name: ret.vendor_name,
+              invoice_number: ret.return_number,
+              invoice_date: ret.return_date,
+              description: `Debit Note: ${ret.description || 'Purchase return'}`,
+              payment_status: 'due',
+              payment_date: null,
+              payment_mode: null,
+              bank_reference: null,
+              created_by: null,
+              approved_by: null
+            }));
+            await syncExpenseRows(returnPayloads, 'debit note(s)');
+
             successfulReports++;
           } else {
             console.log('  ℹ️ No purchase returns found for this period');
+            dumpReportRows('purchase-returns', returnRows);
           }
         }
       } catch (re) {

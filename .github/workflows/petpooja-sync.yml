@@ -7,7 +7,7 @@ name: Petpooja Variable Pay Automated Sync
 # cannot reach billing.petpooja.com at all. Vercel (AWS egress) is allowed,
 # so this workflow only schedules the request and collects the result.
 #
-# The sync is split into three report groups because a full run is longer than
+# The sync is split into four report groups because a full run is longer than
 # a serverless function is allowed to run. The groups are called one after the
 # other so they never race on the same metric rows.
 #
@@ -27,7 +27,7 @@ on:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
       group:
-        description: 'Run only one report group (1, 2, 3). Leave empty to run all three.'
+        description: 'Run only one report group (1, 2, 3, 4). Leave empty to run all four.'
         required: false
 
 # Never let two syncs overlap — they would race on the same metric rows.
@@ -62,11 +62,11 @@ jobs:
             PERIOD=""
           fi
 
-          # A manual run may target a single group; the scheduled run does all three.
+          # A manual run may target a single group; the scheduled run does all four.
           if [ -n "$ONLY_GROUP" ]; then
             GROUPS="$ONLY_GROUP"
           else
-            GROUPS="1 2 3"
+            GROUPS="1 2 3 4"
           fi
 
           FAILED=""
