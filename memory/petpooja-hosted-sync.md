@@ -105,6 +105,29 @@ Three layers now stop that class of failure:
 3. The workflow fails the job when a group reports "ok" but fetched no
    reports, completed only some of them, or refused to write a metric.
 
+## A dead browser must not cost the day
+
+On 16 Nov the hosted run failed at **group 5** with:
+
+```
+HTTP 500  {"ok":false,"error":"page.waitForTimeout: Target page, context or browser has been closed"}
+```
+
+Chromium had died about 15 seconds after the login submit. Groups 1-4 and 6 were
+fine, so it was a dead browser, not a broken report — but one dead browser lost
+the whole daily sync.
+
+Two layers now absorb it:
+
+1. The engine creates its browser, context and page through `openBrowser()`, so
+   a dead session can be replaced. The login is retried up to three times, each
+   retry on a fresh browser after a 10 s pause.
+2. The workflow retries a failed group once after 30 s, and pauses 10 s between
+   groups so Petpooja never sees two logins at once.
+
+The lesson is the same as the `GROUPS` bug above: **a failure that is only
+sometimes real must be retried, and a success must be proven, not assumed.**
+
 ## Two syncs must never overlap
 
 Petpooja refuses a second login while another session is active: the second
@@ -153,10 +176,13 @@ second request hijack the first one's capture.
 
 - The Google service-account key (`GOOGLE_PRIVATE_KEY_PATH`) points at a Windows
   path and is not on this machine, so the **Customer Feedback (Google Sheets) sync
-  is inactive** in the hosted run. The engine skips it gracefully.
+  is inactive** in the hosted run. The engine skips it gracefully. The owner
+  decided on 16 Nov to leave it off for now — it is a deliberate gap, not an
+  oversight, and it can be switched on by putting the key on the host.
 - SMTP is not configured, so failure email alerts are skipped. GitHub's own
-  workflow-failure notification still fires — and it is the only alert, because
-  the workflow now goes red when a group does not complete all its reports.
+  workflow-failure notification still fires. The owner asked for email alerts to
+  be switched on; it needs `SMTP_USER` / `SMTP_PASS` (a Google app password)
+  on the Vercel production environment.
 
 ## The office computer's own schedule
 
