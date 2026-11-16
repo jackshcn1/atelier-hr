@@ -597,6 +597,23 @@ export async function runPetpoojaSync(options = {}) {
   // every attempt and every browser restart shares ONE time budget, because a
   // serverless function may only run for 300 seconds and the reports still
   // need most of that.
+  //
+  // The probe is the difference between "the page did not render" and "the
+  // site is not answering us at all". Petpooja's edge blocks datacenter IP
+  // ranges, so from the serverless host that distinction decides whether a
+  // retry is worth anything.
+  async function probePetpooja() {
+    try {
+      const res = await fetch('https://billing.petpooja.com/', {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(15000),
+      });
+      return `direct fetch got HTTP ${res.status}`;
+    } catch (err) {
+      return `direct fetch failed (${err.message})`;
+    }
+  }
+
   async function loginToPetpooja() {
     const EMAIL = '#UserEmail, input[name="data[User][email]"], input[placeholder*="Email"]';
     const PASS = '#UserPassword, input[name="data[User][password]"], input[type="password"]';
@@ -687,7 +704,7 @@ export async function runPetpoojaSync(options = {}) {
       return;
     }
 
-    throw new Error(`Petpooja login did not complete. Last page said: ${await pageText()}`);
+    throw new Error(`Petpooja login did not complete. Probe: ${await probePetpooja()}. Last page said: ${await pageText()}`);
   }
 
   try {
