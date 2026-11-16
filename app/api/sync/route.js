@@ -100,19 +100,21 @@ async function handle(req) {
   try {
     // Serverless has no bundled browser and no display.
     process.env.PETPOOJA_HEADLESS = 'true';
+
+    // The software graphics stack (SwiftShader) is not needed to fill in a
+    // login form or read a report, and on a single serverless CPU it is
+    // expensive enough to stop the page from ever painting. Turning it off
+    // also skips unpacking it.
+    chromium.setGraphicsMode = false;
     process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH = await chromium.executablePath();
 
-    // `--single-process` puts the browser and the page in one process: a heavy
-    // page then takes the whole browser down with it, which is exactly what
-    // the hosted runs kept hitting ("Target page, context or browser has been
-    // closed"). Dropping it lets a slow page fail on its own instead of
-    // killing the session. The memory it costs is well inside the function's
-    // budget.
-    const chromiumArgs = chromium.args.filter(
-      (arg) => arg !== '--single-process' && arg !== '--no-zygote',
-    );
+    // NOTE: `--single-process` stays. @sparticuz/chromium needs it in this
+    // environment — without it the browser dies on startup with
+    // "browserContext.newPage: Target crashed". The engine handles a browser
+    // that dies later by starting a fresh one.
     process.env.PETPOOJA_CHROMIUM_ARGS = JSON.stringify([
-      ...chromiumArgs,
+      ...chromium.args,
+      '--disable-gpu',
       '--disable-blink-features=AutomationControlled',
     ]);
 
