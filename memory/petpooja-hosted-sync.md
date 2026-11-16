@@ -181,20 +181,38 @@ never comes into it.
 
 How it is wired:
 
-- `scripts/petpooja-sync.mjs` — `runPetpoojaSync({ sessionCookies, keepSession })`.
+- `scripts/petpooja-sync.mjs` — `runPetpoojaSync({ keepSession })`.
   `tryReuseSession()` restores the cookies and checks for the dashboard; if
   that fails it logs in as before. `keepSession: true` leaves the session
-  alive and returns it; the last group of the run leaves it out and logs out.
+  alive and stores it; the last group of the run leaves it out and logs out.
   A group that **failed** always logs out, so the next group starts clean.
-- `app/api/sync/route.js` — the session travels in the `x-petpooja-session`
-  request header and comes back in the same response header. **Never in the
-  body**: the body is printed in the workflow log.
-- `.github/workflows/petpooja-sync.yml` — a shell variable carries the session
-  from group to group. It is passed in a header, never echoed, and the header
-  file is deleted as soon as it has been read.
+- `public.petpooja_sync_session` — the live session, **one row**, stored in
+  the database. This is the carrier: any group can pick it up, including the
+  first group of a run that was interrupted. It is read and written by the
+  engine alone, through the service role; RLS is on and there are no client
+  policies.
+- `app/api/sync/route.js` — `?keepSession=1` and nothing else. The route does
+  not pass the session around; it does not need to.
+- `.github/workflows/petpooja-sync.yml` — calls the groups in order, with
+  `keepSession=1` on all but the last. No session handling at all.
+
+The session is a live credential: it is never written to the log, never put
+in the response body, and never held in a CI variable.
+
+**A refused login must release the session it is holding.** Petpooja turns a
+login away while another session is alive. The engine keeps the cookies it was
+given, so when the password box never appears it visits the logout URL with
+those cookies — that releases the session on Petpooja's side — and tries
+again. Without this, a stale session from a different address locks the
+account until a human clears it.
+
+**A browser that dies must not lose the session.** `openBrowser()` puts the
+carried cookies into every new context, so a replacement browser comes up
+with the session already in it, and `tryReuseSession()` retries once on a
+fresh browser when the old one dies.
 
 **How to apply:** do not "fix" a refused login by adding retries. Restore the
-session. And keep the session out of every log — it is a live credential.
+session, and release it if the restore is refused.
 
 **A password box on the page does not mean you are logged out.** The dashboard
 page keeps a password input in the DOM (a change-password modal), so

@@ -137,26 +137,19 @@ async function handle(req) {
 
     // Session hand-over between groups.
     //
-    // The run is split into ten serverless calls, and Petpooja refuses a new
-    // login from a different IP while a session is alive — which every group
-    // after the first is, because serverless invocations do not share an
-    // egress address. So the first group logs in and hands its session
-    // cookies to the next group in the `x-petpooja-session` header; the next
-    // group restores them and goes straight to the dashboard.
+    // The run is split into ten serverless calls, and Petpooja turns away a
+    // login from an address it does not recognise as the one holding the
+    // live session — which every group after the first is, because serverless
+    // invocations do not share an egress address.
     //
-    // `?keepSession=1` asks this group to leave the session alive and hand
-    // it on. The last group of the run leaves it out, so the account is
+    // So the first group logs in and leaves its session behind; the next
+    // group restores it and goes straight to the dashboard. The session lives
+    // in the database, so any group can pick it up — including the first
+    // group of a run that was interrupted.
+    //
+    // `?keepSession=1` asks this group to leave the session alive for its
+    // successor. The last group of the run leaves it out, so the account is
     // logged out and free for tomorrow.
-    const sessionHeader = req.headers.get('x-petpooja-session');
-    let sessionCookies = null;
-    if (sessionHeader) {
-      try {
-        const parsed = JSON.parse(sessionHeader);
-        if (Array.isArray(parsed) && parsed.length > 0) sessionCookies = parsed;
-      } catch {
-        push('⚠️ The session header was not valid JSON — this group will log in from scratch.');
-      }
-    }
     const keepSession = params.get('keepSession') === '1';
 
     // An unknown group or report name is rejected outright. Silently running
@@ -197,16 +190,7 @@ async function handle(req) {
     }
 
     push('🌐 Starting Petpooja sync on Vercel...');
-    const result = await runPetpoojaSync({ sessionCookies, keepSession });
-
-    // The session is a set of live login cookies. They are a credential, so
-    // they never go into the response body — the body is printed in the
-    // workflow log. They travel in a response header instead, where only the
-    // scheduler reads them.
-    const { sessionCookies: freshSession, ...publicResult } = result || {};
-    const handedOn = (freshSession || []).filter(
-      (c) => c && ['user_id', 'user_key', 'PETPOOJA_CO'].includes(c.name)
-    );
+    const result = await runPetpoojaSync({ keepSession });
 
     // A pay cycle that has ended must be locked with its figures frozen.
     // The office-computer runner did this after every sync; the hosted run
@@ -226,13 +210,10 @@ async function handle(req) {
     const response = NextResponse.json({
       ok: true,
       durationMs: Date.now() - started,
-      result: publicResult,
+      result: result || {},
       closedCycles: closed?.closed ?? 0,
       logs: logs.slice(-200),
     });
-    if (keepSession && handedOn.length > 0) {
-      response.headers.set('x-petpooja-session', JSON.stringify(handedOn));
-    }
     return response;
   } catch (err) {
     console.error('Sync failed:', err);
