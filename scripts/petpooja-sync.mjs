@@ -200,7 +200,14 @@ function tempSpace() {
     } catch {
       // No listing — the space is what matters.
     }
-    return `${free}MB free of ${total}MB (${profiles} leftover browser profile(s))`;
+    let ours = '';
+    try {
+      const s2 = statfsSync(RUN_TMP_DIR);
+      ours = `, run folder ${Math.round((s2.bavail * s2.bsize) / 1048576)}MB free`;
+    } catch {
+      // The run folder may not exist yet.
+    }
+    return `${free}MB free of ${total}MB (${profiles} leftover browser profile(s)${ours})`;
   } catch {
     return 'unknown';
   }
@@ -235,6 +242,14 @@ function cleanStaleProfiles() {
   } catch {
     return 0;
   }
+}
+
+// The folder the browser keeps its profile in, read from the browser's own
+// command line. It is the folder that has to be removed when the browser
+// goes, so that the next group starts with the same amount of room.
+function profileDirOf(cmdline) {
+  const match = /--user-data-dir=(\S+)/.exec(cmdline || '');
+  return match ? match[1] : null;
 }
 
 // How much the browser process is using right now, while it is still alive.
@@ -304,6 +319,52 @@ function memorySnapshot() {
   parts.push(`node rss ${Math.round(mem.rss / 1048576)}MB heap ${Math.round(mem.heapUsed / 1048576)}MB`);
   parts.push(`tmp ${tempSpace()}`);
   return parts.join(' | ');
+}
+
+// A folder of our own for everything the browser writes while it runs.
+//
+// Playwright puts the browser's profile, its cache and the files it
+// downloads into the system's temporary folder — on the serverless host that
+// is /tmp, and it is only 512MB. Every report group leaves a profile behind,
+// and ten of them fill the disk; the browser then starts dying in ways that
+// look like nothing to do with the disk at all. The room left in /tmp is
+// printed with every death, and it was down to 16MB when the last groups
+// failed.
+//
+// So the browser writes into a folder of our own, and that folder is emptied
+// when the browser closes.
+const RUN_TMP_DIR = '/tmp/atelier-petpooja';
+
+// Point the browser's temporary files at our own folder.
+function useOwnTempFolder() {
+  try {
+    mkdirSync(RUN_TMP_DIR, { recursive: true });
+    process.env.TMPDIR = RUN_TMP_DIR;
+    return true;
+  } catch {
+    // No permission — the system folder will have to do.
+    return false;
+  }
+}
+
+// Remove what the browser left behind.
+function clearRunTemp() {
+  try {
+    for (const name of readdirSync(RUN_TMP_DIR)) {
+      if (!name.startsWith('playwright')) continue;
+      const path = join(RUN_TMP_DIR, name);
+      try {
+        // A folder that was touched in the last minute may belong to a
+        // browser that is running right now, in another request.
+        if (Date.now() - statSync(path).mtimeMs < 60000) continue;
+        rmSync(path, { recursive: true, force: true });
+      } catch {
+        // Still in use, or already gone.
+      }
+    }
+  } catch {
+    // Nothing to clear.
+  }
 }
 
 // A browser that dies can leave its helper processes behind. On the serverless
@@ -652,6 +713,7 @@ export async function runPetpoojaSync(options = {}) {
   let context = null;
   let page = null;
   let browserPid = null;
+  let browserProfileDir = null;
 
   // Set while the browser is being closed on purpose, so the "the browser
   // died" message is only printed when it really did.
@@ -665,6 +727,12 @@ export async function runPetpoojaSync(options = {}) {
 
   async function openBrowser() {
     console.log(`🌐 Launching browser (headless=${headless})...`);
+    // The browser writes into a folder of our own, and that folder is emptied
+    // when the browser closes. On the serverless host the system's temporary
+    // folder is only 512MB, and ten report groups' worth of browser profiles
+    // fill it — after which the browser dies in ways that look like anything
+    // but a full disk.
+    useOwnTempFolder();
     // A browser that died leaves its profile and cache behind in /tmp, and
     // the serverless host reuses the same instance for the next group. Those
     // leftovers are cleared first, because a full /tmp makes the next
@@ -681,6 +749,7 @@ export async function runPetpoojaSync(options = {}) {
     const browserProc = browser?._process ?? null;
     const found = findBrowserPid();
     browserPid = found?.pid ?? browserProc?.pid ?? null;
+    browserProfileDir = profileDirOf(found?.cmd || '');
     browser.on('disconnected', () => {
       // The same event fires when the browser is closed on purpose, so it is
       // only worth reporting when the browser died on its own.
@@ -693,6 +762,15 @@ export async function runPetpoojaSync(options = {}) {
       if (killed > 0) {
         console.error(`  🧹 Cleared ${killed} leftover browser process(es).`);
       }
+      if (browserProfileDir) {
+        try {
+          rmSync(browserProfileDir, { recursive: true, force: true });
+        } catch {
+          // Already gone.
+        }
+        browserProfileDir = null;
+      }
+      clearRunTemp();
     });
 
     console.log(`  🧠 Browser memory after launch: ${browserMemory(browserPid)} (${found?.cmd || 'browser process not found'})`);
@@ -747,6 +825,17 @@ export async function runPetpoojaSync(options = {}) {
     browser = null;
     context = null;
     page = null;
+    // The profile is the browser's own folder in /tmp. It is big, and it is
+    // not cleaned up when the browser dies — so it is cleaned up here.
+    if (browserProfileDir) {
+      try {
+        rmSync(browserProfileDir, { recursive: true, force: true });
+      } catch {
+        // Already gone.
+      }
+      browserProfileDir = null;
+    }
+    clearRunTemp();
   }
 
   await openBrowser();
@@ -1208,8 +1297,11 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
           return await fetchCustomReportOnce(url, reportName, queryCycle, sheetMatch);
         } catch (err) {
           const browserDied = /closed|Target closed|browser has been closed/i.test(err.message || '');
-          if (attempt === 2 || !browserDied) throw err;
-          console.log(`  ⚠️ The browser died during ${reportName} — starting a fresh one and trying again.`);
+          // A page that never finished rendering is the same kind of problem:
+          // a fresh browser gets a clean page.
+          const pageNotReady = /Excel button not found/i.test(err.message || '');
+          if (attempt === 2 || (!browserDied && !pageNotReady)) throw err;
+          console.log(`  ⚠️ ${pageNotReady ? 'The page did not finish rendering' : 'The browser died'} during ${reportName} — starting a fresh one and trying again.`);
           await closeBrowser();
           await new Promise((r) => setTimeout(r, 5000));
           await openBrowser();
