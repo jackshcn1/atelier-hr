@@ -123,6 +123,58 @@ export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
 // there. Nothing depends on them; they only explain a crash.
 // ---------------------------------------------------------------------------
 
+// Find the browser process.
+//
+// Playwright does not hand the browser's process over, but the browser is a
+// direct child of this process, so the kernel can be asked. This is the only
+// way to read the browser's real memory — Node's own numbers say nothing
+// about a separate process — and to tell an out-of-memory kill (SIGKILL)
+// from a crash (SIGSEGV).
+function findBrowserPid() {
+  try {
+    const pids = readdirSync('/proc').filter((n) => /^\d+$/.test(n));
+    for (const pid of pids) {
+      if (Number(pid) === process.pid) continue;
+      try {
+        const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+        const ppid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
+        if (ppid !== process.pid) continue;
+        const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim();
+        if (!cmd) continue;
+        return { pid: Number(pid), cmd: cmd.slice(0, 120) };
+      } catch {
+        // The process ended while we were looking at it.
+      }
+    }
+  } catch {
+    // No /proc — not a Linux box.
+  }
+  return null;
+}
+
+// A one-off look at what this machine will let us see. It is the first thing
+// to read when the browser dies and the reason is not obvious.
+function environmentReport() {
+  const lines = [];
+  try {
+    lines.push(`proc pids: ${readdirSync('/proc').filter((n) => /^\d+$/.test(n)).length}`);
+  } catch {
+    lines.push('proc: not readable');
+  }
+  try {
+    lines.push(`cgroup: ${readdirSync('/sys/fs/cgroup').slice(0, 12).join(', ')}`);
+  } catch {
+    lines.push('cgroup: not readable');
+  }
+  try {
+    const mem = readFileSync('/proc/meminfo', 'utf8');
+    lines.push(`meminfo: ${(mem.match(/MemTotal:\s*(\d+)/) || [])[1] || '?'} kB total`);
+  } catch {
+    lines.push('meminfo: not readable');
+  }
+  return lines.join(' | ');
+}
+
 // How much the browser process is using right now, while it is still alive.
 //
 // This is the number that matters and that Node cannot give: the browser is
@@ -558,7 +610,8 @@ export async function runPetpoojaSync(options = {}) {
     // recognised and cleared. Playwright does not hand this over officially,
     // so it is read defensively — a null id only costs the extra cleanup.
     const browserProc = browser?._process ?? null;
-    browserPid = browserProc?.pid ?? null;
+    const found = findBrowserPid();
+    browserPid = found?.pid ?? browserProc?.pid ?? null;
     browser.on('disconnected', () => {
       // The same event fires when the browser is closed on purpose, so it is
       // only worth reporting when the browser died on its own.
@@ -573,7 +626,8 @@ export async function runPetpoojaSync(options = {}) {
       }
     });
 
-    console.log(`  🧠 Browser memory after launch: ${browserMemory(browserPid)}`);
+    console.log(`  🧠 Browser memory after launch: ${browserMemory(browserPid)} (${found?.cmd || 'browser process not found'})`);
+    if (!browserPid) console.log(`  🖥️ ${environmentReport()}`);
 
     context = await browser.newContext({
       acceptDownloads: true,
