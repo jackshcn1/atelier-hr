@@ -107,6 +107,12 @@ All four connections are live and verified. Re-verify with
   computer's own tasks off — they must not run alongside the hosted one.
 - Data is pulled by **browser automation**, not an API: `runPetpoojaSync()` drives
   Chrome via Playwright against `billing.petpooja.com`.
+- **A dead browser must never cost the daily sync.** Chromium can die mid-run
+  (serverless memory pressure), which shows up as
+  `Target page, context or browser has been closed`. The engine therefore creates
+  its browser through `openBrowser()` and retries the login on a fresh one, and
+  the workflow retries a failed group once after 30 s. A red run always means
+  the work did not happen; it is never a false alarm.
 - The local computer workflow still works as a manual fallback:
   `node scripts/petpooja-sync.mjs` (headed Chrome). On the desktop it runs every
   report; `SYNC_GROUP=1` runs one group.
@@ -118,9 +124,10 @@ All four connections are live and verified. Re-verify with
   so bill rows are compared and written individually — never `upsert` with an
   `onConflict` on that pair.
 - **Known gaps:** the Google service-account key is not on the server, so the
-  Customer Feedback (Google Sheets) sync is inactive in the hosted run; SMTP is
-  not configured, so email alerts are skipped (GitHub's own failure notification
-  still fires).
+  Customer Feedback (Google Sheets) sync is inactive in the hosted run — the
+  owner chose to leave it off for now; it is skipped gracefully and does not
+  fail the run. SMTP is not configured yet, so email alerts are skipped (the
+  GitHub workflow-failure notification still fires).
 
 ---
 
