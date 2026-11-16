@@ -123,13 +123,14 @@ All four connections are live and verified. Re-verify with
   The `expenses` table has **no** unique index on `(vendor_name, invoice_number)`,
   so bill rows are compared and written individually — never `upsert` with an
   `onConflict` on that pair.
-- **Petpooja throttles the serverless IP.** The edge counts sessions per source
-  IP and the serverless host burns them fast. When it is throttled every group
-  fails with `chrome-error://chromewebdata/` — the page will not load at all —
-  and the error carries a probe (`direct fetch got HTTP 403`) that says so
-  plainly. This is not a code fault: wait for the bucket to refill and re-run
-  rather than rewriting anything. The daily 05:00 run is the first burst of
-  the day and starts with a full bucket.
+- **Every group must log out of Petpooja.** Closing the browser does not end
+  the session: it stays live on Petpooja's side, and the next login is then
+  refused — the email field appears but the password field never does. From
+  the serverless host each group can come from a different IP, so the account
+  collects one dead session per group. Each group ends by visiting
+  `billing.petpooja.com/users/logout`. The login error carries a probe (a
+  plain fetch of the login page from the same host) so "the site refused us"
+  can be told from "the page did not render".
 - **Known gaps:** the Google service-account key is not on the server, so the
   Customer Feedback (Google Sheets) sync is inactive in the hosted run — the
   owner chose to leave it off for now; it is skipped gracefully and does not
