@@ -1,13 +1,18 @@
 name: Petpooja Variable Pay Automated Sync
 
-# Runs unattended so the local office computer no longer has to stay on.
+# Runs unattended so the office computer no longer has to stay on.
+#
+# The browser work happens on Vercel, not here: Petpooja's edge blocks
+# datacenter IP ranges with a raw nginx 403, and a GitHub Actions runner
+# cannot reach billing.petpooja.com at all. Vercel (AWS egress) is allowed,
+# so this workflow only schedules the request and collects the result.
+#
+# The sync is split into four report groups because a full run is longer than
+# a serverless function is allowed to run. The groups are called one after the
+# other so they never race on the same metric rows.
 #
 # Schedule is UTC (GitHub cron is always UTC):
 #   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * *'
-#
-# The payroll cycle is computed from the current date, so the runner timezone
-# is pinned to Asia/Kolkata. Without this the cycle would roll over at the
-# wrong moment (the runner is 5h30m behind IST).
 on:
   schedule:
     - cron: '30 23 * * *'
@@ -21,6 +26,9 @@ on:
       end_date:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
+      group:
+        description: 'Run only one report group (1, 2, 3, 4). Leave empty to run all four.'
+        required: false
 
 # Never let two syncs overlap — they would race on the same metric rows.
 concurrency:
@@ -31,86 +39,76 @@ jobs:
   sync-petpooja:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      TZ: Asia/Kolkata
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browser and system dependencies
-        run: npx playwright install --with-deps chromium
-
-      - name: Build runtime config from secrets
+      - name: Request the Petpooja sync
         env:
-          PETPOOJA_EMAIL: ${{ secrets.PETPOOJA_EMAIL }}
-          PETPOOJA_PASSWORD: ${{ secrets.PETPOOJA_PASSWORD }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
-          GOOGLE_PRIVATE_KEY_B64: ${{ secrets.GOOGLE_PRIVATE_KEY_B64 }}
-          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
-          GOOGLE_SHEETS_SHEET_NAME: ${{ secrets.GOOGLE_SHEETS_SHEET_NAME }}
-          GOOGLE_SHEETS_RANGE: ${{ secrets.GOOGLE_SHEETS_RANGE }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          PETPOOJA_HEADLESS: 'false'
-        run: node scripts/ci-write-petpooja-config.mjs
+          SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
+          SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          ONLY_GROUP: ${{ inputs.group }}
+        run: |
+          set -u
+          if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
+            echo "::error::VERCEL_SYNC_URL and VERCEL_SYNC_SECRET must be configured as repository secrets."
+            exit 1
+          fi
 
-      # Headed Chrome under Xvfb. Petpooja is far more tolerant of a real
-      # browser window than of a headless one, so headed is the primary path.
-      - name: Diagnose Petpooja access from this runner
-        run: xvfb-run --auto-servernum node scripts/ci-check-petpooja-access.mjs
+          if [ -n "$START_DATE" ] && [ -n "$END_DATE" ]; then
+            PERIOD="start=$START_DATE&end=$END_DATE"
+            echo "Overriding period: $START_DATE -> $END_DATE"
+          else
+            PERIOD=""
+          fi
 
-      - name: Run Petpooja sync (headed Chrome under Xvfb)
-        env:
-          SYNC_START_DATE: ${{ inputs.start_date }}
-          SYNC_END_DATE: ${{ inputs.end_date }}
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" node scripts/petpooja-sync.mjs
+          # A manual run may target a single group; the scheduled run does all four.
+          if [ -n "$ONLY_GROUP" ]; then
+            GROUPS="$ONLY_GROUP"
+          else
+            GROUPS="1 2 3 4"
+          fi
 
-      # Fallback: if the headed run failed (e.g. no X server on the image),
-      # retry headless rather than losing the whole day.
-      - name: Retry sync headless
-        if: failure()
-        env:
-          SYNC_START_DATE: ${{ inputs.start_date }}
-          SYNC_END_DATE: ${{ inputs.end_date }}
-          PETPOOJA_HEADLESS: 'true'
-        run: node scripts/petpooja-sync.mjs
+          FAILED=""
+          for G in $GROUPS; do
+            echo ""
+            echo "=== Report group $G ==="
+            URL="$SYNC_URL?group=$G"
+            [ -n "$PERIOD" ] && URL="$URL&$PERIOD"
 
-      - name: Upload sync log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: petpooja-sync-log
-          path: |
-            scripts/petpooja-sync.log
-            scripts/last-successful-sync.json
-          if-no-files-found: ignore
-          retention-days: 30
+            STATUS=$(curl -sS -o "response-group-$G.json" -w '%{http_code}' -X POST "$URL" \
+              -H "x-sync-secret: $SYNC_SECRET" \
+              -H 'Content-Type: application/json' \
+              --max-time 600) || STATUS="000"
 
-      - name: Write run summary
+            echo "HTTP $STATUS"
+            head -c 4000 "response-group-$G.json" || true
+            echo ""
+
+            if [ "$STATUS" != "200" ]; then
+              echo "::error::Report group $G failed with HTTP $STATUS"
+              FAILED="$FAILED $G"
+            fi
+          done
+
+          if [ -n "$FAILED" ]; then
+            echo "::error::Failed report groups:$FAILED"
+            exit 1
+          fi
+
+      - name: Publish run summary
         if: always()
         run: |
           {
-            echo "### Petpooja sync — $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "### Petpooja daily sync"
             echo
-            if [ -f scripts/petpooja-sync.log ]; then
+            echo "- Finished: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            for f in response-group-*.json; do
+              [ -e "$f" ] || continue
+              echo ""
+              echo "#### ${f%.json}"
+              echo '```json'
+              head -c 2000 "$f"
               echo '```'
-              tail -n 60 scripts/petpooja-sync.log
-              echo '```'
-            else
-              echo 'No sync log was produced.'
-            fi
+            done
           } >> "$GITHUB_STEP_SUMMARY"

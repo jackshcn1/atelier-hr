@@ -13,6 +13,28 @@ async function getActivePeriodId() {
   return period?.id || null;
 }
 
+// The expenses table is not scoped to a period — the Petpooja sync adds the
+// vendor bills of every cycle to it. Without a window, the dashboard would
+// keep adding each month's bills to the next month's total. Rows without an
+// invoice date (manually entered costs) are always included.
+async function getActivePeriodWindow() {
+  const { data: period } = await supabase
+    .from('variable_pay_periods')
+    .select('period_start, period_end')
+    .eq('status', 'open')
+    .maybeSingle();
+  if (!period?.period_start || !period?.period_end) return null;
+  return { start: period.period_start, end: period.period_end };
+}
+
+function queryExpensesInWindow(query, window) {
+  if (!window) return query;
+  // Rows without an invoice date (manually entered costs) are always included.
+  return query.or(
+    `invoice_date.gte.${window.start},invoice_date.lte.${window.end},invoice_date.is.null`
+  );
+}
+
 async function getMetricSum(periodId, metricId) {
   const { data } = await supabase
     .from('variable_metric_inputs')
@@ -35,7 +57,10 @@ export async function GET() {
       .filter(item => item.type === 'expense')
       .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-    const { data: expenses } = await supabase.from('expenses').select('amount, cost_type, category');
+    const { data: expenses } = await queryExpensesInWindow(
+      supabase.from('expenses').select('amount, cost_type, category'),
+      await getActivePeriodWindow()
+    );
     const totalVariableActual = (expenses || [])
       .filter(e => e.cost_type === 'variable' || !e.cost_type)
       .reduce((sum, item) => sum + Number(item.amount || 0), 0);

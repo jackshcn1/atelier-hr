@@ -28,7 +28,25 @@ metadata:
    - `accounting`: 50% Cash/Card Reconcile (<=10% variance), 30% Delivery Sales (₹6.5L), 20% GST Filing (0 delays).
 5. **Payslip & Payroll Integration**: Monthly metrics entered via interactive calculator in `/payroll`; detailed criteria breakdown saved into `payroll_line_items.variable_breakdown` and printed on payslips.
 
+**Petpooja report shapes that are not obvious:**
+
+- The **Executive Sales Summary** export is a **17-sheet workbook**. Sheet1 holds only
+  `['Name:', 'Executive Sales Report']`; the Order Type table (Count / Total / Net Sales
+  for Delivery, Dine In, Pick Up) is on **Sheet10**. Reading only the first sheet finds
+  nothing, and the column names sit on the row *below* the "Order Type" title — so the
+  Net Sales column is index 3, not the "Total" column at index 2.
+  `scripts/petpooja-sync.mjs` now reads every sheet and picks the one it needs
+  (`fetchCustomReport(..., sheetMatch)`); `parseExecutiveOrderTypes()` finds the Net
+  Sales column from the row that names it.
+- `rev_dine_in` / `rev_delivery` / `rev_pick_up` are **standalone dashboard metrics**
+  consumed by `/api/finance/dashboard`. They are in no scheme's weighted formula, so
+  writing them changes no attainment result.
+- The **Base Menu** export (needed for the KOT prep-time metric) is cached under
+  `.claude/base-menu-cache/`. On a serverless runtime that path is read-only, so the
+  cache falls back to the temp directory — otherwise the write throws and the kitchen
+  prep-time metric is skipped.
+
 **Why:** Enforces accurate incentive calculations and transparency for staff.
 **How to apply:** Use `lib/variablePayCalculator.js` whenever evaluating metric payouts.
 
-Related: [[project-atelier-hr]], [[payroll-business-logic]], [[salary-split-logic]]
+Related: [[project-atelier-hr]], [[payroll-business-logic]], [[salary-split-logic]], [[petpooja-hosted-sync]]

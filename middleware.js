@@ -39,6 +39,9 @@ export async function middleware(request) {
 }
 
 // Apply to every route except static assets — including the homepage.
+// /api/sync is excluded: it is the machine-to-machine Petpooja sync endpoint
+// and authenticates with its own shared secret, not a Supabase session.
+// The anchor matters — /api/sync-petpooja must stay behind the session gate.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/sync$).*)'],
 };
