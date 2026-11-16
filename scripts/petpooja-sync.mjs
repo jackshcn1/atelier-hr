@@ -136,6 +136,9 @@ export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
 // way to read the browser's real memory — Node's own numbers say nothing
 // about a separate process — and to tell an out-of-memory kill (SIGKILL)
 // from a crash (SIGSEGV).
+//
+// The command line is read in full: the browser's own folder is at the very
+// end of it, and a shortened command line loses it.
 function findBrowserPid() {
   try {
     const pids = readdirSync('/proc').filter((n) => /^\d+$/.test(n));
@@ -146,8 +149,8 @@ function findBrowserPid() {
         const ppid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
         if (ppid !== process.pid) continue;
         const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim();
-        if (!cmd) continue;
-        return { pid: Number(pid), cmd: cmd.slice(0, 120) };
+        if (!cmd || !/chromium|chrome|headless_shell/i.test(cmd)) continue;
+        return { pid: Number(pid), cmd: cmd.slice(0, 4000) };
       } catch {
         // The process ended while we were looking at it.
       }
@@ -207,7 +210,9 @@ function tempSpace() {
     } catch {
       // The run folder may not exist yet.
     }
-    return `${free}MB free of ${total}MB (${profiles} leftover browser profile(s)${ours})`;
+    const biggest = biggestTempItems();
+    return `${free}MB free of ${total}MB (${profiles} leftover browser profile(s)${ours})`
+      + (biggest ? ` | biggest: ${biggest}` : '');
   } catch {
     return 'unknown';
   }
@@ -224,24 +229,26 @@ function tempSpace() {
 // A live browser writes to its profile all the time, so a profile that has
 // not been touched for two minutes belongs to a browser that is gone.
 function cleanStaleProfiles() {
-  try {
-    const cutoff = Date.now() - 2 * 60 * 1000;
-    let removed = 0;
-    for (const name of readdirSync('/tmp')) {
-      if (!name.startsWith('playwright_chromiumdev_profile')) continue;
-      const path = join('/tmp', name);
-      try {
-        if (statSync(path).mtimeMs > cutoff) continue;
-        rmSync(path, { recursive: true, force: true });
-        removed++;
-      } catch {
-        // Still in use, or already gone.
+  let removed = 0;
+  for (const folder of tempFolders()) {
+    try {
+      const cutoff = Date.now() - 2 * 60 * 1000;
+      for (const name of readdirSync(folder)) {
+        if (!name.startsWith('playwright_chromiumdev_profile')) continue;
+        const path = join(folder, name);
+        try {
+          if (statSync(path).mtimeMs > cutoff) continue;
+          rmSync(path, { recursive: true, force: true });
+          removed++;
+        } catch {
+          // Still in use, or already gone.
+        }
       }
+    } catch {
+      // No listing.
     }
-    return removed;
-  } catch {
-    return 0;
   }
+  return removed;
 }
 
 // The folder the browser keeps its profile in, read from the browser's own
@@ -347,24 +354,85 @@ function useOwnTempFolder() {
   }
 }
 
+// Every folder the browser may write to.
+function tempFolders() {
+  return ['/tmp', RUN_TMP_DIR];
+}
+
 // Remove what the browser left behind.
 function clearRunTemp() {
+  for (const folder of tempFolders()) {
+    try {
+      for (const name of readdirSync(folder)) {
+        if (!name.startsWith('playwright')) continue;
+        const path = join(folder, name);
+        try {
+          // A folder that was touched in the last minute may belong to a
+          // browser that is running right now, in another request.
+          if (Date.now() - statSync(path).mtimeMs < 60000) continue;
+          rmSync(path, { recursive: true, force: true });
+        } catch {
+          // Still in use, or already gone.
+        }
+      }
+    } catch {
+      // Nothing to clear.
+    }
+  }
+}
+
+// The size of the biggest things in the temporary folders.
+//
+// When the disk fills up, the only question that matters is what filled it.
+// This answers it.
+function dirSize(path, depth = 2) {
+  let total = 0;
+  let files = 0;
+  let entries = [];
   try {
-    for (const name of readdirSync(RUN_TMP_DIR)) {
-      if (!name.startsWith('playwright')) continue;
-      const path = join(RUN_TMP_DIR, name);
+    entries = readdirSync(path);
+  } catch {
+    return 0;
+  }
+  for (const name of entries) {
+    if (files > 400) break;
+    try {
+      const st = statSync(join(path, name));
+      if (st.isDirectory() && depth > 0) {
+        total += dirSize(join(path, name), depth - 1);
+        files++;
+      } else {
+        total += st.size;
+        files++;
+      }
+    } catch {
+      // A file that went away.
+    }
+  }
+  return total;
+}
+
+function biggestTempItems() {
+  const items = [];
+  for (const folder of tempFolders()) {
+    let entries = [];
+    try {
+      entries = readdirSync(folder);
+    } catch {
+      continue;
+    }
+    for (const name of entries) {
       try {
-        // A folder that was touched in the last minute may belong to a
-        // browser that is running right now, in another request.
-        if (Date.now() - statSync(path).mtimeMs < 60000) continue;
-        rmSync(path, { recursive: true, force: true });
+        const st = statSync(join(folder, name));
+        if (!st.isDirectory()) continue;
+        items.push(`${name} ${Math.round(dirSize(join(folder, name)) / 1048576)}MB`);
       } catch {
-        // Still in use, or already gone.
+        // Gone.
       }
     }
-  } catch {
-    // Nothing to clear.
   }
+  items.sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
+  return items.slice(0, 4).join(', ');
 }
 
 // A browser that dies can leave its helper processes behind. On the serverless
