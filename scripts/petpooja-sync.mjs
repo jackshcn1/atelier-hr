@@ -560,48 +560,90 @@ export async function runPetpoojaSync(options = {}) {
   }
 
   // 3. Login to Petpooja Billing (2-Step Form)
+  //
+  // The login page is flaky on the serverless browser: sometimes the form is
+  // in the DOM but not yet painted (the fill times out with "element is not
+  // visible"), and sometimes the second step never appears because the page
+  // did not accept the email. Both clear up on a fresh load of the page, so
+  // every step waits for a *visible* field and the whole login is retried.
   async function loginToPetpooja() {
+    const EMAIL = '#UserEmail, input[name="data[User][email]"], input[placeholder*="Email"]';
+    const PASS = '#UserPassword, input[name="data[User][password]"], input[type="password"]';
+
+    // What the page is actually showing. This is the difference between
+    // "still loading" and "Petpooja is telling us something", and it is the
+    // only clue worth having when the login fails.
+    const pageText = async () => {
+      try {
+        const text = await page.locator('body').innerText({ timeout: 5000 });
+        return text.replace(/\s+/g, ' ').trim().slice(0, 300);
+      } catch {
+        return '(could not read the page)';
+      }
+    };
+
     console.log('🔐 Navigating to Petpooja Billing (https://billing.petpooja.com/)...');
-    await page.goto('https://billing.petpooja.com/', { waitUntil: 'load', timeout: 45000 });
-    await page.waitForTimeout(3000);
 
-    console.log(`  Current Page URL: ${page.url()}`);
-    console.log(`  Current Page Title: "${await page.title()}"`);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await page.goto('https://billing.petpooja.com/', { waitUntil: 'load', timeout: 45000 })
+        .catch(() => {});
+      await page.waitForTimeout(4000);
 
-    // Diagnostic: find all inputs on the page
-    const inputCount = await page.locator('input').count();
-    console.log(`  Total input tags found on page: ${inputCount}`);
+      console.log(`  Current Page URL: ${page.url()}`);
+      console.log(`  Current Page Title: "${await page.title()}"`);
+      console.log(`  Total input tags found on page: ${await page.locator('input').count()}`);
 
-    // Step 1: Email / Username
-    const emailInput = page.locator('#UserEmail, input[name="data[User][email]"], input[placeholder*="Email"]').first();
-    await emailInput.waitFor({ state: 'attached', timeout: 20000 });
-    await emailInput.fill(email);
-    console.log('  ✓ Filled email address.');
+      // Step 1: Email / Username — it must be *visible*, not merely present.
+      const emailInput = page.locator(EMAIL).first();
+      const emailReady = await emailInput.waitFor({ state: 'visible', timeout: 20000 })
+        .then(() => true).catch(() => false);
+      if (!emailReady) {
+        console.error(`  ⚠️ Login form not visible (attempt ${attempt}/3). Page says: ${await pageText()}`);
+        continue;
+      }
 
-    const continueBtn = page.locator('button:has-text("Continue"), button[type="submit"], input[type="submit"]').first();
-    await continueBtn.click();
-    await page.waitForTimeout(3000);
+      await emailInput.fill(email);
+      console.log('  ✓ Filled email address.');
 
-    // Step 2: Password
-    const passInput = page.locator('#UserPassword, input[name="data[User][password]"], input[type="password"]').first();
-    await passInput.waitFor({ state: 'attached', timeout: 20000 });
-    await passInput.fill(password);
-    console.log('  ✓ Filled password.');
+      const continueBtn = page.locator('button:has-text("Continue"), button[type="submit"], input[type="submit"]').first();
+      await continueBtn.click();
 
-    const loginSubmitBtn = page.locator('button:has-text("Sign in"), button:has-text("Login"), button:has-text("Continue"), button[type="submit"], input[type="submit"]').first();
-    await loginSubmitBtn.click();
+      // Step 2: Password — it only appears once the email step is accepted.
+      const passInput = page.locator(PASS).first();
+      const passReady = await passInput.waitFor({ state: 'visible', timeout: 25000 })
+        .then(() => true).catch(() => false);
+      if (!passReady) {
+        console.error(`  ⚠️ Password box never appeared (attempt ${attempt}/3). Page says: ${await pageText()}`);
+        continue;
+      }
 
-    // Wait for navigation after login
-    await page.waitForNavigation({ timeout: 35000 }).catch(() => {});
-    await page.waitForTimeout(5000);
-    console.log(`✓ Post-login URL: ${page.url()} ("${await page.title()}")`);
+      await passInput.fill(password);
+      console.log('  ✓ Filled password.');
+
+      const loginSubmitBtn = page.locator('button:has-text("Sign in"), button:has-text("Login"), button:has-text("Continue"), button[type="submit"], input[type="submit"]').first();
+      await loginSubmitBtn.click();
+
+      // Wait for navigation after login
+      await page.waitForNavigation({ timeout: 35000 }).catch(() => {});
+      await page.waitForTimeout(5000);
+      console.log(`✓ Post-login URL: ${page.url()} ("${await page.title()}")`);
+
+      // A login that did not land on the dashboard did not succeed, however
+      // cheerful the form looked.
+      if (!/dashboard/i.test(page.url())) {
+        throw new Error(`Login did not reach the dashboard (landed on ${page.url()}). Page says: ${await pageText()}`);
+      }
+      return;
+    }
+
+    throw new Error(`Petpooja login did not complete after 3 attempts. Last page said: ${await pageText()}`);
   }
 
-  // A closed browser or page means the session died, not that the report is
-  // broken. Start a fresh browser and try again before failing the whole
-  // group — a group that restarts costs one login, while a failed group
-  // costs the whole daily sync.
-  const isDeadBrowser = (err) => /has been closed|Target closed|Connection closed|browser.*closed/i.test(err?.message || '');
+  // A dead browser or an unusable login page means the session never started,
+  // not that a report is broken. Start a fresh browser and try again before
+  // failing the whole group — a group that restarts costs one login, while a
+  // failed group costs the whole daily sync.
+  const isRetryableLogin = (err) => /has been closed|Target closed|Connection closed|browser.*closed|login did not complete|Timeout .* exceeded/i.test(err?.message || '');
 
   try {
     for (let attempt = 1; ; attempt++) {
@@ -609,11 +651,11 @@ export async function runPetpoojaSync(options = {}) {
         await loginToPetpooja();
         break;
       } catch (err) {
-        if (!isDeadBrowser(err) || attempt >= 3) throw err;
-        console.error(`  ⚠️ Browser closed during login (attempt ${attempt}/3): ${err.message}`);
-        console.error('  ⚠️ Starting a fresh browser and retrying in 10s...');
+        if (!isRetryableLogin(err) || attempt >= 3) throw err;
+        console.error(`  ⚠️ Login failed (attempt ${attempt}/3): ${err.message}`);
+        console.error('  ⚠️ Starting a fresh browser and retrying in 15s...');
         await closeBrowser();
-        await new Promise(r => setTimeout(r, 10000));
+        await new Promise(r => setTimeout(r, 15000));
         await openBrowser();
       }
     }
