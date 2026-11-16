@@ -6,7 +6,7 @@
 - [Variable Pay Engine](variable-pay-engine.md) — Multi-metric incentive schemes, qualification floors, ceilings, and calculator
 - [Workflow Preferences](workflow-preferences.md) — Branches, plans before code, security rules, explanations
 - [Database Access & Migration State](database-access-and-migration-state.md) — exec_sql RPCs, backup command, migration ledger reconciliation (2026-11-14)
-- [Petpooja Hosted Sync](petpooja-hosted-sync.md) — why the sync runs on Vercel (Petpooja blocks datacenter IPs), hosting rules and constraints
+- [Petpooja Hosted Sync](petpooja-hosted-sync.md) — why the sync runs on Vercel (Petpooja blocks datacenter IPs), the four report groups, hosting rules and constraints
 - [Maintenance Module Status](maintenance-module-status.md) — architecture, access/link details, and mandatory workflow rules (browser verify, GATES.md ledger, plain-English steps) — local-only, contains credentials
 - [Maintenance Module Framework](maintenance-module-framework.md) — locked: derived-status + rejected revert + completed picker + save guard + POC picker (filter/search/add-with-dup-guard) + migrations
 - [Maintenance Module Lock](../maintenance-lock-summary.txt) — job POC section (stage picker + bin icon + single-line flex), DB migrations applied (join table + stage col on pocs + stage col on join), deploy Ready (atelier-hr-inky.vercel.app)
