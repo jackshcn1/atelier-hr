@@ -101,8 +101,18 @@ async function handle(req) {
     // Serverless has no bundled browser and no display.
     process.env.PETPOOJA_HEADLESS = 'true';
     process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH = await chromium.executablePath();
+
+    // `--single-process` puts the browser and the page in one process: a heavy
+    // page then takes the whole browser down with it, which is exactly what
+    // the hosted runs kept hitting ("Target page, context or browser has been
+    // closed"). Dropping it lets a slow page fail on its own instead of
+    // killing the session. The memory it costs is well inside the function's
+    // budget.
+    const chromiumArgs = chromium.args.filter(
+      (arg) => arg !== '--single-process' && arg !== '--no-zygote',
+    );
     process.env.PETPOOJA_CHROMIUM_ARGS = JSON.stringify([
-      ...chromium.args,
+      ...chromiumArgs,
       '--disable-blink-features=AutomationControlled',
     ]);
 
@@ -117,7 +127,7 @@ async function handle(req) {
     }
 
     // A full sync is longer than a serverless function may run, so the
-    // reports are split into groups that each fit. ?group=1..6 runs one
+    // reports are split into groups that each fit. ?group=1..10 runs one
     // group; ?reports=captain,pax runs an explicit set; no parameter runs
     // everything (the local-computer path).
     const group = params.get('group');

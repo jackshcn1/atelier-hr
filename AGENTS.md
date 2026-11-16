@@ -93,14 +93,14 @@ All four connections are live and verified. Re-verify with
   daily 23:30 UTC = **05:00 IST**. GitHub Actions only schedules and collects the result.
 - The endpoint requires a shared secret (`SYNC_SECRET` on Vercel,
   `VERCEL_SYNC_SECRET` in GitHub). Never widen access to it.
-- The run is split into **six report groups** because a full sync is longer
-  than a serverless function may run. `?group=1..6` runs one group
-  (1 = captain/pax, 2 = item, 3 = gstn/due_payment, 4 = executive/kot,
-  5 = wastage + purchase bills, 6 = debit notes); no parameter runs
-  everything, which is the local-computer path. The workflow calls the six
-  groups one after the other — never in parallel, because two Petpooja
-  logins at once break each other. The groups are sized for a **slow**
-  Petpooja day, not a fast one.
+- The run is split into **ten report groups — one report each** — because a full
+  sync is longer than a serverless function may run, and two reports per group
+  still overran the 300 s ceiling on a slow Petpooja day (HTTP 504).
+  `?group=1..10` runs one group (1 captain, 2 pax, 3 item, 4 gstn,
+  5 due_payment, 6 executive, 7 kot, 8 wastage, 9 purchase bills,
+  10 debit notes); no parameter runs everything, which is the local-computer
+  path. The workflow calls the groups one after the other — never in parallel,
+  because two Petpooja logins at once break each other.
 - The hosted run also **closes finished pay cycles** (locks the cycle and
   freezes its figures into a snapshot), the same as the office-computer
   runner. `scripts/DISABLE-WINDOWS-SCHEDULE.bat` switches the office
