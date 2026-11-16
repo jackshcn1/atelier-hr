@@ -86,6 +86,20 @@ export const REPORT_GROUPS = {
 // so the login may not spend the whole request.
 const LOGIN_BUDGET_MS = 150000;
 
+// The Petpooja session lives in three cookies on the `.petpooja.com` domain.
+//
+// Closing the browser does NOT end the session — Petpooja keeps it alive on
+// its side, and while it is alive the next login is refused (the email step is
+// accepted, the password box never appears). The old workaround was to log
+// out after every report group, which cost one login per group.
+//
+// Handing these cookies to the next serverless invocation is what lets the
+// whole nightly run share ONE login: the next group restores the session and
+// goes straight to work.
+const SESSION_COOKIE_NAMES = ['user_id', 'user_key', 'PETPOOJA_CO'];
+const DASHBOARD_URL = 'https://billing.petpooja.com/users/dashboard';
+const LOGOUT_URL = 'https://billing.petpooja.com/users/logout';
+
 // Every report the engine knows about, used to reject a bad group or report
 // name instead of quietly running nothing.
 export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
@@ -249,6 +263,12 @@ function parseWorkbookBuffer(buffer) {
 
 export async function runPetpoojaSync(options = {}) {
   const cfg = loadLocalConfig();
+
+  // `sessionCookies` is a session handed over by the previous report group;
+  // `keepSession` says to leave the session alive and hand it on, instead of
+  // logging out at the end of this group.
+  const sessionCookies = options.sessionCookies || null;
+  const keepSession = options.keepSession === true;
 
   // An unknown group or report name must fail loudly. Running nothing and
   // reporting success would look like a working sync while no metric was
@@ -614,22 +634,72 @@ export async function runPetpoojaSync(options = {}) {
     }
   }
 
+  // What the page is actually showing. This is the difference between
+  // "still loading" and "Petpooja is telling us something", and it is the
+  // only clue worth having when the login fails.
+  const pageText = async () => {
+    try {
+      const text = await page.locator('body').innerText({ timeout: 5000 });
+      return text.replace(/\s+/g, ' ').trim().slice(0, 300);
+    } catch {
+      return '(could not read the page)';
+    }
+  };
+
+  // Restore a Petpooja session that a previous group left alive.
+  //
+  // The whole nightly run is split into ten serverless calls, and Petpooja
+  // refuses a second login while a session is live. So instead of ten logins
+  // (ten chances to be refused) the run does ONE: the first group logs in
+  // and hands its session cookies to the next group, which restores them
+  // and goes straight to the dashboard.
+  //
+  // Returns true when the session was restored, false when the caller has to
+  // log in instead.
+  async function tryReuseSession(cookies) {
+    if (!Array.isArray(cookies) || cookies.length === 0) return false;
+
+    const usable = cookies.filter(
+      (c) => c && SESSION_COOKIE_NAMES.includes(c.name) && c.value && c.domain
+    );
+    if (usable.length === 0) return false;
+
+    try {
+      await context.addCookies(usable.map((c) => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path || '/',
+        httpOnly: !!c.httpOnly,
+        secure: !!c.secure,
+        sameSite: c.sameSite || 'Lax',
+        ...(c.expires && c.expires > 0 ? { expires: Math.floor(c.expires) } : {}),
+      })));
+
+      await page.goto(DASHBOARD_URL, { waitUntil: 'load', timeout: 45000 });
+      await page.waitForTimeout(4000);
+
+      // The dashboard is the proof. A refused or expired session sends us
+      // back to the login page instead.
+      if (!/dashboard/i.test(page.url())) {
+        console.log(`  ℹ️ The saved session was refused (landed on ${page.url()}) — logging in instead.`);
+        await context.clearCookies();
+        return false;
+      }
+
+      console.log('  🔑 Restored the Petpooja session — no second login needed.');
+      return true;
+    } catch (err) {
+      console.log(`  ℹ️ Could not restore the session (${err.message}) — logging in instead.`);
+      try { await context.clearCookies(); } catch { /* nothing to clear */ }
+      return false;
+    }
+  }
+
   async function loginToPetpooja() {
     const EMAIL = '#UserEmail, input[name="data[User][email]"], input[placeholder*="Email"]';
     const PASS = '#UserPassword, input[name="data[User][password]"], input[type="password"]';
     const deadline = Date.now() + LOGIN_BUDGET_MS;
-
-    // What the page is actually showing. This is the difference between
-    // "still loading" and "Petpooja is telling us something", and it is the
-    // only clue worth having when the login fails.
-    const pageText = async () => {
-      try {
-        const text = await page.locator('body').innerText({ timeout: 5000 });
-        return text.replace(/\s+/g, ' ').trim().slice(0, 300);
-      } catch {
-        return '(could not read the page)';
-      }
-    };
 
     const left = () => Math.max(0, deadline - Date.now());
 
@@ -707,8 +777,20 @@ export async function runPetpoojaSync(options = {}) {
     throw new Error(`Petpooja login did not complete. Probe: ${await probePetpooja()}. Last page said: ${await pageText()}`);
   }
 
+  // Set when the run ends in a fatal error. A group that failed must NOT
+  // hand a session on: it logs out instead, so the next group starts clean.
+  let runFailed = false;
+  // The live session, captured before the browser goes away, so the next
+  // report group can pick it up instead of logging in again.
+  let sessionOut = null;
+
   try {
-    await loginToPetpooja();
+    // A session handed over by the previous group is restored first; only if
+    // that fails does this group spend a login of its own.
+    const reused = await tryReuseSession(sessionCookies);
+    if (!reused) {
+      await loginToPetpooja();
+    }
 
     // Helper: download custom report and return sheet rows
     // `sheetMatch` picks the sheet to read when a report spreads its sections
@@ -1698,6 +1780,7 @@ export async function runPetpoojaSync(options = {}) {
       });
     }
   } catch (fatal) {
+    runFailed = true;
     console.error('❌ Sync failed:', fatal.message);
     await sendFailureEmail({
       message: 'Fatal error occurred during Petpooja Sync execution.',
@@ -1705,18 +1788,38 @@ export async function runPetpoojaSync(options = {}) {
     });
     throw fatal;
   } finally {
+    // Hand the session on to the next report group.
+    //
+    // The cookies are read before the browser closes, and only the three that
+    // make up the login are kept — the analytics cookies are noise. They are
+    // never written to the log.
+    if (keepSession && !runFailed) {
+      try {
+        const all = await context?.cookies();
+        sessionOut = (all || []).filter((c) => SESSION_COOKIE_NAMES.includes(c.name));
+        if (sessionOut.length) {
+          console.log(`  🔑 Session kept for the next group (${sessionOut.length} cookies).`);
+        }
+      } catch {
+        // A browser that already died has no session to hand on.
+      }
+    }
+
     // End the Petpooja session properly before the browser goes away.
     //
     // Closing the browser does NOT end it: the session (`user_id` +
     // `user_key`) stays live on Petpooja's side. Petpooja then refuses the
     // next login — the email step is accepted but the password box never
-    // appears — because the account already has a session. From the
-    // serverless host each group can come from a different IP, so the
-    // account collects one dead session per group until the next login is
-    // turned away. Logging out releases it, so the next group starts clean.
+    // appears — because the account already has a session. Logging out
+    // releases it.
+    //
+    // The logout happens on the LAST group of the run (nobody needs the
+    // session afterwards) and on any group that failed (so the next group
+    // starts clean). Every other group keeps the session alive and hands it
+    // to its successor.
     try {
-      if (page && !page.isClosed()) {
-        await page.goto('https://billing.petpooja.com/users/logout', {
+      if (page && !page.isClosed() && (!keepSession || runFailed)) {
+        await page.goto(LOGOUT_URL, {
           waitUntil: 'domcontentloaded',
           timeout: 20000,
         }).catch(() => {});
@@ -1804,6 +1907,10 @@ export async function runPetpoojaSync(options = {}) {
       timestamp: new Date().toLocaleTimeString('en-IN')
     }, null, 2));
   } catch {}
+
+  // The session (when there is one) is handed back to the caller. It is
+  // returned, never logged — the caller passes it on in a request header.
+  return { sessionCookies: sessionOut };
 }
 
 // Direct execution from CLI — also mirrors output to a rotating log file so a

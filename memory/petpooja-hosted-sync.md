@@ -152,6 +152,55 @@ A plain `fetch` of the login page from the same host returning HTTP 200 while
 the browser is refused is the tell: the site is answering, the *session* is
 the problem. The probe is in the error message for exactly this reason.
 
+## One login per run: carry the session between groups (16 Nov 2026)
+
+Logging out after every group works, but it costs **one login per group** —
+ten logins for one nightly run, and every one of them is a chance to be
+refused.
+
+The session is just three cookies on `.petpooja.com`:
+
+| Cookie | Purpose |
+|---|---|
+| `user_id` | the logged-in user |
+| `user_key` | the session token |
+| `PETPOOJA_CO` | the company/tenant cookie |
+
+A probe (log in, close the browser, replay the cookies in a fresh browser)
+landed **straight on `https://billing.petpooja.com/users/dashboard`** with no
+login at all. That is the whole fix: the first group logs in and hands its
+cookies to the next group, which restores them and goes to work.
+
+**The refusal is about the IP, not the account.** In the same probe, a second
+login *from the same IP* succeeded even with a live session open. So Petpooja
+lets a login through when it comes from the address that owns the session, and
+turns it away when it comes from a different one. Serverless invocations do not
+share an egress address, which is exactly why every group after the first was
+being refused. Replaying the cookie avoids the login altogether, so the IP
+never comes into it.
+
+How it is wired:
+
+- `scripts/petpooja-sync.mjs` — `runPetpoojaSync({ sessionCookies, keepSession })`.
+  `tryReuseSession()` restores the cookies and checks for the dashboard; if
+  that fails it logs in as before. `keepSession: true` leaves the session
+  alive and returns it; the last group of the run leaves it out and logs out.
+  A group that **failed** always logs out, so the next group starts clean.
+- `app/api/sync/route.js` — the session travels in the `x-petpooja-session`
+  request header and comes back in the same response header. **Never in the
+  body**: the body is printed in the workflow log.
+- `.github/workflows/petpooja-sync.yml` — a shell variable carries the session
+  from group to group. It is passed in a header, never echoed, and the header
+  file is deleted as soon as it has been read.
+
+**How to apply:** do not "fix" a refused login by adding retries. Restore the
+session. And keep the session out of every log — it is a live credential.
+
+**A password box on the page does not mean you are logged out.** The dashboard
+page keeps a password input in the DOM (a change-password modal), so
+"is there a password field?" is the wrong test. The right test is the URL:
+`/users/dashboard` means the session is live.
+
 ## A dead browser must not cost the day
 
 On 16 Nov the hosted run failed at **group 5** with:
