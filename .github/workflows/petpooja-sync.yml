@@ -101,13 +101,14 @@ jobs:
               URL="$URL&keepSession=1"
             fi
 
-            # A group gets two attempts. The first failure is usually a dead
-            # browser or a Petpooja session that had not lapsed yet; both
-            # clear up on their own within a minute.
+            # A group gets three attempts. The browser on the serverless host
+            # dies at random now and then, and a fresh browser usually clears
+            # it within a minute. One attempt is not enough headroom for a
+            # report that must run unattended.
             GROUP_OK=0
-            for ATTEMPT in 1 2; do
-              if [ "$ATTEMPT" = "2" ]; then
-                echo "::warning::Report group $G did not pass on the first attempt — waiting 30s and retrying once."
+            for ATTEMPT in 1 2 3; do
+              if [ "$ATTEMPT" != "1" ]; then
+                echo "::warning::Report group $G did not pass on attempt $((ATTEMPT - 1)) — waiting 30s and trying again."
                 sleep 30
               fi
 

@@ -108,16 +108,6 @@ async function handle(req) {
     chromium.setGraphicsMode = false;
     process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH = await chromium.executablePath();
 
-    // NOTE: `--single-process` stays. @sparticuz/chromium needs it in this
-    // environment — without it the browser dies on startup with
-    // "browserContext.newPage: Target crashed". The engine handles a browser
-    // that dies later by starting a fresh one.
-    process.env.PETPOOJA_CHROMIUM_ARGS = JSON.stringify([
-      ...chromium.args,
-      '--disable-gpu',
-      '--disable-blink-features=AutomationControlled',
-    ]);
-
     // Optional period override for backfills: ?start=YYYY-MM-DD&end=YYYY-MM-DD
     const params = new URL(req.url).searchParams;
     const start = params.get('start');
@@ -127,6 +117,37 @@ async function handle(req) {
       process.env.SYNC_END_DATE = end;
       push(`📅 Overriding period: ${start} → ${end}`);
     }
+
+    // Chromium flags.
+    //
+    // `--single-process` and `--no-zygote` together make Chromium run the
+    // browser, the GPU and the renderer in ONE process. That is the
+    // @sparticuz/chromium default, and it is why the browser used to die at
+    // random: a fault in any part of it takes the whole thing down, and the
+    // sync sees "Target page, context or browser has been closed".
+    //
+    // Removing `--single-process` on its own is not enough — `--no-zygote`
+    // without a zygote leaves Chromium unable to fork a renderer, which is
+    // the "Target crashed" on newPage this project hit before. Both have to
+    // go together.
+    //
+    // `--disable-dev-shm-usage` is added as well: the serverless container
+    // has a tiny /dev/shm, and Chromium crashes when it runs out. The local
+    // run has always passed this flag; the serverless one did not.
+    //
+    // `?chromium=single` keeps the old flags, as an escape hatch if the
+    // normal ones ever stop working.
+    const useSingleProcess = params.get('chromium') === 'single';
+    const baseArgs = useSingleProcess
+      ? chromium.args
+      : chromium.args.filter((a) => a !== '--single-process' && a !== '--no-zygote');
+
+    process.env.PETPOOJA_CHROMIUM_ARGS = JSON.stringify([
+      ...baseArgs,
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+    ]);
 
     // A full sync is longer than a serverless function may run, so the
     // reports are split into groups that each fit. ?group=1..10 runs one

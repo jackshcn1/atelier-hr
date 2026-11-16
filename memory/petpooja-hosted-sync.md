@@ -219,6 +219,53 @@ page keeps a password input in the DOM (a change-password modal), so
 "is there a password field?" is the wrong test. The right test is the URL:
 `/users/dashboard` means the session is live.
 
+## A failed group must not throw the session away (16 Nov 2026)
+
+A ten-group run on 16 Nov failed from group 5 onwards. Groups 1–4 passed,
+including two clean session restores. Then:
+
+1. Group 5's browser died.
+2. The stored session was deleted, because the code deleted it whenever a
+   group failed.
+3. But a group that fails because the browser died leaves the Petpooja session
+   **alive** — only the logout ends it.
+4. So group 6 had nothing to restore, tried a fresh login, and was **turned
+   away** because the session was still live.
+
+One dead browser could lock the whole account until a human cleared it. The
+rule now: **the stored copy is deleted only when the session was really
+ended** (a logout actually happened). When the browser dies, the copy stays
+and the next group picks the session up again.
+
+**How to apply:** the stored session and the live session are the same thing.
+Never delete one without the other.
+
+## The session must never reach the log
+
+The response body of `/api/sync` is printed into the workflow log. The live
+session was in that body, so the login cookies were being written into the
+build log. The engine now returns nothing at all, and the session never
+leaves the database.
+
+## Two separate problems on the serverless host
+
+Do not confuse these — they have different causes and different fixes:
+
+| Symptom | Meaning |
+|---|---|
+| `Login did not reach the dashboard` / the password box never appears | Petpooja turned the login away (a session is already live) |
+| `Target page, context or browser has been closed` | the bundled Chromium died |
+
+The login works fine from an ordinary browser on the same account (verified),
+so a refused login is about the **address**, not the account. Petpooja turns
+away a login that comes from an address it does not recognise as the one
+holding the live session, and serverless invocations do not share an egress
+address. The bundled Chromium also crashes intermittently on the serverless
+host, right after the password is filled.
+
+Both push in the same direction: **log in as rarely as possible.** One login
+per run, restored for the other nine groups, is the answer to both.
+
 ## A dead browser must not cost the day
 
 On 16 Nov the hosted run failed at **group 5** with:
