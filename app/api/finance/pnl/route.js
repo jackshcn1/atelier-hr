@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
 import { monthCosts } from '../../../../lib/financeCosts.js';
+import { monthPosition, monthReadiness } from '../../../../lib/financePosition.js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -45,6 +46,42 @@ export async function GET(req) {
     const netProfit = operatingProfit;
     const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
 
+    // What is filled in, and what is still missing.
+    //
+    // The profit above is only as good as the costs behind it. A month with
+    // no fixed costs configured shows a profit that has not had rent,
+    // salaries or power subtracted from it — so the page is told, and says
+    // so in plain words.
+    const position = await monthPosition(supabase, period);
+
+    const { count: variableBillCount } = await supabase
+      .from('expenses')
+      .select('id', { count: 'exact', head: true })
+      .gte('invoice_date', period.start)
+      .lte('invoice_date', period.end);
+
+    const { count: fixedCostCount } = await supabase
+      .from('fixed_costs')
+      .select('id', { count: 'exact', head: true });
+
+    const { count: pettyEntryCount } = await supabase
+      .from('petty_cash_ledger')
+      .select('id', { count: 'exact', head: true })
+      .gte('date', period.start)
+      .lte('date', period.end);
+
+    const readiness = monthReadiness({
+      revenueSynced: !!revenueRow,
+      revenueAsOf: revenueRow?.window_end || null,
+      variableBillCount: variableBillCount || 0,
+      fixedCostCount: fixedCostCount || 0,
+      pettyEntryCount: pettyEntryCount || 0,
+      receivableCount: position.receivables.totals.invoiceCount,
+      unpaidBillCount: position.payables.totals.billCount,
+    });
+
+    const missing = readiness.filter((item) => item.state === 'empty' && item.missing);
+
     return Response.json({
       success: true,
       data: {
@@ -67,6 +104,12 @@ export async function GET(req) {
         operating_profit: operatingProfit,
         net_profit: netProfit,
         profit_margin: profitMargin,
+        readiness,
+        // The parts of the month that are not filled in yet. The profit is
+        // only as true as these allow.
+        missing: missing.map((item) => ({ label: item.label, message: item.missing })),
+        receivables: position.receivables.totals,
+        payables: position.payables.totals,
       },
     });
   } catch (error) {

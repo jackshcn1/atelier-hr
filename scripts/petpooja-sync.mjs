@@ -23,6 +23,7 @@ import { parseCustomerFeedback } from '../lib/feedbackParsers.js';
 import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
 import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
+import { cleanVendorName } from '../lib/expenseHelpers.js';
 import { monthKeyOf, previousMonthKey, petpoojaMonthWindow } from '../lib/financePeriod.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
@@ -551,11 +552,37 @@ function killOrphanBrowsers(browserPid) {
   return killed;
 }
 
+// The reports that feed the finance pages.
+//
+// The variable-pay metrics are paused, so the run only pulls the reports the
+// finance pages need:
+//
+//   due_payment         money owed by customers  -> finance_receivables
+//   executive           the calendar-month revenue split -> finance_monthly_revenue
+//   purchase_invoices   vendor bills -> expenses
+//   purchase_returns    debit notes   -> expenses
+//
+// The rest of the reports feed variable pay only, and are not pulled at all.
+export const FINANCE_REPORTS = ['due_payment', 'executive', 'purchase_invoices', 'purchase_returns'];
+
+// Is this run finance-only?
+//
+// Finance-only means two things: the variable-pay reports are not pulled, and
+// nothing is written to the variable-pay metric rows. What is left is the
+// finance data — the revenue split, the vendor bills and the money owed by
+// customers.
+export function isFinanceOnly() {
+  const value = String(process.env.SYNC_FINANCE_ONLY ?? '').toLowerCase();
+  return value === '1' || value === 'true';
+}
+
 function reportEnabled(name) {
   const explicit = process.env.SYNC_REPORTS;
   if (explicit) {
     return explicit.split(',').map((s) => s.trim()).filter(Boolean).includes(name);
   }
+  // Finance-only: the reports that feed variable pay are not pulled.
+  if (isFinanceOnly() && !FINANCE_REPORTS.includes(name)) return false;
   const group = process.env.SYNC_GROUP;
   if (group) {
     const list = REPORT_GROUPS[Number(group)] || [];
@@ -568,8 +595,15 @@ function reportEnabled(name) {
 // shares the same pay period and writes to the same metric rows. When the
 // run is split into groups it must run only once — the last group — so the
 // values are not written over and over.
+// The Google Sheets customer-feedback pull is not a Petpooja report, but it
+// shares the same pay period and writes to the same metric rows. When the
+// run is split into groups it must run only once — the last group — so the
+// values are not written over and over.
+//
+// It writes variable-pay metrics, so a finance-only run never pulls it.
 function feedbackEnabled() {
   if (process.env.SYNC_REPORTS) return false; // an explicit report list means Petpooja only
+  if (isFinanceOnly()) return false;
   const group = process.env.SYNC_GROUP;
   if (!group) return true;
   const lastGroup = Math.max(...Object.keys(REPORT_GROUPS).map(Number));
@@ -708,6 +742,110 @@ function parseWorkbookBuffer(buffer) {
   return parseWorkbookSheets(buffer)[0]?.rows || [];
 }
 
+/**
+ * Write the money owed by customers — the finance reading of the Due Payment
+ * Report.
+ *
+ * The rows are a snapshot of one calendar month: each pull replaces that
+ * month's rows, so the page always shows the latest picture, and a month that
+ * is over keeps the picture it was left with.
+ *
+ * @param {object} supabase a Supabase service-role client
+ * @param {object} creditResult the result of parseCreditRecovery()
+ * @param {string} [monthKey] 'YYYY-MM'; today in IST by default
+ */
+async function saveReceivablesSnapshot(supabase, creditResult, monthKey) {
+  const month = monthKey || monthKeyOf();
+  const invoices = creditResult?.openInvoices || [];
+
+  // The same invoice can appear twice in the report; one row is enough.
+  const seen = new Set();
+  const payload = [];
+  for (const row of invoices) {
+    const key = `${row.invoice} ${row.customer}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    payload.push({
+      month,
+      invoice_no: row.invoice || '',
+      customer_name: row.customer || '',
+      invoice_date: row.date || null,
+      remaining_amount: row.remaining,
+      age_days: row.ageDays || 0,
+      is_overdue: !!row.isOverdue,
+      source: 'petpooja:due_payment_report',
+      synced_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  const { error: deleteError } = await supabase
+    .from('finance_receivables')
+    .delete()
+    .eq('month', month);
+  if (deleteError) throw new Error(deleteError.message);
+
+  // In batches, so a long list of invoices is never too much for one write.
+  for (let i = 0; i < payload.length; i += 200) {
+    const { error } = await supabase
+      .from('finance_receivables')
+      .insert(payload.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+  }
+
+  return { month, count: payload.length };
+}
+
+/**
+ * Keep the supplier list in step with the bills.
+ *
+ * Every bill names the supplier it came from, and those names are the truth
+ * about who the restaurant buys from. The vendor list is what the manual
+ * expense screen offers, so a new supplier has to be added to it — otherwise
+ * the next bill typed by hand cannot pick it.
+ *
+ * The name Petpooja writes carries a "[Supplier]" tag, and the same supplier
+ * sometimes turns up without it. Both are reduced to one name, so one
+ * supplier is one entry however Petpooja happened to spell it that day.
+ *
+ * @param {object} supabase a Supabase service-role client
+ */
+async function syncVendorList(supabase) {
+  const { data: bills, error: billError } = await supabase
+    .from('expenses')
+    .select('vendor_name');
+  if (billError) throw new Error(billError.message);
+
+  // The names the bills ask for, one per supplier.
+  const wanted = new Map();
+  for (const bill of bills || []) {
+    const name = cleanVendorName(bill.vendor_name);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (!wanted.has(key)) wanted.set(key, name);
+  }
+
+  const { data: existing, error: vendorError } = await supabase
+    .from('vendors')
+    .select('id, name');
+  if (vendorError) throw new Error(vendorError.message);
+
+  const known = new Set((existing || []).map((v) => cleanVendorName(v.name).toLowerCase()));
+  const missing = [...wanted.values()].filter((name) => !known.has(name.toLowerCase()));
+
+  if (missing.length === 0) return { added: 0, total: wanted.size };
+
+  // In batches, so a long supplier list is never too much for one write.
+  for (let i = 0; i < missing.length; i += 100) {
+    const { error } = await supabase
+      .from('vendors')
+      .insert(missing.slice(i, i + 100).map((name) => ({ name })));
+    if (error) throw new Error(error.message);
+  }
+
+  return { added: missing.length, total: wanted.size };
+}
+
 export async function runPetpoojaSync(options = {}) {
   const cfg = loadLocalConfig();
 
@@ -759,56 +897,69 @@ export async function runPetpoojaSync(options = {}) {
   const cycle = options.cycle || getActivePayrollCycle();
   console.log(`📅 Active Pay Period: ${cycle.start} to ${cycle.end}`);
 
-  let { data: period } = await supabase
-    .from('variable_pay_periods')
-    .select('*')
-    .eq('period_start', cycle.start)
-    .eq('period_end', cycle.end)
-    .maybeSingle();
-
-  if (!period) {
-    const { data: openPeriods } = await supabase
-      .from('variable_pay_periods')
-      .select('id')
-      .eq('status', 'open');
-    if (openPeriods && openPeriods.length > 0) {
-      const { error: closeErr } = await supabase
-        .from('variable_pay_periods')
-        .update({ status: 'locked' })
-        .in('id', openPeriods.map(p => p.id));
-      if (closeErr) throw new Error(`Failed to lock stale periods: ${closeErr.message}`);
-      console.log(`✓ Locked ${openPeriods.length} stale open period(s)`);
-    }
-    const { data: newPeriod, error: pErr } = await supabase
-      .from('variable_pay_periods')
-      .insert([{ period_start: cycle.start, period_end: cycle.end, status: 'open' }])
-      .select()
-      .single();
-    if (pErr) throw new Error(`Failed to create period: ${pErr.message}`);
-    period = newPeriod;
-    console.log(`✓ Initialized new open period #${period.id}`);
-  } else if (period.status === 'open') {
-    console.log(`✓ Period #${period.id} already open; reusing`);
+  // The pay period.
+  //
+  // A finance-only run does not touch it: opening a period, closing a stale
+  // one and locking a finished one are all payroll decisions, and the
+  // variable pay side is paused. The finance figures — the revenue split, the
+  // vendor bills, the money owed — belong to a calendar month and need no
+  // pay period.
+  let period = null;
+  if (isFinanceOnly()) {
+    console.log('💼 Finance-only run — the pay periods are left alone.');
   } else {
-    const { data: openPeriods } = await supabase
+    const { data: foundPeriod } = await supabase
       .from('variable_pay_periods')
-      .select('id')
-      .eq('status', 'open');
-    if (openPeriods && openPeriods.length > 0) {
-      const { error: closeErr } = await supabase
+      .select('*')
+      .eq('period_start', cycle.start)
+      .eq('period_end', cycle.end)
+      .maybeSingle();
+    period = foundPeriod;
+
+    if (!period) {
+      const { data: openPeriods } = await supabase
         .from('variable_pay_periods')
-        .update({ status: 'locked' })
-        .in('id', openPeriods.map(p => p.id));
-      if (closeErr) throw new Error(`Failed to lock stale periods: ${closeErr.message}`);
-      console.log(`✓ Locked ${openPeriods.length} stale open period(s)`);
+        .select('id')
+        .eq('status', 'open');
+      if (openPeriods && openPeriods.length > 0) {
+        const { error: closeErr } = await supabase
+          .from('variable_pay_periods')
+          .update({ status: 'locked' })
+          .in('id', openPeriods.map(p => p.id));
+        if (closeErr) throw new Error(`Failed to lock stale periods: ${closeErr.message}`);
+        console.log(`✓ Locked ${openPeriods.length} stale open period(s)`);
+      }
+      const { data: newPeriod, error: pErr } = await supabase
+        .from('variable_pay_periods')
+        .insert([{ period_start: cycle.start, period_end: cycle.end, status: 'open' }])
+        .select()
+        .single();
+      if (pErr) throw new Error(`Failed to create period: ${pErr.message}`);
+      period = newPeriod;
+      console.log(`✓ Initialized new open period #${period.id}`);
+    } else if (period.status === 'open') {
+      console.log(`✓ Period #${period.id} already open; reusing`);
+    } else {
+      const { data: openPeriods } = await supabase
+        .from('variable_pay_periods')
+        .select('id')
+        .eq('status', 'open');
+      if (openPeriods && openPeriods.length > 0) {
+        const { error: closeErr } = await supabase
+          .from('variable_pay_periods')
+          .update({ status: 'locked' })
+          .in('id', openPeriods.map(p => p.id));
+        if (closeErr) throw new Error(`Failed to lock stale periods: ${closeErr.message}`);
+        console.log(`✓ Locked ${openPeriods.length} stale open period(s)`);
+      }
+      const { error: uErr } = await supabase
+        .from('variable_pay_periods')
+        .update({ period_start: cycle.start, period_end: cycle.end, status: 'open' })
+        .eq('id', period.id);
+      if (uErr) throw new Error(`Failed to update period: ${uErr.message}`);
+      period = { id: period.id, period_start: cycle.start, period_end: cycle.end, status: 'open' };
+      console.log(`✓ Updated period #${period.id} to new cycle`);
     }
-    const { error: uErr } = await supabase
-      .from('variable_pay_periods')
-      .update({ period_start: cycle.start, period_end: cycle.end, status: 'open' })
-      .eq('id', period.id);
-    if (uErr) throw new Error(`Failed to update period: ${uErr.message}`);
-    period = { id: period.id, period_start: cycle.start, period_end: cycle.end, status: 'open' };
-    console.log(`✓ Updated period #${period.id} to new cycle`);
   }
 
   // 2. Fetch employees, schemes, and kitchen categories
@@ -1010,6 +1161,14 @@ export async function runPetpoojaSync(options = {}) {
   await openBrowser();
 
   async function saveMetric(metricId, actual, sourceType, filename, detail, employeeId = null) {
+    // The variable-pay metrics are paused. A finance-only run writes nothing
+    // to them — the finance pages get their own figures, and the attainment
+    // keeps the numbers it has until variable pay is switched back on.
+    if (isFinanceOnly()) {
+      console.log(`  ⏸️ Not writing the variable-pay metric ${metricId} — variable pay is paused.`);
+      return;
+    }
+
     // A metric that is not a real number is never written. A report that
     // could not be understood must show up as a failure in the log, not as a
     // NULL row that quietly drags the attainment down.
@@ -1078,21 +1237,60 @@ export async function runPetpoojaSync(options = {}) {
   // reached the table. Compare against what is already there instead: rows
   // that exist are updated, new ones are inserted. A unique index is not added
   // because the manual expense entry form allows a repeated vendor/invoice.
+  // The existing bills that carry any of the given invoice numbers.
+  //
+  // The list is fetched in batches: a long list of invoice numbers makes a
+  // long address, and a long address is refused by the database gateway
+  // before it ever reaches the table.
+  async function fetchExpensesByInvoice(invoiceNumbers) {
+    const found = [];
+    const batchSize = 150;
+    for (let i = 0; i < invoiceNumbers.length; i += batchSize) {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note')
+        .in('invoice_number', invoiceNumbers.slice(i, i + batchSize));
+      if (error) throw error;
+      found.push(...(data || []));
+    }
+    return { data: found };
+  }
+
   async function syncExpenseRows(rows, label) {
     if (!rows || rows.length === 0) return { inserted: 0, updated: 0 };
 
-    const keyOf = (vendor, invoice) => `${vendor ?? ''}\u0000${invoice ?? ''}`;
-    const vendorNames = [...new Set(rows.map(r => r.vendor_name).filter(Boolean))];
+    // A bill is identified by its supplier and its invoice number.
+    //
+    // The supplier name is compared without regard to capitalisation: the
+    // same supplier written "AMBROSIA" on one day and "Ambrosia" the next is
+    // one supplier, and treating it as two would write every bill twice.
+    const keyOf = (vendor, invoice) =>
+      `${String(vendor ?? '').trim().toLowerCase()}\u0000${String(invoice ?? '').trim().toLowerCase()}`;
 
-    let existing = [];
-    if (vendorNames.length > 0) {
-      const { data } = await supabase
-        .from('expenses')
-        .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note')
-        .in('vendor_name', vendorNames);
-      existing = data || [];
+    // The existing bills are found by invoice number — that is the bill's
+    // own identity — and, for the rare bill that carries no invoice number,
+    // by its supplier name.
+    const invoiceNumbers = [...new Set(rows.map(r => r.invoice_number).filter(Boolean))];
+    const unnamedVendors = [...new Set(
+      rows.filter(r => !String(r.invoice_number || '').trim()).map(r => r.vendor_name).filter(Boolean)
+    )];
+
+    const [byInvoice, byVendor] = await Promise.all([
+      fetchExpensesByInvoice(invoiceNumbers),
+      unnamedVendors.length > 0
+        ? supabase
+            .from('expenses')
+            .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note')
+            .in('vendor_name', unnamedVendors)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    // The same bill can come back from both queries — it is counted once.
+    const existingByKey = new Map();
+    for (const row of [...(byInvoice.data || []), ...(byVendor.data || [])]) {
+      const key = keyOf(row.vendor_name, row.invoice_number);
+      if (!existingByKey.has(key)) existingByKey.set(key, row);
     }
-    const existingByKey = new Map(existing.map(e => [keyOf(e.vendor_name, e.invoice_number), e]));
 
     const toInsert = new Map();
     const toUpdate = [];
@@ -2117,6 +2315,17 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
         const creditResult = parseCreditRecovery(dueRows, { end: cycle.end, maxAgeDays: 30 });
         if (creditResult.ok) {
           console.log(`  📊 B2B Credit Recovery: Pass=${creditResult.pass}, Overdue=${creditResult.overdueCount}, Outstanding=₹${creditResult.outstandingAmount}`);
+
+          // The money owed by customers, for the finance pages. This is
+          // written in every run — it is a finance figure, not a variable-pay
+          // one.
+          try {
+            const snapshot = await saveReceivablesSnapshot(supabase, creditResult);
+            console.log(`  💳 Money owed by customers (${snapshot.month}): ${snapshot.count} open invoice(s)`);
+          } catch (receivableErr) {
+            console.error(`  ⚠️ Could not save the money owed by customers: ${receivableErr.message}`);
+          }
+
           await saveMetric('b2b_credit', creditResult.pass ? 1 : 0, 'petpooja', 'Due Payment Report', {
             scheme_name: 'b2b_counter',
             overdueCount: creditResult.overdueCount,
@@ -2445,7 +2654,7 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
               invoice_number: invoice.invoice_number,
               invoice_date: invoice.invoice_date,
               description: invoice.description || 'Petpooja purchase invoice',
-              payment_status: invoice.payment_status || 'due',
+              payment_status: invoice.payment_status || 'unpaid',
               payment_date: invoice.payment_date || null,
               payment_mode: invoice.payment_mode || null,
               bank_reference: invoice.bank_reference || null,
@@ -2501,7 +2710,7 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
               invoice_number: ret.return_number,
               invoice_date: ret.return_date,
               description: `Debit Note: ${ret.description || 'Purchase return'}`,
-              payment_status: 'due',
+              payment_status: 'unpaid',
               payment_date: null,
               payment_mode: null,
               bank_reference: null,
@@ -2536,6 +2745,18 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
         failedReports++;
         console.error('⚠️ Could not sync Purchase Returns:', re.message);
       }
+    }
+
+    // The supplier list, kept in step with the bills.
+    //
+    // The bills name their supplier, so the supplier list is rebuilt from
+    // them. A new supplier appears in the list the morning after its first
+    // bill — so it can be picked when the next bill is typed by hand.
+    try {
+      const vendorList = await syncVendorList(supabase);
+      console.log(`  🏪 Supplier list: ${vendorList.total} supplier(s) on the bills, ${vendorList.added} added to the list.`);
+    } catch (vendorErr) {
+      console.error(`  ⚠️ Could not update the supplier list: ${vendorErr.message}`);
     }
 
     console.log('\n=============================================================');

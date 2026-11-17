@@ -32,6 +32,54 @@ export async function GET(request) {
       .filter(t => t.type === 'outflow')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
+    // The money owed by customers.
+    //
+    // These are the invoices that are still open — money that is expected to
+    // come in but has not. They are not cash movements, so they sit beside
+    // the transactions rather than inside them.
+    const { data: receivableRows } = await supabase
+      .from('finance_receivables')
+      .select('customer_name, invoice_no, invoice_date, remaining_amount, age_days, is_overdue, synced_at')
+      .eq('month', period.key)
+      .order('remaining_amount', { ascending: false })
+      .limit(1000);
+
+    const receivables = receivableRows || [];
+
+    // One line per customer, biggest first.
+    const byCustomer = new Map();
+    for (const row of receivables) {
+      const name = row.customer_name || 'Unnamed customer';
+      const line = byCustomer.get(name) || {
+        customer: name,
+        amount: 0,
+        invoices: 0,
+        overdueAmount: 0,
+        oldestDays: 0,
+      };
+      const amount = Number(row.remaining_amount || 0);
+      line.amount += amount;
+      line.invoices += 1;
+      if (row.is_overdue) line.overdueAmount += amount;
+      line.oldestDays = Math.max(line.oldestDays, Number(row.age_days || 0));
+      byCustomer.set(name, line);
+    }
+    const customers = [...byCustomer.values()]
+      .map((line) => ({
+        ...line,
+        amount: Math.round(line.amount * 100) / 100,
+        overdueAmount: Math.round(line.overdueAmount * 100) / 100,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const receivableTotals = {
+      outstanding: Math.round(customers.reduce((sum, line) => sum + line.amount, 0) * 100) / 100,
+      overdue: Math.round(customers.reduce((sum, line) => sum + line.overdueAmount, 0) * 100) / 100,
+      invoiceCount: receivables.length,
+      customerCount: customers.length,
+      asOf: receivables[0]?.synced_at || null,
+    };
+
     return Response.json({
       success: true,
       data: {
@@ -48,6 +96,10 @@ export async function GET(request) {
           inflow: totalInflow,
           outflow: totalOutflow,
           net: totalInflow - totalOutflow,
+        },
+        receivables: {
+          customers,
+          totals: receivableTotals,
         },
       },
     });

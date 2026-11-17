@@ -17,6 +17,18 @@ export default function FinanceOverviewPage() {
       href: '/finance/cashflow',
     },
     {
+      title: 'Bills',
+      subtitle: 'Money Owed to Suppliers',
+      description: 'What the restaurant owes its suppliers, bill by bill, and what is still unpaid.',
+      href: '/finance/bills',
+    },
+    {
+      title: 'Suppliers',
+      subtitle: 'Who You Buy From',
+      description: 'The supplier list, filled from the bills, with what is owed to each one.',
+      href: '/finance/vendors',
+    },
+    {
       title: 'P&L Statement',
       subtitle: 'Profitability',
       description: 'View consolidated profit and loss statements, margins, and financial health.',
@@ -41,8 +53,7 @@ export default function FinanceOverviewPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-          {financeModules.map((item) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">          {financeModules.map((item) => (
             <Link
               key={item.title}
               href={item.href}

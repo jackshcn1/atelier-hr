@@ -1,33 +1,26 @@
-name: Petpooja Variable Pay Automated Sync
+name: Petpooja Finance Sync
 
-# PAUSED — 17 Nov 2026.
+# Pulls the finance figures from Petpooja, once a day.
 #
-# The schedule is switched off. Nothing runs on its own any more, so no
-# number is pulled from Petpooja into the payroll or the dashboards without
-# a person asking for it.
+# The variable-pay metrics are paused (17 Nov 2026), so the run writes nothing
+# to them: only the revenue split, the vendor bills and the money owed by
+# customers. The four groups below are the ones that feed the finance pages.
 #
-# To start it again, put the schedule back:
-#
-#   on:
-#     schedule:
-#       - cron: '30 23 * * *'      # 05:00 IST
-#     workflow_dispatch:
-#       ...
-#
-# The manual trigger (the Actions tab → "Run workflow") still works, and it
-# still runs exactly what it ran before. Use it when a specific report is
-# wanted, and check the result before it is trusted.
+# Schedule is UTC (GitHub cron is always UTC):
+#   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * *'
 #
 # The browser work happens on Vercel, not here: Petpooja's edge blocks
 # datacenter IP ranges with a raw nginx 403, and a GitHub Actions runner
 # cannot reach billing.petpooja.com at all. Vercel (AWS egress) is allowed,
 # so this workflow only schedules the request and collects the result.
 #
-# The sync is split into ten report groups — one report each — because a full
-# run is longer than a serverless function is allowed to run, and two reports per
-# group could still overrun the 300 s ceiling on a slow Petpooja day. The groups
-# are called one after the other so they never race on the same metric rows.
+# The sync is split into report groups — one report each — because a full run
+# is longer than a serverless function is allowed to run. The groups are
+# called one after the other so they never race on each other.
 on:
+  schedule:
+    - cron: '30 23 * * *'
+
   # Manual trigger from the Actions tab, with optional period override for backfills.
   workflow_dispatch:
     inputs:
@@ -38,10 +31,15 @@ on:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
       group:
-        description: 'Run only one report group (1-10). Leave empty to run all ten.'
+        description: 'Run only one report group (1-10). Leave empty for the finance groups.'
         required: false
+      variable_pay:
+        description: 'Write the variable-pay metrics as well (they are paused by default)'
+        type: boolean
+        required: false
+        default: false
 
-# Never let two syncs overlap — they would race on the same metric rows.
+# Never let two syncs overlap — they would race on the same rows.
 concurrency:
   group: petpooja-sync
   cancel-in-progress: false
@@ -49,9 +47,9 @@ concurrency:
 jobs:
   sync-petpooja:
     runs-on: ubuntu-latest
-    # Ten groups, each one report, with a retry and a pause in between: a slow
+    # Four groups, each one report, with a retry and a pause in between: a slow
     # Petpooja day needs room for all of that.
-    timeout-minutes: 55
+    timeout-minutes: 45
 
     steps:
       - name: Request the Petpooja sync
@@ -61,6 +59,7 @@ jobs:
           START_DATE: ${{ inputs.start_date }}
           END_DATE: ${{ inputs.end_date }}
           ONLY_GROUP: ${{ inputs.group }}
+          VARIABLE_PAY: ${{ inputs.variable_pay }}
         run: |
           set -u
           if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
@@ -75,7 +74,18 @@ jobs:
             PERIOD=""
           fi
 
-          # A manual run may target a single group; the scheduled run does all ten.
+          # A manual run may target a single group.
+          #
+          # The daily run pulls only the four finance groups:
+          #   5 = Due Payment  (money owed by customers)
+          #   6 = Executive    (the revenue split)
+          #   9 = Purchase invoices (vendor bills)
+          #  10 = Purchase returns  (debit notes)
+          #
+          # The other groups feed variable pay, which is paused.
+          #
+          # Asking for the variable pay back (the `variable_pay` switch) runs
+          # all ten groups, because variable pay needs its own reports.
           #
           # NOTE: do not name this variable GROUPS — `GROUPS` is a Bash
           # built-in array holding the current user's group ids, so assigning
@@ -83,8 +93,22 @@ jobs:
           # the runner user happens to belong to.
           if [ -n "$ONLY_GROUP" ]; then
             SYNC_GROUPS="$ONLY_GROUP"
-          else
+          elif [ "$VARIABLE_PAY" = "true" ]; then
             SYNC_GROUPS="1 2 3 4 5 6 7 8 9 10"
+          else
+            SYNC_GROUPS="5 6 9 10"
+          fi
+
+          # `finance=1` tells the server this is a finance run: it pulls the
+          # finance reports only, writes nothing to the variable-pay figures
+          # and leaves the pay periods alone. Without it a run would touch
+          # the variable-pay rows, which is exactly what is paused.
+          if [ "$VARIABLE_PAY" = "true" ]; then
+            MODE_FLAG=""
+            echo "Variable pay was asked for — all ten groups run, nothing is finance-only."
+          else
+            MODE_FLAG="finance=1"
+            echo "Finance-only run: groups $SYNC_GROUPS. The variable-pay figures are left alone."
           fi
 
           # The Petpooja session is carried from one group to the next by the
@@ -104,6 +128,7 @@ jobs:
             echo ""
             echo "=== Report group $G ==="
             URL="$SYNC_URL?group=$G"
+            [ -n "$MODE_FLAG" ] && URL="$URL&$MODE_FLAG"
             [ -n "$PERIOD" ] && URL="$URL&$PERIOD"
 
             # Every group but the last hands the session on to its successor.

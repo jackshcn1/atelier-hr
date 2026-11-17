@@ -68,9 +68,11 @@ export default function PnLPage() {
   const {
     revenue, revenue_synced, revenue_as_of, total_expenses, cost_of_revenue,
     operating_costs, gross_profit, operating_profit, net_profit, profit_margin, period,
+    missing,
   } = data;
 
   const isProfit = net_profit >= 0;
+
   // The health note used to be a fixed sentence. It now says what the month
   // actually did.
   const health = !revenue_synced
@@ -84,6 +86,12 @@ export default function PnLPage() {
     warn: 'bg-amber-500',
     bad: 'bg-rose-600',
   }[health.tone];
+
+  // A profit that has not had its fixed costs subtracted is not a profit
+  // yet, so the net line says so in words rather than only in colour.
+  const netLine = isProfit
+    ? { label: 'Net Profit', tone: 'good', border: 'border-emerald-200', text: 'text-emerald-700' }
+    : { label: 'Net Loss', tone: 'bad', border: 'border-rose-200', text: 'text-rose-700' };
 
   return (
     <div className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
@@ -131,10 +139,12 @@ export default function PnLPage() {
             <p className="text-[#1e1812] text-3xl font-medium">₹{operating_profit.toLocaleString('en-IN')}</p>
             <p className="text-xs text-[#8b6f4e] mt-2">After the month's standing costs</p>
           </div>
-          <div className={`panel bg-white border rounded-card shadow-sm p-6 ${isProfit ? 'border-[#c44c4c]' : 'border-[#c44c4c]'}`}>
-            <p className="text-[#c44c4c] text-sm font-medium mb-2 uppercase tracking-wide">Net Profit</p>
-            <p className="text-[#1e1812] text-3xl font-medium">₹{net_profit.toLocaleString('en-IN')}</p>
-            <p className="text-xs text-[#8b6f4e] mt-2">Operating profit — no interest, depreciation or tax is on the books yet</p>
+          <div className={`panel bg-white border ${netLine.border} rounded-card shadow-sm p-6`}>
+            <p className={`${netLine.text} text-sm font-medium mb-2 uppercase tracking-wide`}>{netLine.label}</p>
+            <p className={`${netLine.text} text-3xl font-medium`}>₹{Math.abs(net_profit).toLocaleString('en-IN')}</p>
+            <p className="text-xs text-[#8b6f4e] mt-2">
+              {isProfit ? 'Operating profit' : 'Operating loss'} — no interest, depreciation or tax is on the books yet
+            </p>
           </div>
           <div className="panel bg-white border border-[#6b635c] rounded-card shadow-sm p-6">
             <p className="text-[#6b635c] text-sm font-medium mb-2 uppercase tracking-wide">Profit Margin</p>
@@ -154,6 +164,28 @@ export default function PnLPage() {
             </div>
           </div>
         </div>
+
+        {/* What is still missing from the month.
+            A profit shown without its fixed costs is not the real profit, so
+            the missing parts are named here rather than left for the owner
+            to work out. */}
+        {missing?.length > 0 && (
+          <div className="mt-8 px-5 py-4 rounded-xl bg-amber-50 border border-amber-200">
+            <p className="text-amber-900 text-sm font-medium mb-2">
+              This month is not fully on the books yet
+            </p>
+            <ul className="space-y-1">
+              {missing.map((item) => (
+                <li key={item.label} className="text-amber-900 text-sm">
+                  <span className="font-medium">{item.label}:</span> {item.message}
+                </li>
+              ))}
+            </ul>
+            <Link href="/finance/costs/fixed" className="inline-block mt-3 text-xs text-amber-900 underline">
+              Enter the fixed costs →
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

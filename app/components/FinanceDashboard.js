@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import FinanceMonthPicker, { monthFromLocation, setMonthInLocation } from './FinanceMonthPicker';
 
 /**
@@ -149,6 +150,39 @@ export default function FinanceDashboard() {
         </div>
       )}
 
+      {/* What is filled in, and what is still empty.
+          A profit shown without its fixed costs is not a real profit, so the
+          page says which parts of the month are still waiting. */}
+      {data.missing?.length > 0 && (
+        <div className="px-4 py-4 rounded-xl bg-amber-50 border border-amber-200">
+          <p className="text-amber-900 text-sm font-medium mb-2">
+            This month is not fully on the books yet
+          </p>
+          <ul className="space-y-1">
+            {data.missing.map((item) => (
+              <li key={item.key} className="text-amber-900 text-sm">
+                <span className="font-medium">{item.label}:</span> {item.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* The readiness line — every part of the picture at a glance. */}
+      {data.readiness && (
+        <div className="flex flex-wrap gap-2">
+          {data.readiness.map((item) => (
+            <span
+              key={item.key}
+              className={`pill ${item.state === 'ok' ? 'pill-good' : item.state === 'pending' ? 'pill-quiet' : 'pill-warn'}`}
+              title={item.detail}
+            >
+              {item.label}: {item.detail}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-6 rounded-2xl border border-[#ebe8e4] shadow-sm flex flex-col justify-between">
           <div>
@@ -226,6 +260,92 @@ export default function FinanceDashboard() {
               {period.isCurrentMonth ? `Costs recorded 1 – ${period.through} ${period.label}` : `Costs recorded in ${period.label}`}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Where the business stands.
+          Money owed by customers is money that will come in; money owed to
+          suppliers is money that will go out. Neither is in the P&L, and
+          both change what the month is really worth. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded-2xl border border-[#ebe8e4] shadow-sm">
+          <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#f2efec]">
+            <h3 className="font-serif text-xl font-medium text-[#1e1812]">Money owed by customers</h3>
+            <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">
+              {period.label}
+            </span>
+          </div>
+          {data.receivables?.totals?.customerCount > 0 ? (
+            <>
+              <div className="flex items-end justify-between mb-4">
+                <div>
+                  <p className="text-[#8b6f4e] text-sm">Still to come in</p>
+                  <p className="text-3xl font-medium text-[#1e1812]">
+                    {formatINR(data.receivables.totals.outstanding)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[#8b6f4e] text-sm">Overdue</p>
+                  <p className={`text-xl font-medium ${data.receivables.totals.overdue > 0 ? 'text-[#c44c4c]' : 'text-[#6b635c]'}`}>
+                    {formatINR(data.receivables.totals.overdue)}
+                  </p>
+                </div>
+              </div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {data.receivables.customers.slice(0, 6).map((row) => (
+                    <tr key={row.customer} className="border-t border-[#f2efec]">
+                      <td className="py-2 pr-2 truncate">{row.customer}</td>
+                      <td className="py-2 text-right text-[#6b635c] text-xs whitespace-nowrap">{row.invoices} inv</td>
+                      <td className="py-2 pl-2 text-right font-medium whitespace-nowrap">{formatINR(row.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Link href="/finance/cashflow" className="inline-block mt-4 text-xs text-[#8b6f4e] hover:underline">
+                See the full list on Cashflow →
+              </Link>
+            </>
+          ) : (
+            <p className="text-sm text-[#6b635c]">
+              Nothing pulled yet — the nightly sync fills this in from the Due Payment report.
+            </p>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-[#ebe8e4] shadow-sm">
+          <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#f2efec]">
+            <h3 className="font-serif text-xl font-medium text-[#1e1812]">Money owed to suppliers</h3>
+            <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">
+              {period.label}
+            </span>
+          </div>
+          {data.payables?.totals?.billCount > 0 ? (
+            <>
+              <div className="flex items-end justify-between mb-4">
+                <div>
+                  <p className="text-[#8b6f4e] text-sm">Still to go out</p>
+                  <p className="text-3xl font-medium text-[#1e1812]">
+                    {formatINR(data.payables.totals.unpaid)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[#8b6f4e] text-sm">Suppliers</p>
+                  <p className="text-xl font-medium text-[#6b635c]">{data.payables.totals.vendorCount}</p>
+                </div>
+              </div>
+              <p className="text-sm text-[#6b635c]">
+                {data.payables.totals.billCount} unpaid bill(s) from the {period.label} bills.
+              </p>
+              <Link href="/finance/bills" className="inline-block mt-4 text-xs text-[#8b6f4e] hover:underline">
+                See the full list of bills →
+              </Link>
+            </>
+          ) : (
+            <p className="text-sm text-[#6b635c]">
+              Nothing unpaid for this month — every bill on record has been settled.
+            </p>
+          )}
         </div>
       </div>
     </div>
