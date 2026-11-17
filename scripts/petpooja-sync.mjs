@@ -289,12 +289,20 @@ function browserMemory(browserPid) {
 // question that matters is whether they kill it by using too much memory.
 // The browser is gone by the time it dies, so the only way to know is to look
 // while it is alive.
-function startMemoryWatch(label) {
+//
+// The process id is passed in rather than read from the outside: the browser
+// lives inside the run, and its id is only known there.
+function startMemoryWatch(label, pid) {
   let peak = 0;
   const timer = setInterval(() => {
-    const bytes = browserMemoryBytes(browserPid);
-    if (bytes > peak) peak = bytes;
-  }, 1500);
+    // A read that fails must never take the run down with it.
+    try {
+      const bytes = browserMemoryBytes(pid);
+      if (bytes > peak) peak = bytes;
+    } catch {
+      // The browser is gone.
+    }
+  }, 250);
   return {
     stop() {
       clearInterval(timer);
@@ -472,8 +480,14 @@ function biggestTempItems() {
     for (const name of entries) {
       try {
         const st = statSync(join(folder, name));
-        if (!st.isDirectory()) continue;
-        items.push(`${name} ${Math.round(dirSize(join(folder, name)) / 1048576)}MB`);
+        // Files are listed too, not only folders. A browser that crashes
+        // leaves a file behind — a crash dump is the size of the memory the
+        // browser had — and a report that only counts folders hides exactly
+        // the thing that matters.
+        const size = st.isDirectory()
+          ? dirSize(join(folder, name))
+          : st.size;
+        items.push(`${name} ${Math.round(size / 1048576)}MB`);
       } catch {
         // Gone.
       }
@@ -1419,7 +1433,7 @@ export async function runPetpoojaSync(options = {}) {
 // A download that times out is NOT retried here — that is a different
 // problem, and repeating it would only burn the time the function has.
 async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch = null) {
-      const watch = startMemoryWatch(`fetching ${reportName}`);
+      const watch = startMemoryWatch(`fetching ${reportName}`, browserPid);
       try {
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
