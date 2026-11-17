@@ -827,6 +827,14 @@ export async function runPetpoojaSync(options = {}) {
   // playwright package (and its browser download) — the browser binary itself
   // is supplied via PETPOOJA_CHROMIUM_EXECUTABLE_PATH when running headless
   // outside a desktop.
+  //
+  // Chromium's own words about why it died have to be asked for BEFORE
+  // playwright is loaded: it reads the DEBUG setting when it loads, and then
+  // prints what the browser says — the signal, the failed check. That is the
+  // difference between a crash and an out-of-memory kill.
+  if (process.env.PETPOOJA_BROWSER_DEBUG) {
+    process.env.DEBUG = process.env.DEBUG || 'pw:browser*';
+  }
   const { chromium } = await import('playwright-core');
 
   // Headed mode (default on local runs) is more reliable — Petpooja is far
@@ -899,14 +907,6 @@ export async function runPetpoojaSync(options = {}) {
     // browser behave in ways that look like nothing to do with the disk.
     const cleared = cleanStaleProfiles();
     if (cleared > 0) console.log(`  🧹 Cleared ${cleared} leftover browser profile(s) from /tmp.`);
-
-    // Chromium's own words about why it died. Playwright prints what the
-    // browser says when this is on, and the browser says what killed it — a
-    // signal, a failed check, a missing library. That is the difference
-    // between a crash and an out-of-memory kill.
-    if (process.env.PETPOOJA_BROWSER_DEBUG) {
-      process.env.DEBUG = process.env.DEBUG || 'pw:browser*';
-    }
 
     browser = await chromium.launch(launchOptions);
 
