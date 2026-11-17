@@ -16,9 +16,14 @@
  *   POST with  x-sync-secret: <SYNC_SECRET>           (GitHub Actions / manual)
  */
 import { NextResponse } from 'next/server';
+import { mkdirSync } from 'node:fs';
 import chromium from '@sparticuz/chromium';
 import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
 import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.mjs';
+
+// One folder for everything the browser writes: its profile, its cache, the
+// files it downloads, and the browser itself.
+const RUN_TMP_DIR = '/tmp/atelier-petpooja';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -100,6 +105,23 @@ async function handle(req) {
   try {
     // Serverless has no bundled browser and no display.
     process.env.PETPOOJA_HEADLESS = 'true';
+
+    // Everything the browser writes goes into one folder of our own, and
+    // that folder is set BEFORE the browser is unpacked.
+    //
+    // The order matters. The browser is unpacked into the system's temporary
+    // folder, and on the serverless host that folder is only 512MB. If the
+    // folder changes later, the browser is unpacked a SECOND time — and
+    // `TMPDIR` survives between requests on a reused instance, so that second
+    // copy happened on the next request and stayed there. Two copies of the
+    // browser is ~300MB of a 512MB disk, and a full disk is what killed the
+    // browser in the middle of a report.
+    try {
+      mkdirSync(RUN_TMP_DIR, { recursive: true });
+      process.env.TMPDIR = RUN_TMP_DIR;
+    } catch {
+      // No permission — the system folder will have to do.
+    }
 
     // The software graphics stack (SwiftShader) is not needed to fill in a
     // login form or read a report, and on a single serverless CPU it is

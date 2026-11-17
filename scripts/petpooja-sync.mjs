@@ -266,14 +266,40 @@ function profileDirOf(cmdline) {
 // kernel with SIGKILL; a browser that crashed reports SIGSEGV. Knowing which
 // one it was is the difference between "give it less to do" and "give it more
 // room".
-function browserMemory(browserPid) {
-  if (!browserPid) return 'unknown';
+function browserMemoryBytes(browserPid) {
+  if (!browserPid) return 0;
   try {
     const statm = readFileSync(`/proc/${browserPid}/statm`, 'utf8').trim().split(/\s+/);
-    return `${Math.round((Number(statm[1]) || 0) * 4096 / 1048576)}MB`;
+    return (Number(statm[1]) || 0) * 4096;
   } catch {
-    return 'gone';
+    return 0;
   }
+}
+
+function browserMemory(browserPid) {
+  const bytes = browserMemoryBytes(browserPid);
+  return bytes ? `${Math.round(bytes / 1048576)}MB` : 'unknown';
+}
+
+// Watch the browser while a report is being fetched, and report the highest
+// it ever got.
+//
+// The heavy pages kill the browser on the serverless host, and the only
+// question that matters is whether they kill it by using too much memory.
+// The browser is gone by the time it dies, so the only way to know is to look
+// while it is alive.
+function startMemoryWatch(label) {
+  let peak = 0;
+  const timer = setInterval(() => {
+    const bytes = browserMemoryBytes(browserPid);
+    if (bytes > peak) peak = bytes;
+  }, 1500);
+  return {
+    stop() {
+      clearInterval(timer);
+      if (peak) console.log(`  🧠 Peak browser memory while ${label}: ${Math.round(peak / 1048576)}MB`);
+    },
+  };
 }
 
 function memorySnapshot() {
@@ -343,10 +369,18 @@ function memorySnapshot() {
 const RUN_TMP_DIR = '/tmp/atelier-petpooja';
 
 // Point the browser's temporary files at our own folder.
+// Point the browser's temporary files at our own folder.
+//
+// The serverless route sets this BEFORE the browser is unpacked, so there is
+// exactly one copy of the browser on the disk. This is the belt to that
+// braces: if the engine is ever run without the route (the office computer
+// path), the folder is still ours — and it never overrides a folder that has
+// already been chosen, because changing it after the browser is unpacked
+// would unpack it a second time.
 function useOwnTempFolder() {
   try {
     mkdirSync(RUN_TMP_DIR, { recursive: true });
-    process.env.TMPDIR = RUN_TMP_DIR;
+    if (!process.env.TMPDIR) process.env.TMPDIR = RUN_TMP_DIR;
     return true;
   } catch {
     // No permission — the system folder will have to do.
@@ -1385,20 +1419,25 @@ export async function runPetpoojaSync(options = {}) {
 // A download that times out is NOT retried here — that is a different
 // problem, and repeating it would only burn the time the function has.
 async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch = null) {
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          return await fetchCustomReportOnce(url, reportName, queryCycle, sheetMatch);
-        } catch (err) {
-          const browserDied = /closed|Target closed|browser has been closed/i.test(err.message || '');
-          // A page that never finished rendering is the same kind of problem:
-          // a fresh browser gets a clean page.
-          const pageNotReady = /Excel button not found/i.test(err.message || '');
-          if (attempt === 2 || (!browserDied && !pageNotReady)) throw err;
-          console.log(`  ⚠️ ${pageNotReady ? 'The page did not finish rendering' : 'The browser died'} during ${reportName} — starting a fresh one and trying again.`);
-          await closeBrowser();
-          await new Promise((r) => setTimeout(r, 5000));
-          await openBrowser();
+      const watch = startMemoryWatch(`fetching ${reportName}`);
+      try {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            return await fetchCustomReportOnce(url, reportName, queryCycle, sheetMatch);
+          } catch (err) {
+            const browserDied = /closed|Target closed|browser has been closed/i.test(err.message || '');
+            // A page that never finished rendering is the same kind of problem:
+            // a fresh browser gets a clean page.
+            const pageNotReady = /Excel button not found/i.test(err.message || '');
+            if (attempt === 2 || (!browserDied && !pageNotReady)) throw err;
+            console.log(`  ⚠️ ${pageNotReady ? 'The page did not finish rendering' : 'The browser died'} during ${reportName} — starting a fresh one and trying again.`);
+            await closeBrowser();
+            await new Promise((r) => setTimeout(r, 5000));
+            await openBrowser();
+          }
         }
+      } finally {
+        watch.stop();
       }
     }
 
