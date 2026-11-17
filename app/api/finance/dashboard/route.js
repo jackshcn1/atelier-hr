@@ -52,9 +52,11 @@ export async function GET(req) {
     // How much of the month's picture is actually filled in. A profit shown
     // without its fixed costs is not a real profit, so the pages are told
     // which parts are still empty.
-    const { data: readinessCounts } = await supabase
+    // The count comes back in `count`, not in `data` — a head query returns
+    // no rows at all, only the number of rows there are.
+    const { count: billCount } = await supabase
       .from('expenses')
-      .select('id, cost_type', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .gte('invoice_date', period.start)
       .lte('invoice_date', period.end);
 
@@ -71,7 +73,7 @@ export async function GET(req) {
     const readiness = monthReadiness({
       revenueSynced: !!revenueRow,
       revenueAsOf: revenueRow?.window_end || null,
-      variableBillCount: readinessCounts || 0,
+      variableBillCount: billCount || 0,
       fixedCostCount: fixedCostCount || 0,
       pettyEntryCount: pettyEntryCount || 0,
       receivableCount: position.receivables.totals.invoiceCount,

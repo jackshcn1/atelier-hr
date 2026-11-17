@@ -91,6 +91,18 @@ check('the bills answer with what is owed to each supplier', () => {
   if (typeof d.totals.unpaid !== 'number') throw new Error('no unpaid total');
 });
 
+check('the dashboard counts the bills it says are on record', () => {
+  // A head query returns the number in `count`, not in `data`. Reading the
+  // wrong one made every month look as though it had no bills at all.
+  const billsRow = dash.body.data.readiness.find((r) => r.key === 'variable');
+  if (!billsRow) throw new Error('no bills row in the readiness list');
+  if (billsRow.state !== 'ok') throw new Error(`bills reported as "${billsRow.state}": ${billsRow.detail}`);
+  const count = Number(billsRow.detail.replace(/[^0-9]/g, ''));
+  if (count !== dash.body.data.payables.totals.billCount) {
+    throw new Error(`readiness says ${count} bills, the dashboard says ${dash.body.data.payables.totals.billCount}`);
+  }
+});
+
 const exp = await json(await expensesGET(req('/api/finance/expenses')));
 check('every bill comes back with one payment spelling', () => {
   if (exp.status !== 200) throw new Error(`status ${exp.status}`);
