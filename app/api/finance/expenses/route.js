@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../../../../lib/supabaseServer.js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
 import { cleanExpense, cleanExpensePatch, normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // The expenses are the bills — what the restaurant has bought and what it
 // still owes for it.
@@ -27,6 +22,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // have can never break the insert again.
 export async function GET(request) {
   try {
+    const supabase = getSupabase();
     const params = new URL(request.url).searchParams;
     const view = params.get('view');
     const month = params.get('month');
@@ -184,6 +180,7 @@ function billTotals(rows) {
 
 export async function POST(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const row = cleanExpense(body);
 
@@ -203,6 +200,7 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const { id, ...updates } = body;
     if (!id) throw new Error('ID is required');

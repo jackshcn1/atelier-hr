@@ -1,16 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../../../../lib/supabaseServer.js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Cashflow is a calendar-month statement, like every other finance metric.
 // The transactions of the month are returned, and the totals the page shows
 // are the month's totals — not the totals of every transaction ever recorded.
 export async function GET(request) {
   try {
+    const supabase = getSupabase();
     const params = new URL(request.url).searchParams;
     const period = financePeriod(params.get('month'));
 
@@ -114,6 +110,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const { data, error } = await supabase
       .from('cashflow_transactions')
