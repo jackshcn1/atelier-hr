@@ -4,7 +4,7 @@ description: "How the Petpooja daily sync is hosted (Vercel), why it cannot run 
 metadata:
   node_type: memory
   type: project
-  modified: 2026-11-15T03:00:00.000Z
+  modified: 2026-11-17T08:00:00.000Z
 ---
 
 # Petpooja Hosted Sync (replaces the local-computer job)
@@ -397,6 +397,51 @@ cycle and freezing its figures into a snapshot). The hosted endpoint does the
 same — `closeFinishedCycles()` now reads the Supabase environment variables
 when there is no local config file, which there never is on the serverless
 runtime.
+
+## Finance-only mode (17 Nov 2026)
+
+The variable-pay metrics are paused by the owner's decision, so the nightly
+run pulls the **finance reports only** and writes nothing to the
+variable-pay rows.
+
+| | |
+|---|---|
+| Reports pulled | `due_payment`, `executive`, `purchase_invoices`, `purchase_returns` |
+| Groups in the workflow | 5, 6, 9, 10 |
+| Trigger | `?finance=1` on `/api/sync` → `SYNC_FINANCE_ONLY=1` |
+| Back to variable pay | the `variable_pay` switch on the manual trigger, which runs all ten groups |
+
+What a finance-only run does **not** do:
+
+- writes nothing to `variable_metric_inputs` (`saveMetric()` returns early);
+- does not open, lock or create a pay period in `variable_pay_periods`;
+- does not close a finished pay cycle (`closeFinishedCycles()` is skipped);
+- does not pull the Google Sheets customer feedback (it writes metric rows).
+
+Measured on production, 17 Nov 2026, all four groups green in one run:
+
+| Group | Report | Time | Result |
+|---|---|---|---|
+| 5 | `due_payment` | 41 s | 13 open invoices, ₹89,243 outstanding, ₹55,890 overdue, 8 customers |
+| 6 | `executive` | 37 s | calendar month 2026-11 → ₹10,30,035.74 covering 1–17 Nov |
+| 9 | `purchase_invoices` | 24 s | 211 invoices downloaded, 0 duplicates |
+| 10 | `purchase_returns` | 25 s | 27 debit notes, 1 new |
+
+`variable_metric_inputs` stayed at 34 rows across the whole run — the proof
+that a finance-only run leaves variable pay alone.
+
+**The bill de-duplication is by invoice number, not by row order.** A bill is
+identified by (supplier, invoice number) compared without regard to
+capitalisation, and the existing bills are fetched by invoice number in
+batches of 150 — a long list of invoice numbers makes a long address, and a
+long address is refused by the database gateway. The supplier name is no
+longer the lookup key, because Petpooja writes it with a `[Supplier]` tag
+that is sometimes missing, and a case change in the name would otherwise
+write the same bill twice.
+
+**The supplier list is rebuilt from the bills** on every run
+(`syncVendorList()`), so a new supplier appears the morning after its first
+bill. The bills are the truth about who the restaurant buys from.
 
 ## Useful limits (measured, not guessed)
 
