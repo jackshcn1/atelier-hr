@@ -51,6 +51,11 @@ export default function FinanceDashboard() {
   const formatINR = (num) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
   const period = data.period;
 
+  // The month's costs, salary included. Salary is an operating cost, so it
+  // belongs in the total the three bars and the salary line are shares of —
+  // otherwise the panel would show a salary and then a total without it.
+  const totalCosts = data.costs.total + (data.salary?.amount || 0);
+
   const DrilldownModal = ({ title, items, onClose }) => (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto">
@@ -142,6 +147,16 @@ export default function FinanceDashboard() {
         Net is revenue minus the costs on record. Fixed costs and petty cash are entered by hand, so they
         are only counted once they have been entered.
       </p>
+
+      {/* A month in progress does not have a real profit yet: the revenue
+          covers only the days that have happened, while the salary and the
+          standing costs are for the whole month. */}
+      {period.isCurrentMonth && data.revenue.asOf && (
+        <p className="text-xs text-[#8b6f4e] -mt-1">
+          The revenue above covers 1 – {period.through} {period.label}, while the salary and the standing
+          costs are for the whole month. The month's profit settles at month end.
+        </p>
+      )}
 
       {data.revenue.synced === false && (
         <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
@@ -235,26 +250,43 @@ export default function FinanceDashboard() {
             <Meter
               label="Fixed Costs"
               actual={data.costs.fixed}
-              total={data.costs.total}
+              total={totalCosts}
               onClick={() => setDrilldown({ title: 'Fixed costs', items: data.costs.breakdown.fixed })}
             />
             <Meter
               label="Variable Costs"
               actual={data.costs.variable}
-              total={data.costs.total}
+              total={totalCosts}
               onClick={() => setDrilldown({ title: 'Variable costs', items: data.costs.breakdown.variable })}
             />
             <Meter
               label="Petty Expenses"
               actual={data.costs.petty}
-              total={data.costs.total}
+              total={totalCosts}
               onClick={() => setDrilldown({ title: 'Petty cash', items: data.costs.breakdown.petty })}
             />
+
+            {/* Staff salary sits with the operating costs, not with the cost
+                of making a sale — so the gross margin still means something.
+                It is a forecast until the payroll for the cycle is run. */}
+            {data.salary && (
+              <div className="mb-4 pt-4 border-t border-[#f2efec]">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-[#6b635c]">Staff salary</span>
+                  <span className="font-semibold text-[#1e1812]">{formatINR(data.salary.amount)}</span>
+                </div>
+                <p className="text-[11px] text-[#8b6f4e]">
+                  {data.salary.state === 'actual'
+                    ? `Actual — the payroll for ${data.salary.cycle.start} → ${data.salary.cycle.end} has been processed`
+                    : `Forecast — every active employee a full month, for ${data.salary.cycle.start} → ${data.salary.cycle.end}`}
+                </p>
+              </div>
+            )}
           </div>
           <div className="mt-8 pt-4 border-t border-[#ebe8e4] flex flex-col gap-2 bg-[#faf8f6] p-4 rounded-xl">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-[#1e1812]">Total Costs</span>
-              <span className="text-lg font-serif font-bold text-rose-800">{formatINR(data.costs.total)}</span>
+              <span className="text-lg font-serif font-bold text-rose-800">{formatINR(totalCosts)}</span>
             </div>
             <div className="text-xs text-[#6b635c] text-right">
               {period.isCurrentMonth ? `Costs recorded 1 – ${period.through} ${period.label}` : `Costs recorded in ${period.label}`}
