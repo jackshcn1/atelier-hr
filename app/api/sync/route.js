@@ -142,7 +142,13 @@ async function handle(req) {
     let browserPath = browserBinary;
     try {
       const launcher = join('/tmp/atelier-petpooja', 'chromium-no-core');
-      writeFileSync(launcher, '#!/bin/sh\nulimit -c 0\nexec "$@"\n', { mode: 0o755 });
+      // The browser's own path is written into the script: `exec "$@"` would
+      // read the browser's first flag as an option of `exec` and refuse.
+      writeFileSync(
+        launcher,
+        `#!/bin/sh\nulimit -c 0\nexec ${JSON.stringify(browserBinary)} "$@"\n`,
+        { mode: 0o755 },
+      );
       browserPath = launcher;
     } catch {
       // No permission or no shell — the browser is started as it is.
