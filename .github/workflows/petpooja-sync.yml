@@ -8,15 +8,26 @@ name: Petpooja Variable Pay Automated Sync
 # so this workflow only schedules the request and collects the result.
 #
 # The sync is split into ten report groups — one report each — because a full
-# run is longer than a serverless function is allowed to run, and two reports per
-# group could still overrun the 300 s ceiling on a slow Petpooja day. The groups
-# are called one after the other so they never race on the same metric rows.
+# run is longer than a serverless function is allowed to run, and two reports
+# per group could still overrun the 300 s ceiling on a slow Petpooja day.
 #
-# Schedule is UTC (GitHub cron is always UTC):
-#   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * *'
+# Schedule. GitHub cron is always UTC; the business day is IST (UTC+05:30):
+#   18:30 UTC = 00:00 IST  \
+#   19:30 UTC = 01:00 IST   |
+#   20:30 UTC = 02:00 IST   |  five data batches, two report groups each
+#   21:30 UTC = 03:00 IST   |
+#   22:30 UTC = 04:00 IST  /
+#   23:30 UTC = 05:00 IST     the catch-up — everything still missing
+#
+# Every hour the workflow asks the server for all ten groups and lets the
+# server decide which ones are needed. A group that already ran today is
+# skipped without the browser even being started, and the server keeps to two
+# groups an hour until 05:00 IST, when the catch-up lifts that limit and runs
+# whatever is still missing. So a batch that was delayed or missed is picked up
+# by the next hour or by the catch-up — nothing is quietly lost.
 on:
   schedule:
-    - cron: '30 23 * * *'
+    - cron: '30 18-23 * * *'
 
   # Manual trigger from the Actions tab, with optional period override for backfills.
   workflow_dispatch:
@@ -39,9 +50,10 @@ concurrency:
 jobs:
   sync-petpooja:
     runs-on: ubuntu-latest
-    # Ten groups, each one report, with a retry and a pause in between: a slow
-    # Petpooja day needs room for all of that.
-    timeout-minutes: 55
+    # A normal hour runs two groups. The 05:00 IST catch-up can run up to ten
+    # if the day went badly, with a retry and a pause in between each: that
+    # needs room.
+    timeout-minutes: 90
 
     steps:
       - name: Request the Petpooja sync
@@ -65,7 +77,11 @@ jobs:
             PERIOD=""
           fi
 
-          # A manual run may target a single group; the scheduled run does all ten.
+          # A manual run may target a single group; the scheduled run asks for
+          # all ten and lets the server decide which of them are needed.
+          #
+          # A manual run is always a deliberate re-fetch, so it never asks the
+          # server to skip anything.
           #
           # NOTE: do not name this variable GROUPS — `GROUPS` is a Bash
           # built-in array holding the current user's group ids, so assigning
@@ -73,8 +89,10 @@ jobs:
           # the runner user happens to belong to.
           if [ -n "$ONLY_GROUP" ]; then
             SYNC_GROUPS="$ONLY_GROUP"
+            EXTRA=""
           else
             SYNC_GROUPS="1 2 3 4 5 6 7 8 9 10"
+            EXTRA="&skipFresh=1"
           fi
 
           # The Petpooja session is carried from one group to the next by the
@@ -93,7 +111,7 @@ jobs:
           for G in $SYNC_GROUPS; do
             echo ""
             echo "=== Report group $G ==="
-            URL="$SYNC_URL?group=$G"
+            URL="$SYNC_URL?group=$G$EXTRA"
             [ -n "$PERIOD" ] && URL="$URL&$PERIOD"
 
             # Every group but the last hands the session on to its successor.
@@ -126,6 +144,15 @@ jobs:
               if [ "$STATUS" != "200" ]; then
                 echo "::error::Report group $G failed with HTTP $STATUS"
                 continue
+              fi
+
+              # The server answered "not needed" — this group already ran
+              # today, or this hour has already had its share of work. That is
+              # a good outcome, not a failure.
+              if grep -q '"skipped":true' "response-group-$G.json"; then
+                echo "::notice::Report group $G was not needed: $(grep -o '"reason":"[^"]*"' "response-group-$G.json" | head -1)"
+                GROUP_OK=1
+                break
               fi
 
               # A 200 is not enough: the endpoint must say it actually fetched
@@ -171,9 +198,18 @@ jobs:
         if: always()
         run: |
           {
-            echo "### Petpooja daily sync"
+            echo "### Petpooja hourly sync"
             echo
             echo "- Finished: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            for f in response-group-*.json; do
+              [ -e "$f" ] || continue
+              if grep -q '"skipped":true' "$f"; then
+                echo "- ${f%.json}: skipped — $(grep -o '"reason":"[^"]*"' "$f" | head -1 | sed 's/^"reason":"//; s/"$//')"
+              else
+                echo "- ${f%.json}: fetched"
+              fi
+            done
+            echo
             for f in response-group-*.json; do
               [ -e "$f" ] || continue
               echo ""

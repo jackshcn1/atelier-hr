@@ -22,7 +22,7 @@ import { NextResponse } from 'next/server';
 // shared libraries and fonts.
 import { useBrowserTempDir } from '../../../lib/browserTempDir.js';
 import chromium from '@sparticuz/chromium';
-import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
+import { runPetpoojaSync, planReportGroup, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
 import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.mjs';
 
 export const runtime = 'nodejs';
@@ -106,6 +106,87 @@ async function handle(req) {
     // Serverless has no bundled browser and no display.
     process.env.PETPOOJA_HEADLESS = 'true';
 
+    // The request is read first, before anything heavy happens. A group that
+    // turns out to be unnecessary must cost nothing at all — not even
+    // unpacking the browser.
+    //
+    //   ?group=N        run one report group (1..10)
+    //   ?reports=a,b    run an explicit list of reports
+    //   ?skipFresh=1    let the server decide whether the group is needed
+    //   ?catchup=1      ignore the hourly limit (the catch-up run)
+    //   ?start=&end=    period override for backfills
+    const params = new URL(req.url).searchParams;
+    const start = params.get('start');
+    const end = params.get('end');
+    if (start && end) {
+      process.env.SYNC_START_DATE = start;
+      process.env.SYNC_END_DATE = end;
+      push(`📅 Overriding period: ${start} → ${end}`);
+    }
+
+    const group = params.get('group');
+    const reports = params.get('reports');
+    const skipFresh = params.get('skipFresh') === '1';
+    const catchup = params.get('catchup') === '1';
+
+    // An unknown group or report name is rejected outright. Silently running
+    // nothing would answer 200 with "0 reports" — a scheduler would call that
+    // a successful run while no metric was ever fetched.
+    if (group && !REPORT_GROUPS[Number(group)]) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Unknown report group "${group}".`,
+          knownGroups: Object.keys(REPORT_GROUPS),
+        },
+        { status: 400 },
+      );
+    }
+    if (reports) {
+      const unknown = reports.split(',').map((s) => s.trim()).filter(Boolean)
+        .filter((name) => !REPORT_NAMES.includes(name));
+      if (unknown.length > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Unknown report(s): ${unknown.join(', ')}.`,
+            knownReports: REPORT_NAMES,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Is this group needed at all?
+    //
+    // The hourly schedule calls every group every hour and lets the server
+    // decide. The server knows a group's last successful run from the metric
+    // that group writes, so it can skip a group that already ran today, and
+    // it can hold back a group when the hour has already had its share of
+    // work. From 05:00 IST the catch-up lifts that limit and runs whatever is
+    // still missing.
+    if (group && skipFresh) {
+      let plan = null;
+      try {
+        plan = await planReportGroup(Number(group), { catchup });
+      } catch (planErr) {
+        // A failed check must never stop the sync — run the group instead.
+        console.error(`⚠️ Could not read the freshness of group ${group}: ${planErr.message}`);
+      }
+      if (plan && plan.action === 'skip') {
+        push(`⏭️ Report group ${group} skipped: ${plan.reason}`);
+        return NextResponse.json({
+          ok: true,
+          skipped: true,
+          group: Number(group),
+          reason: plan.reason,
+          durationMs: Date.now() - started,
+          logs: logs.slice(-200),
+        });
+      }
+      if (plan) push(`▶️ Report group ${group} will run: ${plan.reason}`);
+    }
+
     // Everything the browser writes goes into one folder of our own, and
     // that folder is set BEFORE the browser is unpacked.
     //
@@ -128,16 +209,6 @@ async function handle(req) {
     // also skips unpacking it.
     chromium.setGraphicsMode = false;
     process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH = await chromium.executablePath();
-
-    // Optional period override for backfills: ?start=YYYY-MM-DD&end=YYYY-MM-DD
-    const params = new URL(req.url).searchParams;
-    const start = params.get('start');
-    const end = params.get('end');
-    if (start && end) {
-      process.env.SYNC_START_DATE = start;
-      process.env.SYNC_END_DATE = end;
-      push(`📅 Overriding period: ${start} → ${end}`);
-    }
 
     // Chromium flags.
     //
@@ -187,13 +258,6 @@ async function handle(req) {
     ]);
     push(`🧭 Chromium mode: ${chromiumMode}`);
 
-    // A full sync is longer than a serverless function may run, so the
-    // reports are split into groups that each fit. ?group=1..10 runs one
-    // group; ?reports=captain,pax runs an explicit set; no parameter runs
-    // everything (the local-computer path).
-    const group = params.get('group');
-    const reports = params.get('reports');
-
     // Session hand-over between groups.
     //
     // The run is split into ten serverless calls, and Petpooja turns away a
@@ -210,34 +274,6 @@ async function handle(req) {
     // successor. The last group of the run leaves it out, so the account is
     // logged out and free for tomorrow.
     const keepSession = params.get('keepSession') === '1';
-
-    // An unknown group or report name is rejected outright. Silently running
-    // nothing would answer 200 with "0 reports" — a scheduler would call that
-    // a successful run while no metric was ever fetched.
-    if (group && !REPORT_GROUPS[Number(group)]) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Unknown report group "${group}".`,
-          knownGroups: Object.keys(REPORT_GROUPS),
-        },
-        { status: 400 },
-      );
-    }
-    if (reports) {
-      const unknown = reports.split(',').map((s) => s.trim()).filter(Boolean)
-        .filter((name) => !REPORT_NAMES.includes(name));
-      if (unknown.length > 0) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `Unknown report(s): ${unknown.join(', ')}.`,
-            knownReports: REPORT_NAMES,
-          },
-          { status: 400 },
-        );
-      }
-    }
 
     if (group) {
       process.env.SYNC_GROUP = group;

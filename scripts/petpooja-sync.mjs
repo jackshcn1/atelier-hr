@@ -23,7 +23,7 @@ import { parseCustomerFeedback } from '../lib/feedbackParsers.js';
 import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
 import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
-import { monthKeyOf, previousMonthKey, petpoojaMonthWindow } from '../lib/financePeriod.js';
+import { monthKeyOf, previousMonthKey, petpoojaMonthWindow, todayInIST, nowInIST } from '../lib/financePeriod.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -116,6 +116,143 @@ const SESSION_TABLE = 'petpooja_sync_session';
 // Every report the engine knows about, used to reject a bad group or report
 // name instead of quietly running nothing.
 export const REPORT_NAMES = [...new Set(Object.values(REPORT_GROUPS).flat())];
+
+// ---------------------------------------------------------------------------
+// Has this report group already run today?
+//
+// The hourly schedule calls every group every hour and lets the server decide
+// what is worth doing. To decide, the server has to know when each group last
+// fetched its report.
+//
+// The record is the metric the group itself writes: every group writes at
+// least one, and the row carries the time it was last written. Nothing extra
+// is stored and nothing extra is written — the answer is already in the data.
+//
+// Group 9 (purchase invoices) is the exception: it writes vendor bills to the
+// expenses table and no metric at all, so there is no time to read. It
+// therefore always runs.
+// ---------------------------------------------------------------------------
+export const GROUP_MARKER_METRIC = {
+  1: 'cap_sales',
+  2: 'cap_pax_avg',
+  3: 'b2b_counter_sales',
+  4: 'b2b_rev',
+  5: 'b2b_credit',
+  6: 'rev_dine_in',
+  7: 'kit_prep_time',
+  8: 'kit_wastage',
+  9: null,
+  10: 'b2b_returns',
+};
+
+const ALL_MARKERS = Object.values(GROUP_MARKER_METRIC).filter(Boolean);
+
+// The daily window, in IST.
+//
+// The five data batches run from 00:00 to 04:00 IST and take two groups each,
+// so the server is never asked to do more than that in an hour. From 05:00
+// IST the catch-up runs: everything not yet fetched today is fetched then,
+// whatever the hour — so a batch that was missed is not missed for good.
+const BATCH_HOUR_IST = 5;
+const GROUPS_PER_HOUR = 2;
+
+// The Supabase client the sync talks to.
+//
+// The service role is used when it is there (the server side); the anon key
+// is the fallback for a local run.
+function supabaseClient() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wzxswmopfxnucmeygqeg.supabase.co';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment.');
+  }
+  return createClient(url, key);
+}
+
+// What should the server do with this report group right now?
+//
+// 'run'  — fetch it now.
+// 'skip' — it already ran today, or this hour has already had its share.
+//
+// The hours are IST hours, because the business day is the IST day. The
+// server's own clock is UTC, and on the last day of a month the two disagree
+// about what day it is.
+export async function planReportGroup(groupNumber, options = {}) {
+  const group = Number(groupNumber);
+  const marker = GROUP_MARKER_METRIC[group] ?? null;
+  const now = options.now ? new Date(options.now) : new Date();
+  const istDay = todayInIST(now);
+  const istHour = nowInIST(now).getUTCHours();
+  const catchup = options.catchup === true || istHour >= BATCH_HOUR_IST;
+
+  const plan = {
+    group,
+    marker,
+    catchup,
+    action: 'run',
+    reason: '',
+    updatedAt: null,
+    ranToday: false,
+    ranThisHour: 0,
+  };
+
+  // Group 9 writes vendor bills, not metrics — there is no time to read.
+  if (!marker) {
+    plan.reason = 'This group writes no metric, so no earlier run can be seen.';
+    return plan;
+  }
+
+  const supabase = options.client || supabaseClient();
+  const cycle = getActivePayrollCycle();
+
+  const { data: period } = await supabase
+    .from('variable_pay_periods')
+    .select('id')
+    .eq('period_start', cycle.start)
+    .eq('period_end', cycle.end)
+    .maybeSingle();
+
+  let rows = [];
+  if (period) {
+    const { data } = await supabase
+      .from('variable_metric_inputs')
+      .select('metric_id, updated_at')
+      .eq('period_id', period.id)
+      .is('employee_id', null)
+      .in('metric_id', ALL_MARKERS);
+    rows = data || [];
+  }
+
+  // How many groups have already run in this hour, and has this one run today?
+  let ranThisHour = 0;
+  for (const row of rows) {
+    if (!row.updated_at) continue;
+    if (row.metric_id === marker) plan.updatedAt = row.updated_at;
+    const at = new Date(row.updated_at);
+    if (todayInIST(at) !== istDay) continue;
+    // The same IST hour, and not later than now.
+    if (nowInIST(at).getUTCHours() === istHour && at.getTime() <= now.getTime()) ranThisHour++;
+    if (row.metric_id === marker) plan.ranToday = true;
+  }
+  plan.ranThisHour = ranThisHour;
+
+  if (plan.ranToday) {
+    plan.action = 'skip';
+    plan.reason = `Already fetched today (last update ${plan.updatedAt}).`;
+    return plan;
+  }
+
+  if (!catchup && ranThisHour >= GROUPS_PER_HOUR) {
+    plan.action = 'skip';
+    plan.reason = `This hour has already run ${ranThisHour} report groups.`;
+    return plan;
+  }
+
+  plan.reason = catchup
+    ? 'Not fetched today — the catch-up is running.'
+    : 'Not fetched today.';
+  return plan;
+}
 
 // ---------------------------------------------------------------------------
 // What the machine is actually doing when the browser dies.
@@ -382,9 +519,7 @@ const RUN_TMP_DIR = BROWSER_TMP_DIR;
 // The serverless route sets this BEFORE the browser is unpacked, so there is
 // exactly one copy of the browser on the disk. This is the belt to that
 // braces: if the engine is ever run without the route (the office computer
-// path), the folder is still ours — and it never overrides a folder that has
-// already been chosen, because changing it after the browser is unpacked
-// would unpack it a second time.
+// path), the folder is still ours.
 function useOwnTempFolder() {
   try {
     mkdirSync(RUN_TMP_DIR, { recursive: true });
@@ -719,12 +854,7 @@ export async function runPetpoojaSync(options = {}) {
     }
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wzxswmopfxnucmeygqeg.supabase.co';
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseKey) {
-    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment.');
-  }
+  const supabase = supabaseClient();
 
   const email = process.env.PETPOOJA_EMAIL;
   const password = process.env.PETPOOJA_PASSWORD;
@@ -734,7 +864,6 @@ export async function runPetpoojaSync(options = {}) {
   }
 
   console.log('🚀 Starting Petpooja Automated Variable Pay Sync...');
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   // 1. Determine cycle & period
   const cycle = options.cycle || getActivePayrollCycle();

@@ -33,8 +33,10 @@ architecture, not an obstacle to it.
   (`@sparticuz/chromium` + `playwright-core`), then calls the existing
   `runPetpoojaSync()`.
 - `.github/workflows/petpooja-sync.yml` — the scheduler only. It POSTs to the
-  endpoint and collects the result. Daily at **23:30 UTC = 05:00 IST**
-  (`cron: '30 23 * * *'`; GitHub cron is always UTC).
+  endpoint and collects the result. Hourly from **18:30 to 23:30 UTC**
+  (`cron: '30 18-23 * * *'`; GitHub cron is always UTC) — that is 00:00 to
+  05:00 IST, five data batches and a catch-up. See
+  [[the hourly schedule and the freshness marker]].
 - Auth: the endpoint requires a shared secret, accepted as either
   `Authorization: Bearer <SYNC_SECRET>` (what Vercel Cron sends) or
   `x-sync-secret: <SYNC_SECRET>`. `anon` and `authenticated` are not relevant here —
@@ -334,6 +336,79 @@ does **not** stop the server-side function, which keeps running for its full
 300 s. GitHub's `concurrency: petpooja-sync` group stops two *workflow runs*
 from overlapping, but nothing stops a manual endpoint call from racing the
 schedule. Let a previous call finish before starting another.
+
+## The hourly schedule and the freshness marker (17 Nov 2026)
+
+A single nightly run means a single point of failure: one bad report group and
+the whole day is missed, and nothing tells the dashboards the numbers are
+stale. The sync now runs **every hour** and spreads itself out.
+
+| IST | UTC | What runs |
+|---|---|---|
+| 00:00 | 18:30 | report groups 1–2 |
+| 01:00 | 19:30 | report groups 3–4 |
+| 02:00 | 20:30 | report groups 5–6 |
+| 03:00 | 21:30 | report groups 7–8 |
+| 04:00 | 22:30 | report groups 9–10 |
+| 05:00 | 23:30 | **the catch-up** — everything still missing |
+
+**The workflow does not decide this — the server does.** Every hour the
+workflow asks for all ten groups with `?skipFresh=1`, and the server answers
+each one with either "run it" or "not needed". This is deliberate: the hour is
+read on the server, in IST, so a delayed or queued GitHub trigger cannot pick
+the wrong batch, and a batch that was missed is picked up by the next hour or
+by the catch-up instead of being lost.
+
+**How the server knows a group already ran:** the marker is the metric that
+group itself writes. Every group writes at least one, and the row carries the
+time it was last written — so the answer is already in the data, with no extra
+table and no extra write.
+
+| Group | Marker metric | | Group | Marker metric |
+|---|---|---|---|---|
+| 1 `captain` | `cap_sales` | | 6 `executive` | `rev_dine_in` |
+| 2 `pax` | `cap_pax_avg` | | 7 `kot` | `kit_prep_time` |
+| 3 `item` | `b2b_counter_sales` | | 8 `inventory` | `kit_wastage` |
+| 4 `gstn` | `b2b_rev` | | 9 `purchase_invoices` | **none** |
+| 5 `due_payment` | `b2b_credit` | | 10 `purchase_returns` | `b2b_returns` |
+
+Group 9 writes vendor bills to the `expenses` table and no metric at all, so
+there is no time to read — it therefore always runs. That is one extra report
+fetch a day and is accepted.
+
+**The two rules** (`planReportGroup()` in `scripts/petpooja-sync.mjs`):
+
+1. A group whose marker was already updated **today (IST)** is skipped. The
+   answer is `{"ok": true, "skipped": true, "reason": "..."}` — a skip is a
+   good outcome, not a failure, and the workflow treats it as one.
+2. Until 05:00 IST the server runs at most **two groups an hour**. After
+   05:00 IST the catch-up lifts that limit and runs everything still missing.
+
+The check happens **before the browser is unpacked**, so a group that is not
+needed costs one database read and nothing else.
+
+**How to apply:** if a group has to be forced, do not add a parameter — run it
+without `skipFresh`. A manual run (`workflow_dispatch`) never skips anything.
+
+## The browser was being unpacked twice (17 Nov 2026)
+
+The serverless temporary folder is only **512MB**, and the browser was
+unpacked into it **twice**: once into `/tmp/chromium` by `@sparticuz/chromium`
+and again into `/tmp/atelier-petpooja` by the engine's own run folder.
+
+The browser reads the temporary folder **when it is unpacked**, and the folder
+was changed *after* the first unpack — so the second copy appeared on the next
+request. `TMPDIR` survives between requests on a reused Vercel instance, so it
+stayed there. Two copies of the browser is ~300MB of a 512MB disk, and the
+last failure had **28MB free of 525MB**.
+
+The route now sets `TMPDIR` **before** `chromium.executablePath()`, so the
+browser is unpacked once. The engine's `useOwnTempFolder()` only sets `TMPDIR`
+when nothing has set it already — changing it after the unpack is exactly what
+caused the second copy.
+
+**How to apply:** never change `TMPDIR` after the browser has been unpacked.
+If the temporary folder has to change, it has to change *before*.
 
 ## Console capture
 

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "sync:petpooja": "node scripts/petpooja-sync.mjs",
-    "setup:petpooja": "node scripts/setup-petpooja.mjs"
+    "setup:petpooja": "node scripts/setup-petpooja.mjs",
+    "test:sync-plan": "node tests/sync-plan-verify.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
