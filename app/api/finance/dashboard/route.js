@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
 import { monthCosts } from '../../../../lib/financeCosts.js';
 import { monthPosition, monthReadiness } from '../../../../lib/financePosition.js';
+import { cycleEndingIn, salaryForCycle } from '../../../../lib/financeSalary.js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -44,7 +45,15 @@ export async function GET(req) {
     };
 
     const costs = await monthCosts(supabase, period);
-    const netProfitOrLoss = revenue.total - costs.total;
+
+    // Staff salary.
+    //
+    // A forecast until the payroll for the cycle has been run, the real
+    // figure after. The cycle that ends in this month is the one that
+    // counts, because that is when the salary is paid.
+    const salary = await salaryForCycle(supabase, cycleEndingIn(period.key));
+
+    const netProfitOrLoss = revenue.total - costs.total - salary.amount;
 
     // The balance-sheet side: what customers owe, what suppliers are owed.
     const position = await monthPosition(supabase, period);
@@ -60,20 +69,21 @@ export async function GET(req) {
       .gte('date', period.start)
       .lte('date', period.end);
 
-    const { count: fixedCostCount } = await supabase
-      .from('fixed_costs')
-      .select('id', { count: 'exact', head: true });
-
     const readiness = monthReadiness({
       revenueSynced: !!revenueRow,
       revenueAsOf: revenueRow?.window_end || null,
       // The bills on record for the month — paid or not, and not counting
       // the credit notes, which are a credit back rather than a bill.
       variableBillCount: position.payables.totals.billCountTotal,
-      fixedCostCount: fixedCostCount || 0,
+      fixedCostCount: costs.standing.length,
+      standingOutstanding: costs.standingOutstanding.length,
       pettyEntryCount: pettyEntryCount || 0,
       receivableCount: position.receivables.totals.invoiceCount,
       unpaidBillCount: position.payables.totals.billCount,
+      salaryState: salary.state,
+      salaryAmount: salary.amount,
+      salaryEmployeeCount: salary.state === 'actual' ? salary.actual.employeeCount : salary.forecast.employeeCount,
+      salaryCycle: salary.cycle,
     });
 
     // The months that have figures, so the dashboard can offer the ones worth
@@ -100,6 +110,7 @@ export async function GET(req) {
         },
         revenue,
         costs,
+        salary,
         net_pl: netProfitOrLoss,
         ...position,
         readiness,

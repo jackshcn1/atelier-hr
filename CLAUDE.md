@@ -47,7 +47,18 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
    - Variable Pay Targets (`/documents?category=targets`)
    - Company Policies (`/documents?category=policy`)
 
-5. **Standalone Links**
+5. **Finance**
+   - Finance (`/finance`) — the four finance modules, on the calendar month
+   - Costs & Expenses (`/finance/costs`) — revenue channels and the cost breakdown
+   - Bill Entry (`/finance/costs/entry`) — log a bill by hand (the fallback path)
+   - Standing Costs (`/finance/costs/fixed`) — the expected monthly costs; the month's invoice replaces the expected amount
+   - Petty Cash (`/finance/costs/petty`) — Cash entry (money in) or Expense (money out)
+   - Bills (`/finance/bills`) — what the restaurant owes its suppliers, bill by bill
+   - Suppliers (`/finance/vendors`) — the supplier list, with what is owed to each
+   - Cashflow (`/finance/cashflow`) — the month's cash movements and the money owed by customers
+   - P&L (`/finance/pnl`) — the statement for the calendar month
+
+6. **Standalone Links**
    - Export (`/export`) — CSV data download
    - Settings (`/settings`) — System configuration, departments, and user management (`/settings/users`)
 
@@ -80,7 +91,11 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Public anon key (JWT starting with `eyJ...`)
 - `SUPABASE_SERVICE_ROLE_KEY` — Protected server-side secret key (used strictly in backend routes and local sync scripts)
 
-**Last Updated**: 2026-10-07 — Completed:
+**Last Updated**: 2026-11-17 — Completed:
+- **Finance Module (calendar month)**: Revenue from Petpooja's Executive Sales Summary for the plain calendar month (separate from the 20–19 pay cycle), a real P&L (revenue → cost of revenue → gross profit → operating costs → net), bills and suppliers from the Petpooja purchase reports, receivables from the due-payment report, cashflow, and a readiness list that names what is still missing. Purchase returns are credit notes and reduce cost of purchases. See `memory/finance-calendar-month.md`.
+- **Staff Salary as an Operating Cost**: The pay cycle that *ends* in the month is the one that counts. Until that cycle's regular payroll run exists, the salary is a forecast frozen at the 1st of the month after the cycle ends; once it exists, the real payroll figure replaces it. Advances are cash out, not cost. Variable pay is not forecast. See `memory/finance-salary-and-standing-costs.md`.
+- **Standing Costs as a Checklist**: The standing-cost list holds the *expected* amount; the month's invoice replaces it rather than adding to it, so nothing is counted twice. Category matching, monthly/annual cycles, and a Received / Expected-amount-used status on the page.
+- **Accountant Invoice Sheet (design)**: A Google Sheet is the only place an amount is written; a `bucket` column decides Variable / Fixed / Petty. Column design recorded in `memory/finance-invoice-sheet.md`. **Not yet built** — blocked on a Google service-account key.
 - **Onboarding Workflow**: 5-stage gating (`Draft` → `Documents Pending` → `Compensation Set` → `Assets Issued` → `Active`), standing legal/compliance terms auto-compiler with merge fields, instant A4 PDF agreement generator, and mandatory Day 1 physical signature verification gate.
 - **Executive Employee Dossier**: Segmented tabbed profile layout (`Job & Hierarchy`, `Personal & ID`, `Compensation & Slips`, `Assets & Facilities`, `Compliance & Training`, `Notes & Record`, `Exit & Offboarding`), interactive 1:1 square photo cropper with zoom/pan, unified asset inventory with deposit status, and full multi-section master record print dossier.
 - **Recruitment Pipeline**: Atelier design system layout with headcount positions, active pipeline tracking, candidate evaluation scoring, and stage transitions.

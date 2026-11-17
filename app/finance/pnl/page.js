@@ -68,18 +68,26 @@ export default function PnLPage() {
   const {
     revenue, revenue_synced, revenue_as_of, total_expenses, cost_of_revenue,
     operating_costs, gross_profit, operating_profit, net_profit, profit_margin, period,
-    missing,
+    missing, salary, revenue_covers_days, month_days,
   } = data;
 
   const isProfit = net_profit >= 0;
+
+  // A month in progress does not have a real profit yet: the revenue covers
+  // only the days that have happened, while the salary and the standing
+  // costs are for the whole month. Rent for November is paid for November
+  // whichever day you look at it.
+  const monthInProgress = period.isCurrentMonth && revenue_covers_days > 0 && revenue_covers_days < month_days;
 
   // The health note used to be a fixed sentence. It now says what the month
   // actually did.
   const health = !revenue_synced
     ? { tone: 'warn', label: 'Waiting', text: 'Revenue for this month has not been pulled from Petpooja yet' }
-    : isProfit
-      ? { tone: 'good', label: 'In profit', text: `Revenue covers the month's costs, leaving ${profit_margin.toFixed(1)}% margin` }
-      : { tone: 'bad', label: 'At a loss', text: `The month's costs are above its revenue by ${Math.abs(profit_margin).toFixed(1)}% of revenue` };
+    : monthInProgress
+      ? { tone: 'warn', label: 'Still running', text: `Only ${revenue_covers_days} of ${month_days} days have been sold, against the whole month's costs — the profit settles at month end` }
+      : isProfit
+        ? { tone: 'good', label: 'In profit', text: `Revenue covers the month's costs, leaving ${profit_margin.toFixed(1)}% margin` }
+        : { tone: 'bad', label: 'At a loss', text: `The month's costs are above its revenue by ${Math.abs(profit_margin).toFixed(1)}% of revenue` };
 
   const toneClass = {
     good: 'bg-emerald-500',
@@ -138,6 +146,22 @@ export default function PnLPage() {
             <p className="text-[#1e1812] text-sm font-medium mb-2 uppercase tracking-wide">Operating Profit</p>
             <p className="text-[#1e1812] text-3xl font-medium">₹{operating_profit.toLocaleString('en-IN')}</p>
             <p className="text-xs text-[#8b6f4e] mt-2">After the month's standing costs</p>
+          </div>
+          <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
+            <p className="text-[#8b6f4e] text-sm font-medium mb-2 uppercase tracking-wide">Operating Costs</p>
+            <p className="text-[#1e1812] text-3xl font-medium">₹{operating_costs.toLocaleString('en-IN')}</p>
+            <p className="text-xs text-[#8b6f4e] mt-2">
+              Staff salary ₹{(salary?.amount || 0).toLocaleString('en-IN')} · fixed costs and petty cash
+            </p>
+          </div>
+          <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
+            <p className="text-[#8b6f4e] text-sm font-medium mb-2 uppercase tracking-wide">Staff Salary</p>
+            <p className="text-[#1e1812] text-3xl font-medium">₹{(salary?.amount || 0).toLocaleString('en-IN')}</p>
+            <p className="text-xs text-[#8b6f4e] mt-2">
+              {salary?.state === 'actual'
+                ? `Actual — the payroll for ${salary.cycle.start} → ${salary.cycle.end} has been processed`
+                : `Forecast — every active employee a full month, for ${salary?.cycle?.start} → ${salary?.cycle?.end}`}
+            </p>
           </div>
           <div className={`panel bg-white border ${netLine.border} rounded-card shadow-sm p-6`}>
             <p className={`${netLine.text} text-sm font-medium mb-2 uppercase tracking-wide`}>{netLine.label}</p>

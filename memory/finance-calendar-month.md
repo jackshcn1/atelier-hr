@@ -109,7 +109,7 @@ It is now a real statement for the calendar month:
 revenue          calendar-month revenue (Petpooja)
 cost of revenue  the variable costs of the month
 gross profit     revenue - cost of revenue
-operating costs  fixed costs + petty cash
+operating costs  fixed costs + petty cash + staff salary
 operating profit gross profit - operating costs
 net profit       operating profit (no interest, depreciation or tax on the books)
 ```
@@ -129,11 +129,15 @@ refresh. The default is the current month, up to today.
 
 ## The figures are only as complete as the books
 
-`fixed_costs` and `petty_cash_ledger` are entered by hand and are both empty
-today, so the profit shown is revenue minus the Petpooja vendor bills alone —
-which is why the margin looks high. The dashboard says so on the page. This is
-not a bug in the reporting; it is the cost of not having entered the standing
-costs yet.
+The standing costs (`fixed_costs`) are entered by hand and are now filled in —
+seven of them. The petty cash ledger is still empty. So the profit shown
+carries the standing costs at their **expected** amounts, not at their real
+ones, because no invoice has been entered for them yet. The dashboard says so
+on the page, and the standing-costs page marks each line **Expected amount
+used** until its invoice arrives.
+
+This is not a bug in the reporting; it is the cost of the invoices not being
+in the books yet. See [[finance-salary-and-standing-costs]].
 
 ## The pages that exist now (17 Nov 2026)
 

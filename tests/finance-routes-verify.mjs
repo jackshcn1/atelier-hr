@@ -83,6 +83,114 @@ check('the cashflow answers with the money owed by customers', () => {
   if (!Array.isArray(d.receivables.customers)) throw new Error('no customers');
 });
 
+// Staff salary.
+//
+// The cycle that ends in the month is the one that counts. It is a forecast
+// until the payroll for that cycle has been run, and the real figure after.
+check('the P&L carries the staff salary of the cycle ending in the month', () => {
+  const d = pnl.body.data;
+  if (!d.salary) throw new Error('no salary on the P&L');
+  if (d.salary.state !== 'forecast' && d.salary.state !== 'actual') {
+    throw new Error(`salary state is "${d.salary.state}"`);
+  }
+  if (typeof d.salary.amount !== 'number' || d.salary.amount <= 0) {
+    throw new Error(`salary amount is ${d.salary.amount}`);
+  }
+  // The cycle runs from the 20th of one month to the 19th of the next, and
+  // the one that ends in this month is the one that is paid for it.
+  const cycle = d.salary.cycle;
+  if (!cycle || !cycle.start || !cycle.end) throw new Error('no cycle on the salary');
+  if (!cycle.end.endsWith('-19')) throw new Error(`the cycle ends on ${cycle.end}, not on the 19th`);
+  if (cycle.end.slice(0, 7) !== d.period.key) {
+    throw new Error(`the cycle ends in ${cycle.end.slice(0, 7)}, not in ${d.period.key}`);
+  }
+  // It starts on the 20th of the month before.
+  if (!cycle.start.endsWith('-20')) throw new Error(`the cycle starts on ${cycle.start}, not on the 20th`);
+  const [endYear, endMonth] = cycle.end.split('-').map(Number);
+  const startYear = endMonth === 1 ? endYear - 1 : endYear;
+  const startMonth = endMonth === 1 ? 12 : endMonth - 1;
+  if (cycle.start.slice(0, 7) !== `${startYear}-${String(startMonth).padStart(2, '0')}`) {
+    throw new Error(`the cycle starts in ${cycle.start.slice(0, 7)}, not the month before ${d.period.key}`);
+  }
+});
+
+check('the salary is an operating cost, not part of the cost of making a sale', () => {
+  const d = pnl.body.data;
+  if (d.cost_of_revenue >= d.operating_costs && d.salary.amount > 0) {
+    throw new Error('the salary looks like it is sitting in the cost of revenue');
+  }
+  // Gross profit must not have the salary taken out of it.
+  if (d.gross_profit !== d.revenue - d.cost_of_revenue) {
+    throw new Error('the gross profit has the salary in it');
+  }
+});
+
+check('the salary forecast is frozen at the first of the month after the cycle ends', () => {
+  const d = pnl.body.data;
+  const cycle = d.salary.cycle;
+  const [year, month] = cycle.end.split('-').map(Number);
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const expected = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+  if (d.salary.snapshotDate !== expected) {
+    throw new Error(`the roster is settled on ${d.salary.snapshotDate}, not ${expected}`);
+  }
+});
+
+check('the readiness list says whether the salary is a forecast or a real figure', () => {
+  const row = dash.body.data.readiness.find((r) => r.key === 'salary');
+  if (!row) throw new Error('no salary row in the readiness list');
+  if (row.state !== 'ok') throw new Error(`salary reported as "${row.state}": ${row.detail}`);
+  if (!/forecast|actual/i.test(row.detail)) throw new Error(`the detail does not say which: ${row.detail}`);
+});
+
+check('a salary advance is cash out, not cost', () => {
+  const d = pnl.body.data;
+  if (d.salary.state !== 'forecast') return; // an actual cycle has no open advance
+  const advanced = Number(d.salary.actual?.advanced || 0);
+  if (advanced < 0) throw new Error('the advance is negative');
+  if (advanced > d.salary.amount) {
+    throw new Error(`₹${advanced} advanced is more than the ₹${d.salary.amount} forecast`);
+  }
+});
+
+// Standing costs.
+//
+// The standing-cost list is the checklist of what to expect. An invoice for
+// the month replaces the expected amount rather than adding to it, so the
+// same rent is never counted twice.
+const standingGET = (await import('../app/api/finance/fixed-costs/route.js')).GET;
+const standing = await json(await standingGET(req('/api/finance/fixed-costs?month=2026-11')));
+
+check('the standing costs answer with what the month is expected to cost', () => {
+  if (standing.status !== 200) throw new Error(`status ${standing.status}`);
+  if (!Array.isArray(standing.body.data)) throw new Error('no standing costs');
+  if (!standing.body.totals) throw new Error('no totals');
+  if (typeof standing.body.totals.recognised !== 'number') throw new Error('no recognised total');
+});
+
+check('a standing cost is counted once — the invoice replaces the expected amount', () => {
+  for (const row of standing.body.data) {
+    if (row.received && row.invoiceTotal > 0) {
+      if (row.amount !== row.invoiceTotal) {
+        throw new Error(`${row.name} counts ₹${row.amount}, but its invoice is ₹${row.invoiceTotal}`);
+      }
+    } else if (!row.received) {
+      if (row.amount !== row.monthlyExpected) {
+        throw new Error(`${row.name} counts ₹${row.amount} with no invoice, but its expected amount is ₹${row.monthlyExpected}`);
+      }
+    }
+  }
+});
+
+check('the standing costs are counted as costs of the month', () => {
+  const d = pnl.body.data;
+  const expected = standing.body.totals.recognised;
+  if (Math.abs(d.operating_costs - (d.salary.amount + expected)) > 0.01) {
+    throw new Error(`operating costs ₹${d.operating_costs}, but salary ₹${d.salary.amount} + standing ₹${expected}`);
+  }
+});
+
 const bills = await json(await expensesGET(req('/api/finance/expenses?view=bills')));
 check('the bills answer with what is owed to each supplier', () => {
   if (bills.status !== 200) throw new Error(`status ${bills.status}`);
@@ -94,7 +202,7 @@ check('the bills answer with what is owed to each supplier', () => {
 check('the dashboard counts the bills it says are on record', () => {
   // A head query returns the number in `count`, not in `data`. Reading the
   // wrong one made every month look as though it had no bills at all.
-  const billsRow = dash.body.data.readiness.find((r) => r.key === 'variable');
+  const billsRow = dash.body.data.readiness.find((r) => r.key === 'bills');
   if (!billsRow) throw new Error('no bills row in the readiness list');
   if (billsRow.state !== 'ok') throw new Error(`bills reported as "${billsRow.state}": ${billsRow.detail}`);
   const count = Number(billsRow.detail.replace(/[^0-9]/g, ''));
