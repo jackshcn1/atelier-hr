@@ -8,7 +8,8 @@
     "start": "next start",
     "sync:petpooja": "node scripts/petpooja-sync.mjs",
     "setup:petpooja": "node scripts/setup-petpooja.mjs",
-    "test:finance": "node tests/expense-helpers-verify.mjs"
+    "test:finance": "node tests/expense-helpers-verify.mjs",
+    "test:finance-routes": "node tests/finance-routes-verify.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
