@@ -202,6 +202,43 @@ jobs:
             exit 1
           fi
 
+      # The accountant's invoice sheet.
+      #
+      # It is a Google Sheet, not a Petpooja report, so it needs no browser
+      # and no login — it is its own request, and it takes about a second.
+      #
+      # It is asked for once, after the Petpooja groups, so the sheet's bills
+      # land in the same night's books. A sheet that is not set up yet answers
+      # "skipped" and does not fail the run.
+      - name: Pull the accountant invoice sheet
+        env:
+          SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
+          SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
+        run: |
+          set -u
+          if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
+            echo "::error::VERCEL_SYNC_URL and VERCEL_SYNC_SECRET must be configured as repository secrets."
+            exit 1
+          fi
+
+          SHEET_STATUS=$(curl -sS -o "response-sheet.json" -w '%{http_code}' -X POST "$SYNC_URL?sheet=1" \
+            -H "x-sync-secret: $SYNC_SECRET" \
+            -H 'Content-Type: application/json' \
+            --max-time 120) || SHEET_STATUS="000"
+
+          echo "HTTP $SHEET_STATUS"
+          tail -c 4000 "response-sheet.json" || true
+          echo ""
+
+          if [ "$SHEET_STATUS" != "200" ]; then
+            echo "::error::The invoice sheet pull failed with HTTP $SHEET_STATUS"
+            exit 1
+          fi
+          if ! grep -q '"ok":true' "response-sheet.json"; then
+            echo "::error::The invoice sheet pull did not report ok:true"
+            exit 1
+          fi
+
       - name: Publish run summary
         if: always()
         run: |
@@ -209,7 +246,7 @@ jobs:
             echo "### Petpooja daily sync"
             echo
             echo "- Finished: $(date -u '+%Y-%m-%d %H:%M UTC')"
-            for f in response-group-*.json; do
+            for f in response-group-*.json response-sheet.json; do
               [ -e "$f" ] || continue
               echo ""
               echo "#### ${f%.json}"

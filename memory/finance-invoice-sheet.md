@@ -13,8 +13,11 @@ The bills that Petpooja does not know about — electricity, gas, water, rent,
 pest control, marketing — come in through a Google Sheet the accountant
 fills in. The system reads it.
 
-**Proposed, not yet built** — the column set below is what was put to the
-owner on 17 Nov 2026 and is waiting on their answer.
+**The reader is built** (`lib/invoiceSheet.js`, wired into the nightly run as
+`?sheet=1`). **It is dormant** until the Google service account is set up —
+without the key it answers "skipped" and the nightly run carries on. The
+column set below is what the reader expects; it is waiting on the owner's
+word-for-word confirmation.
 
 ## The mechanic
 
@@ -39,6 +42,23 @@ the column names are the form's question labels.
 | 11 | `reference` | text | no | UTR or transaction reference, to match the bank statement |
 
 Google Forms adds its own timestamp column, which the row id falls back to.
+
+**The columns are found by NAME, not by position.** A Form adds its own
+timestamp column, the accountant may add another, and the columns may be
+moved. The reader looks each one up by its heading, so a column that is
+reordered does not break it. A column has to be spelled one of the names the
+reader accepts — `SHEET_COLUMNS` in `lib/invoiceSheet.js` is the one list, and
+it accepts a few natural synonyms (`Supplier` for `vendor`, `Bill No` for
+`invoice_no`, `Paid On` for `payment_date`).
+
+A heading is normalised before it is compared: lower case, and anything that
+is not a letter or a digit becomes an underscore. So `Invoice No.`,
+`invoice no` and `INVOICE_NO` all find the same column.
+
+**The reader accepts the forms a Form produces.** A date may be `dd/mm/yyyy`
+or `yyyy-mm-dd`; an amount may carry a rupee sign and thousands separators
+(`₹ 12,500.00`); a payment state of `Paid`, `Settled` or `Cleared` is paid,
+and `Pending`, `Unpaid` or `Due` is not.
 
 ## What each bucket does
 
@@ -70,20 +90,55 @@ The same sheet row typed twice is also caught — the sheet is de-duplicated on
 
 ## The setup that is needed before any of it works
 
-The reading side already exists (`lib/googleSheetsService.js`) but it needs a
-Google **service account**:
+The reading side exists (`lib/googleSheetsService.js` and
+`lib/invoiceSheet.js`) but it needs a Google **service account**:
 
 1. create a service account in Google Cloud and download its key;
 2. share the Sheet with the service account's email, as Viewer;
-3. put the key on Vercel (`GOOGLE_SERVICE_ACCOUNT_EMAIL` and the key itself);
+3. put the key on Vercel;
 4. lock the sheet's columns so the labels cannot drift.
 
+### The key on Vercel
+
 The key is best stored as the PEM **content** in an environment variable
-rather than a file path — Vercel has no file to point at. The existing helper
-reads a path, so it needs to accept the content too.
+rather than a file path — Vercel has no file to point at. The helper takes
+either:
+
+| variable | what it holds |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | the service account's address |
+| `GOOGLE_PRIVATE_KEY` | the PEM **content** (preferred) |
+| `GOOGLE_PRIVATE_KEY_PATH` | a path to a key file (a local machine) |
+
+A PEM that was pasted into an environment variable arrives with its newlines
+written as the two characters `\n`, so the helper puts them back before use.
+
+### The sheet's own settings
+
+| variable | default | what it holds |
+|---|---|---|
+| `INVOICE_SHEET_SPREADSHEET_ID` | `GOOGLE_SHEETS_SPREADSHEET_ID` | which spreadsheet |
+| `INVOICE_SHEET_NAME` | `Invoices` | which tab |
+| `INVOICE_SHEET_RANGE` | `A:K` | which columns |
+
+The customer-feedback sheet uses the `GOOGLE_SHEETS_*` names, so the invoice
+sheet has its own — one service account can open both.
+
+## How it runs
+
+`POST /api/sync?sheet=1` — its own request, with the shared sync secret.
+It needs no browser and no Petpooja login, so it takes about a second and
+cannot affect the Petpooja groups. The nightly workflow calls it once,
+after the report groups.
+
+**A sheet that is not set up yet is not a failure.** Without the key the
+request answers `{"ok": true, "skipped": true}` and the nightly run carries
+on. A sheet that is set up but broken answers HTTP 500, so the scheduler
+retries it.
 
 A Composio connection to a personal Google account was considered and not
 chosen for this: an unattended nightly pull should not depend on a personal
 connector staying connected.
 
-Related: [[finance-calendar-month]], [[petpooja-hosted-sync]]
+Related: [[finance-calendar-month]], [[finance-salary-and-standing-costs]],
+[[petpooja-hosted-sync]]
