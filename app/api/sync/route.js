@@ -20,7 +20,7 @@ import { NextResponse } from 'next/server';
 // is loaded, so this import comes before it on purpose: loading it sets the
 // folder, and the browser package then records the same one for the browser's
 // shared libraries and fonts.
-import { useBrowserTempDir } from '../../../lib/browserTempDir.js';
+import { useBrowserTempDir, writeFontConfig } from '../../../lib/browserTempDir.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import chromium from '@sparticuz/chromium';
@@ -163,6 +163,11 @@ async function handle(req) {
     // also skips unpacking it.
     chromium.setGraphicsMode = false;
     const browserBinary = await chromium.executablePath();
+
+    // The fonts have just been unpacked, so the font configuration is written
+    // now — the one that came with them points at `/tmp/fonts`, which is not
+    // where they are, and a browser with no fonts stops dead.
+    writeFontConfig();
 
     // Chromium writes a core dump when it dies, and on this host that dump is
     // about 900MB on a 512MB disk. One crash fills the disk, and then every
