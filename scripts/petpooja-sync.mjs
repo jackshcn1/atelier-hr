@@ -2699,12 +2699,18 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
             });
 
             // Sync each debit note to expenses table.
+            //
+            // A debit note is a credit against the supplier, not a cost of
+            // its own: the amount is zero and the whole value sits in
+            // `debit_note`, so every total reads `amount - debit_note` and
+            // a return reduces the cost of purchases instead of being
+            // counted as one.
             const returnPayloads = returnsResult.returns.map((ret) => ({
               category: 'Vendor',
               cost_type: 'variable',
               entry_type: 'actual',
               status: 'approved',
-              amount: ret.total_amount, // Store as positive, debit_note field handles reduction
+              amount: 0,
               debit_note: ret.total_amount,
               vendor_name: ret.vendor_name,
               invoice_number: ret.return_number,

@@ -337,6 +337,12 @@ export default function FinanceDashboard() {
               <p className="text-sm text-[#6b635c]">
                 {data.payables.totals.billCount} unpaid bill(s) from the {period.label} bills.
               </p>
+              {data.payables.totals.credit > 0 && (
+                <p className="text-sm text-[#6b635c] mt-1">
+                  ₹{data.payables.totals.credit.toLocaleString('en-IN')} of goods were returned in credit notes —
+                  a credit to claim, which is why the purchases cost less than the bills.
+                </p>
+              )}
               <Link href="/finance/bills" className="inline-block mt-4 text-xs text-[#8b6f4e] hover:underline">
                 See the full list of bills →
               </Link>

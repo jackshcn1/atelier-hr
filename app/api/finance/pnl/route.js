@@ -54,12 +54,6 @@ export async function GET(req) {
     // so in plain words.
     const position = await monthPosition(supabase, period);
 
-    const { count: variableBillCount } = await supabase
-      .from('expenses')
-      .select('id', { count: 'exact', head: true })
-      .gte('invoice_date', period.start)
-      .lte('invoice_date', period.end);
-
     const { count: fixedCostCount } = await supabase
       .from('fixed_costs')
       .select('id', { count: 'exact', head: true });
@@ -73,7 +67,9 @@ export async function GET(req) {
     const readiness = monthReadiness({
       revenueSynced: !!revenueRow,
       revenueAsOf: revenueRow?.window_end || null,
-      variableBillCount: variableBillCount || 0,
+      // The bills on record for the month — paid or not, and not counting
+      // the credit notes, which are a credit back rather than a bill.
+      variableBillCount: position.payables.totals.billCountTotal,
       fixedCostCount: fixedCostCount || 0,
       pettyEntryCount: pettyEntryCount || 0,
       receivableCount: position.receivables.totals.invoiceCount,
