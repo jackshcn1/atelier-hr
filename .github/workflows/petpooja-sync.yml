@@ -1,6 +1,22 @@
 name: Petpooja Variable Pay Automated Sync
 
-# Runs unattended so the office computer no longer has to stay on.
+# PAUSED — 17 Nov 2026.
+#
+# The schedule is switched off. Nothing runs on its own any more, so no
+# number is pulled from Petpooja into the payroll or the dashboards without
+# a person asking for it.
+#
+# To start it again, put the schedule back:
+#
+#   on:
+#     schedule:
+#       - cron: '30 23 * * *'      # 05:00 IST
+#     workflow_dispatch:
+#       ...
+#
+# The manual trigger (the Actions tab → "Run workflow") still works, and it
+# still runs exactly what it ran before. Use it when a specific report is
+# wanted, and check the result before it is trusted.
 #
 # The browser work happens on Vercel, not here: Petpooja's edge blocks
 # datacenter IP ranges with a raw nginx 403, and a GitHub Actions runner
@@ -11,13 +27,7 @@ name: Petpooja Variable Pay Automated Sync
 # run is longer than a serverless function is allowed to run, and two reports per
 # group could still overrun the 300 s ceiling on a slow Petpooja day. The groups
 # are called one after the other so they never race on the same metric rows.
-#
-# Schedule is UTC (GitHub cron is always UTC):
-#   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * *'
 on:
-  schedule:
-    - cron: '30 23 * * *'
-
   # Manual trigger from the Actions tab, with optional period override for backfills.
   workflow_dispatch:
     inputs:
