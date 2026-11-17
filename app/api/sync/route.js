@@ -16,14 +16,14 @@
  *   POST with  x-sync-secret: <SYNC_SECRET>           (GitHub Actions / manual)
  */
 import { NextResponse } from 'next/server';
-import { mkdirSync } from 'node:fs';
+// The browser's temporary folder has to be decided BEFORE the browser package
+// is loaded, so this import comes before it on purpose: loading it sets the
+// folder, and the browser package then records the same one for the browser's
+// shared libraries and fonts.
+import { useBrowserTempDir } from '../../../lib/browserTempDir.js';
 import chromium from '@sparticuz/chromium';
 import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
 import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.mjs';
-
-// One folder for everything the browser writes: its profile, its cache, the
-// files it downloads, and the browser itself.
-const RUN_TMP_DIR = '/tmp/atelier-petpooja';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -116,12 +116,11 @@ async function handle(req) {
     // copy happened on the next request and stayed there. Two copies of the
     // browser is ~300MB of a 512MB disk, and a full disk is what killed the
     // browser in the middle of a report.
-    try {
-      mkdirSync(RUN_TMP_DIR, { recursive: true });
-      process.env.TMPDIR = RUN_TMP_DIR;
-    } catch {
-      // No permission — the system folder will have to do.
-    }
+    //
+    // The folder also has to be the one the browser package recorded when it
+    // was loaded, because that is where the browser will look for its shared
+    // libraries (`libnspr4.so` and friends).
+    useBrowserTempDir();
 
     // The software graphics stack (SwiftShader) is not needed to fill in a
     // login form or read a report, and on a single serverless CPU it is
