@@ -24,6 +24,7 @@ import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
 import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
 import { monthKeyOf, previousMonthKey, petpoojaMonthWindow } from '../lib/financePeriod.js';
+import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -366,9 +367,8 @@ function memorySnapshot() {
 //
 // So the browser writes into a folder of our own, and that folder is emptied
 // when the browser closes.
-const RUN_TMP_DIR = '/tmp/atelier-petpooja';
+const RUN_TMP_DIR = BROWSER_TMP_DIR;
 
-// Point the browser's temporary files at our own folder.
 // Point the browser's temporary files at our own folder.
 //
 // The serverless route sets this BEFORE the browser is unpacked, so there is
