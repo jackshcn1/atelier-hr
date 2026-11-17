@@ -7,6 +7,7 @@ import { normalizePaymentStatus } from '../../../lib/expenseHelpers.js';
 const FILTERS = [
   { value: 'unpaid', label: 'Not paid yet' },
   { value: 'paid', label: 'Paid' },
+  { value: 'credit', label: 'Credit notes' },
   { value: 'all', label: 'All bills' },
 ];
 
@@ -59,12 +60,34 @@ export default function BillsPage() {
   };
 
   // The bills, grouped by supplier.
+  //
+  // A credit note — goods sent back to a supplier — is not something you
+  // owe. It is money coming back, so it is kept apart from the payable
+  // instead of quietly netting it away.
   const grouped = new Map();
   for (const bill of bills) {
     const name = (bill.vendor_name || '').trim() || 'Unknown vendor';
-    const line = grouped.get(name) || { vendor: name, unpaid: 0, paid: 0, billCount: 0, unpaidCount: 0, oldestDate: null, rows: [] };
-    const amount = Number(bill.amount || 0) - Number(bill.debit_note || 0);
+    const amount = Number(bill.amount || 0);
+    const credit = Number(bill.debit_note || 0);
     const isPaid = normalizePaymentStatus(bill.payment_status) === 'paid';
+
+    const line = grouped.get(name) || {
+      vendor: name,
+      unpaid: 0,
+      paid: 0,
+      credit: 0,
+      billCount: 0,
+      unpaidCount: 0,
+      oldestDate: null,
+      rows: [],
+    };
+
+    if (credit > 0) {
+      line.credit += credit;
+      line.rows.push(bill);
+      grouped.set(name, line);
+      continue;
+    }
 
     line.billCount += 1;
     line.rows.push(bill);
@@ -83,13 +106,15 @@ export default function BillsPage() {
   const vendors = [...grouped.values()].sort((a, b) => b.unpaid - a.unpaid);
 
   const visible = vendors.filter((line) => {
-    if (filter === 'unpaid') return line.unpaidCount > 0;
+    if (filter === 'unpaid') return line.unpaidCount > 0 || line.credit > 0;
     if (filter === 'paid') return line.paid > 0;
+    if (filter === 'credit') return line.credit > 0;
     return true;
   });
 
   const grandUnpaid = vendors.reduce((sum, line) => sum + line.unpaid, 0);
   const grandPaid = vendors.reduce((sum, line) => sum + line.paid, 0);
+  const grandCredit = vendors.reduce((sum, line) => sum + line.credit, 0);
   const unpaidCount = vendors.reduce((sum, line) => sum + line.unpaidCount, 0);
 
   return (
@@ -120,6 +145,11 @@ export default function BillsPage() {
             <p className="text-[#8b6f4e] text-sm font-medium mb-2 uppercase tracking-wide">Already paid</p>
             <p className="text-[#1e1812] text-3xl font-medium">₹{grandPaid.toLocaleString('en-IN')}</p>
             <p className="text-xs text-[#6b635c] mt-1">Marked settled</p>
+          </div>
+          <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
+            <p className="text-[#8b6f4e] text-sm font-medium mb-2 uppercase tracking-wide">Credit notes</p>
+            <p className="text-[#1e1812] text-3xl font-medium">₹{grandCredit.toLocaleString('en-IN')}</p>
+            <p className="text-xs text-[#6b635c] mt-1">Goods returned — a credit to claim</p>
           </div>
           <div className="panel bg-white border border-[#ebe8e4] rounded-card shadow-sm p-6">
             <p className="text-[#8b6f4e] text-sm font-medium mb-2 uppercase tracking-wide">Suppliers owed</p>
@@ -203,14 +233,19 @@ export default function BillsPage() {
                       <tbody>
                         {line.rows
                           .filter((bill) => {
+                            const isCredit = Number(bill.debit_note || 0) > 0;
                             const isPaid = normalizePaymentStatus(bill.payment_status) === 'paid';
-                            if (filter === 'unpaid') return !isPaid;
-                            if (filter === 'paid') return isPaid;
+                            if (filter === 'unpaid') return isCredit || !isPaid;
+                            if (filter === 'paid') return !isCredit && isPaid;
+                            if (filter === 'credit') return isCredit;
                             return true;
                           })
                           .map((bill) => {
+                            const isCredit = Number(bill.debit_note || 0) > 0;
                             const isPaid = normalizePaymentStatus(bill.payment_status) === 'paid';
-                            const amount = Number(bill.amount || 0) - Number(bill.debit_note || 0);
+                            const amount = isCredit
+                              ? -Number(bill.debit_note || 0)
+                              : Number(bill.amount || 0);
                             return (
                               <tr key={bill.id} className="border-t border-[#f0ede9]">
                                 <td className="table-cell">
@@ -220,22 +255,30 @@ export default function BillsPage() {
                                   )}
                                 </td>
                                 <td className="table-cell text-[#6b635c]">{bill.invoice_date || '—'}</td>
-                                <td className="table-cell text-right font-medium">₹{amount.toLocaleString('en-IN')}</td>
+                                <td className={`table-cell text-right font-medium ${isCredit ? 'text-emerald-700' : ''}`}>
+                                  {isCredit ? '−' : ''}₹{Math.abs(amount).toLocaleString('en-IN')}
+                                </td>
                                 <td className="table-cell text-right">
-                                  <span className={`pill ${isPaid ? 'pill-good' : 'pill-warn'}`}>
-                                    {isPaid ? 'Paid' : 'Not paid'}
-                                  </span>
+                                  {isCredit ? (
+                                    <span className="pill pill-good">Credit note</span>
+                                  ) : (
+                                    <span className={`pill ${isPaid ? 'pill-good' : 'pill-warn'}`}>
+                                      {isPaid ? 'Paid' : 'Not paid'}
+                                    </span>
+                                  )}
                                   {bill.payment_date && (
                                     <span className="block text-xs text-[#6b635c] mt-1">{bill.payment_date}</span>
                                   )}
                                 </td>
                                 <td className="table-cell text-right">
-                                  <button
-                                    onClick={() => setPaid(bill, !isPaid)}
-                                    className="text-[#8b6f4e] hover:underline text-xs"
-                                  >
-                                    {isPaid ? 'Mark unpaid' : 'Mark paid'}
-                                  </button>
+                                  {!isCredit && (
+                                    <button
+                                      onClick={() => setPaid(bill, !isPaid)}
+                                      className="text-[#8b6f4e] hover:underline text-xs"
+                                    >
+                                      {isPaid ? 'Mark unpaid' : 'Mark paid'}
+                                    </button>
+                                  )}
                                 </td>
                               </tr>
                             );

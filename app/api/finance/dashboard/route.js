@@ -54,26 +54,22 @@ export async function GET(req) {
     // which parts are still empty.
     // The count comes back in `count`, not in `data` — a head query returns
     // no rows at all, only the number of rows there are.
-    const { count: billCount } = await supabase
-      .from('expenses')
-      .select('id', { count: 'exact', head: true })
-      .gte('invoice_date', period.start)
-      .lte('invoice_date', period.end);
-
-    const { count: fixedCostCount } = await supabase
-      .from('fixed_costs')
-      .select('id', { count: 'exact', head: true });
-
     const { count: pettyEntryCount } = await supabase
       .from('petty_cash_ledger')
       .select('id', { count: 'exact', head: true })
       .gte('date', period.start)
       .lte('date', period.end);
 
+    const { count: fixedCostCount } = await supabase
+      .from('fixed_costs')
+      .select('id', { count: 'exact', head: true });
+
     const readiness = monthReadiness({
       revenueSynced: !!revenueRow,
       revenueAsOf: revenueRow?.window_end || null,
-      variableBillCount: billCount || 0,
+      // The bills on record for the month — paid or not, and not counting
+      // the credit notes, which are a credit back rather than a bill.
+      variableBillCount: position.payables.totals.billCountTotal,
       fixedCostCount: fixedCostCount || 0,
       pettyEntryCount: pettyEntryCount || 0,
       receivableCount: position.receivables.totals.invoiceCount,

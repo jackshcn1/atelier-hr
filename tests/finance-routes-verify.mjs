@@ -98,8 +98,19 @@ check('the dashboard counts the bills it says are on record', () => {
   if (!billsRow) throw new Error('no bills row in the readiness list');
   if (billsRow.state !== 'ok') throw new Error(`bills reported as "${billsRow.state}": ${billsRow.detail}`);
   const count = Number(billsRow.detail.replace(/[^0-9]/g, ''));
-  if (count !== dash.body.data.payables.totals.billCount) {
-    throw new Error(`readiness says ${count} bills, the dashboard says ${dash.body.data.payables.totals.billCount}`);
+  if (count !== dash.body.data.payables.totals.billCountTotal) {
+    throw new Error(`readiness says ${count} bills, the dashboard says ${dash.body.data.payables.totals.billCountTotal}`);
+  }
+});
+
+check('a credit note is a credit back, not a bill to pay', () => {
+  const t = dash.body.data.payables.totals;
+  if (t.credit > 0 && t.billCountTotal !== t.billCount && t.unpaid === t.credit) {
+    throw new Error('the payable is the credit instead of the bills');
+  }
+  // What you owe is the invoices; the credit notes are money coming back.
+  if (t.credit > 0 && t.unpaid < t.credit) {
+    throw new Error('the payable is less than the credit notes alone');
   }
 });
 

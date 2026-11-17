@@ -89,18 +89,28 @@ function billsByVendor(rows) {
 
   for (const row of rows) {
     const name = (row.vendor_name || '').trim() || 'Unknown vendor';
-    const amount = Number(row.amount || 0) - Number(row.debit_note || 0);
+    const amount = Number(row.amount || 0);
+    const credit = Number(row.debit_note || 0);
     const paid = normalizePaymentStatus(row.payment_status) === PAID;
 
     const line = map.get(name) || {
       vendor: name,
       unpaid: 0,
       paid: 0,
+      credit: 0,
       billCount: 0,
       unpaidCount: 0,
       oldestDays: 0,
       oldestDate: null,
     };
+
+    // A credit note is not a bill — it is goods sent back to the supplier.
+    // It is money coming back, so it is kept apart from what is owed.
+    if (credit > 0) {
+      line.credit += credit;
+      map.set(name, line);
+      continue;
+    }
 
     line.billCount += 1;
     if (paid) {
@@ -126,28 +136,49 @@ function billsByVendor(rows) {
       ...line,
       unpaid: Math.round(line.unpaid * 100) / 100,
       paid: Math.round(line.paid * 100) / 100,
+      credit: Math.round(line.credit * 100) / 100,
     }))
     .sort((a, b) => b.unpaid - a.unpaid);
 }
 
 // The totals the bills page shows across every supplier.
 function billTotals(rows) {
-  const unpaidRows = rows.filter((row) => normalizePaymentStatus(row.payment_status) !== PAID);
-  const unpaid = unpaidRows.reduce(
-    (sum, row) => sum + Number(row.amount || 0) - Number(row.debit_note || 0),
-    0
+  let unpaid = 0;
+  let paid = 0;
+  let credit = 0;
+  let unpaidCount = 0;
+  let billCount = 0;
+
+  for (const row of rows) {
+    const note = Number(row.debit_note || 0);
+    const amount = Number(row.amount || 0);
+
+    if (note > 0) {
+      credit += note;
+      continue;
+    }
+
+    billCount += 1;
+    if (normalizePaymentStatus(row.payment_status) === PAID) {
+      paid += amount;
+    } else {
+      unpaid += amount;
+      unpaidCount += 1;
+    }
+  }
+
+  const vendors = new Set(
+    rows.filter((row) => Number(row.debit_note || 0) <= 0).map((row) => (row.vendor_name || '').trim() || 'Unknown vendor')
   );
-  const paid = rows
-    .filter((row) => normalizePaymentStatus(row.payment_status) === PAID)
-    .reduce((sum, row) => sum + Number(row.amount || 0) - Number(row.debit_note || 0), 0);
 
   return {
     unpaid: Math.round(unpaid * 100) / 100,
     paid: Math.round(paid * 100) / 100,
+    credit: Math.round(credit * 100) / 100,
     total: Math.round((unpaid + paid) * 100) / 100,
-    billCount: rows.length,
-    unpaidCount: unpaidRows.length,
-    vendorCount: new Set(unpaidRows.map((row) => (row.vendor_name || '').trim() || 'Unknown vendor')).size,
+    billCount,
+    unpaidCount,
+    vendorCount: vendors.size,
   };
 }
 
