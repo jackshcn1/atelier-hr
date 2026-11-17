@@ -370,11 +370,19 @@ second request hijack the first one's capture.
 
 ## Still local-only
 
-- The Google service-account key (`GOOGLE_PRIVATE_KEY_PATH`) points at a Windows
-  path and is not on this machine, so the **Customer Feedback (Google Sheets) sync
-  is inactive** in the hosted run. The engine skips it gracefully. The owner
-  decided on 16 Nov to leave it off for now — it is a deliberate gap, not an
-  oversight, and it can be switched on by putting the key on the host.
+- The Google service-account key is not on the server, so two things are
+  inactive in the hosted run:
+  - the **Customer Feedback (Google Sheets) sync** — the engine skips it
+    gracefully. The owner decided on 16 Nov to leave it off for now; it is a
+    deliberate gap, not an oversight;
+  - the **accountant's invoice sheet** — `?sheet=1` answers "skipped" and the
+    nightly run carries on.
+
+  Both need the same thing: a Google service account, its key on Vercel
+  (`GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`), and the sheet
+  shared with the service account as Viewer. The helper now takes the key as
+  PEM **content**, which is what Vercel can hold.
+
 - SMTP is not configured, so failure email alerts are skipped. GitHub's own
   workflow-failure notification still fires. The owner asked for email alerts to
   be switched on; it needs `SMTP_USER` / `SMTP_PASS` (a Google app password)
@@ -442,6 +450,50 @@ write the same bill twice.
 **The supplier list is rebuilt from the bills** on every run
 (`syncVendorList()`), so a new supplier appears the morning after its first
 bill. The bills are the truth about who the restaurant buys from.
+
+## The invoice sheet is its own step (17 Nov 2026)
+
+The accountant's Google Sheet is **not** a Petpooja report, so it needs no
+browser and no login — it is one API call, about a second.
+
+`POST /api/sync?sheet=1` pulls it and stops there. The workflow calls it once,
+after the report groups. It is a separate request on purpose: it keeps the
+sheet clear of the browser work and clear of the 300 s ceiling, and it cannot
+disturb the Petpooja groups.
+
+- **A sheet that is not set up yet is not a failure.** The request answers
+  `{"ok": true, "skipped": true}` and the nightly run carries on.
+- **A sheet that is set up but broken answers HTTP 500**, so the scheduler
+  retries it.
+
+See [[finance-invoice-sheet]] for the columns and the rules that stop a rupee
+being counted twice.
+
+## A preview build must not need a secret (17 Nov 2026)
+
+Every preview build failed with `supabaseKey is required`, and the failing
+route was always the first one Next happened to load. The preview environment
+has no service-role key, and the eight finance routes made their client at
+**module scope** — `createClient` throws the moment it is loaded without a
+key, and Next loads every route while it builds.
+
+The consequence was worse than a red tick: **the Vercel check on every pull
+request had been red since PR #23 whatever the change was**, so a real break
+in a route could not be told apart from the missing key. A check that is
+always red carries no information.
+
+The client is now made on first use (`lib/supabaseServer.js`) and inside each
+route's try block, so a missing key answers with a clear message instead of an
+unhandled throw. Production has the key, so nothing changes there. A preview
+without one now **builds**, and its finance routes fail only when they are
+actually called.
+
+**How to apply:** do not put the service-role key into the Preview environment
+to make a preview build pass — that would hand the key to every preview
+deployment of the project, including one made from a fork. Make the code
+tolerate the missing key instead. **Never add the service-role key to the
+generic Preview environment.** It is set for Production and Development only,
+plus one branch-scoped preview.
 
 ## Useful limits (measured, not guessed)
 
