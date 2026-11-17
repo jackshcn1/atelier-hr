@@ -80,6 +80,24 @@ console.log = tee(console.log);
 console.warn = tee(console.warn);
 console.error = tee(console.error);
 
+// Chromium's own output goes straight to stderr — it does not use the
+// console — so it is captured here as well. When the browser dies, that
+// output is the only thing that says why: the signal, the failed check, the
+// missing file.
+const originalStderrWrite = process.stderr.write.bind(process.stderr);
+process.stderr.write = (chunk, ...rest) => {
+  const text = typeof chunk === 'string' ? chunk : String(chunk);
+  const target = capture.logs;
+  if (target) {
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      target.push(line);
+    }
+    if (target.length > 1000) target.splice(0, target.length - 1000);
+  }
+  return originalStderrWrite(chunk, ...rest);
+};
+
 async function handle(req) {
   const started = Date.now();
 
@@ -122,7 +140,22 @@ async function handle(req) {
     // The folder also has to be the one the browser package recorded when it
     // was loaded, because that is where the browser will look for its shared
     // libraries (`libnspr4.so` and friends).
-    useBrowserTempDir();
+    //
+    // `?tmp=legacy` leaves the browser in the system's own folder instead.
+    // That is the arrangement that worked before, so it is the yardstick the
+    // new one is measured against.
+    const legacyTmp = new URL(req.url).searchParams.get('tmp') === 'legacy';
+    if (legacyTmp) {
+      // The arrangement that worked before the browser was given a folder of
+      // its own: the browser, its libraries and its fonts all in /tmp.
+      process.env.TMPDIR = '/tmp';
+      process.env.HOME = '/tmp';
+      process.env.FONTCONFIG_PATH = '/tmp/fonts';
+      process.env.LD_LIBRARY_PATH = '/tmp/al2023/lib';
+      push('🧪 Legacy temporary folder — the browser stays in /tmp.');
+    } else {
+      useBrowserTempDir();
+    }
 
     // The software graphics stack (SwiftShader) is not needed to fill in a
     // login form or read a report, and on a single serverless CPU it is
