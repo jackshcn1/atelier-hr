@@ -1,10 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../../../../lib/supabaseServer.js';
 import { normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // The supplier list.
 //
@@ -17,6 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // the newest one.
 export async function GET(request) {
   try {
+    const supabase = getSupabase();
     const params = new URL(request.url).searchParams;
     const search = (params.get('search') || '').trim().toLowerCase();
 
@@ -100,6 +96,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const name = String(body.name || '').trim();
     if (!name) {
@@ -129,6 +126,7 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const id = body.id;
     if (!id) throw new Error('ID is required');
@@ -160,6 +158,7 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
   try {
+    const supabase = getSupabase();
     const params = new URL(request.url).searchParams;
     const id = params.get('id');
     if (!id) throw new Error('ID is required');

@@ -1,12 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../../../../lib/supabaseServer.js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
 import { monthCosts } from '../../../../lib/financeCosts.js';
 import { monthPosition, monthReadiness } from '../../../../lib/financePosition.js';
 import { cycleEndingIn, salaryForCycle } from '../../../../lib/financeSalary.js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // How many days a span covers, counting both ends.
 function daysBetween(start, end) {
@@ -33,6 +29,7 @@ function daysBetween(start, end) {
 // days that have happened, and say so.
 export async function GET(req) {
   try {
+    const supabase = getSupabase();
     const params = new URL(req.url).searchParams;
     const period = financePeriod(params.get('month'));
 

@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../../../../lib/supabaseServer.js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
 import { monthCosts } from '../../../../lib/financeCosts.js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // The standing costs — the checklist of what the restaurant expects to pay
 // every month: rent, pest control, the broadband.
@@ -17,6 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // GET with a month answers "which of these have their invoice in yet".
 export async function GET(request) {
   try {
+    const supabase = getSupabase();
     const params = new URL(request.url).searchParams;
     const period = financePeriod(params.get('month'));
 
@@ -44,6 +40,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const name = String(body.name || '').trim();
     if (!name) {
@@ -71,6 +68,7 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
     const { id } = body;
     if (!id) throw new Error('ID is required');
@@ -99,6 +97,7 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
   try {
+    const supabase = getSupabase();
     const params = new URL(request.url).searchParams;
     const id = params.get('id');
     if (!id) throw new Error('ID is required');

@@ -1,10 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '../../../../../lib/supabaseServer.js';
 import { cleanExpensePatch } from '../../../../../lib/expenseHelpers.js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // One bill.
 //
@@ -13,6 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // 404 — the bill was never marked.
 export async function GET(request, { params }) {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
@@ -30,6 +26,7 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
 
     // Only the fields the request mentions are changed.
@@ -58,6 +55,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
+    const supabase = getSupabase();
     const { error } = await supabase.from('expenses').delete().eq('id', params.id);
     if (error) throw error;
     return Response.json({ success: true });

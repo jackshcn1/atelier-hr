@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { getSupabase } from '../../../../lib/supabaseServer.js';
 
 // The petty cash ledger — the cash float.
 //
@@ -31,6 +26,7 @@ const WRITABLE = [
 
 export async function GET() {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('petty_cash_ledger')
       .select('*')
@@ -51,6 +47,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const supabase = getSupabase();
     const body = await request.json();
 
     const row = {};
