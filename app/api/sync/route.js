@@ -211,6 +211,18 @@ async function handle(req) {
       push('🔎 Browser debug output is on.');
     }
 
+    // ?finance=1 runs the finance side only.
+    //
+    // The variable-pay metrics are paused, so a finance run writes nothing to
+    // them: only the revenue split, the vendor bills and the money owed by
+    // customers. The pay periods are left alone too — closing a cycle is a
+    // payroll decision, and it is not one this run is allowed to make.
+    const financeOnly = params.get('finance') === '1';
+    if (financeOnly) {
+      process.env.SYNC_FINANCE_ONLY = '1';
+      push('💼 Finance-only run — the variable-pay figures are left alone.');
+    }
+
     // Chromium flags.
     //
     // The @sparticuz/chromium default is `--single-process` + `--no-zygote`:
@@ -329,16 +341,24 @@ async function handle(req) {
     // A pay cycle that has ended must be locked with its figures frozen.
     // The office-computer runner did this after every sync; the hosted run
     // has to do it too, or the closed cycles would never get a snapshot.
+    //
+    // A finance-only run does not do it: closing a cycle freezes the
+    // variable-pay figures, and the variable pay side is paused — that
+    // decision belongs to a person.
     let closed = null;
-    try {
-      closed = await closeFinishedCycles({ generatedBy: 'hosted-sync' });
-      if (closed?.closed > 0) {
-        push(`🔒 Closed ${closed.closed} finished pay cycle(s).`);
+    if (financeOnly) {
+      push('⏸️ The pay cycles are left alone — closing one is a payroll decision.');
+    } else {
+      try {
+        closed = await closeFinishedCycles({ generatedBy: 'hosted-sync' });
+        if (closed?.closed > 0) {
+          push(`🔒 Closed ${closed.closed} finished pay cycle(s).`);
+        }
+      } catch (closeErr) {
+        // The figures synced fine — a cycle that could not be closed can be
+        // closed by hand from the attainment dashboard.
+        console.error(`⚠️ Could not close finished pay cycles: ${closeErr.message}`);
       }
-    } catch (closeErr) {
-      // The figures synced fine — a cycle that could not be closed can be
-      // closed by hand from the attainment dashboard.
-      console.error(`⚠️ Could not close finished pay cycles: ${closeErr.message}`);
     }
 
     // A group that fetched nothing must not look like a success. The

@@ -21,9 +21,15 @@ export default function CostsExpensesPage() {
               Manage operational costs, vendor bills, and budget tracking
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <Link href="/finance/costs/entry" className="btn-primary text-sm px-4 py-2">
-              + New Variable Cost
+              + Log a Bill
+            </Link>
+            <Link href="/finance/bills" className="btn-secondary text-sm px-4 py-2">
+              Bills
+            </Link>
+            <Link href="/finance/vendors" className="btn-secondary text-sm px-4 py-2">
+              Suppliers
             </Link>
             <Link href="/finance/costs/fixed" className="btn-secondary text-sm px-4 py-2">
               Fixed Costs

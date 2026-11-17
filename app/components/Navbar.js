@@ -239,7 +239,7 @@ export default function Navbar() {
     },
     finance: {
       admin: [
-        { label: 'Finance', links: [{ href: '/finance', label: 'Overview' }, { href: '/finance/costs', label: 'Costs & Expenses' }, { href: '/finance/cashflow', label: 'Cashflow' }, { href: '/finance/pnl', label: 'P&L Statement' }] },
+        { label: 'Finance', links: [{ href: '/finance', label: 'Overview' }, { href: '/finance/costs', label: 'Costs & Expenses' }, { href: '/finance/bills', label: 'Bills' }, { href: '/finance/vendors', label: 'Suppliers' }, { href: '/finance/cashflow', label: 'Cashflow' }, { href: '/finance/pnl', label: 'P&L Statement' }] },
       ],
       employee: [
         { label: 'Finance', links: [{ href: '/finance', label: 'Overview' }] },

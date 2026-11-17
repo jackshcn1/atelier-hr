@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
 import { monthCosts } from '../../../../lib/financeCosts.js';
+import { monthPosition, monthReadiness } from '../../../../lib/financePosition.js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -45,6 +46,38 @@ export async function GET(req) {
     const costs = await monthCosts(supabase, period);
     const netProfitOrLoss = revenue.total - costs.total;
 
+    // The balance-sheet side: what customers owe, what suppliers are owed.
+    const position = await monthPosition(supabase, period);
+
+    // How much of the month's picture is actually filled in. A profit shown
+    // without its fixed costs is not a real profit, so the pages are told
+    // which parts are still empty.
+    const { data: readinessCounts } = await supabase
+      .from('expenses')
+      .select('id, cost_type', { count: 'exact', head: true })
+      .gte('invoice_date', period.start)
+      .lte('invoice_date', period.end);
+
+    const { count: fixedCostCount } = await supabase
+      .from('fixed_costs')
+      .select('id', { count: 'exact', head: true });
+
+    const { count: pettyEntryCount } = await supabase
+      .from('petty_cash_ledger')
+      .select('id', { count: 'exact', head: true })
+      .gte('date', period.start)
+      .lte('date', period.end);
+
+    const readiness = monthReadiness({
+      revenueSynced: !!revenueRow,
+      revenueAsOf: revenueRow?.window_end || null,
+      variableBillCount: readinessCounts || 0,
+      fixedCostCount: fixedCostCount || 0,
+      pettyEntryCount: pettyEntryCount || 0,
+      receivableCount: position.receivables.totals.invoiceCount,
+      unpaidBillCount: position.payables.totals.billCount,
+    });
+
     // The months that have figures, so the dashboard can offer the ones worth
     // looking at.
     const { data: availableMonths } = await supabase
@@ -70,6 +103,12 @@ export async function GET(req) {
         revenue,
         costs,
         net_pl: netProfitOrLoss,
+        ...position,
+        readiness,
+        // The parts of the month that are not filled in yet.
+        missing: readiness
+          .filter((item) => item.state === 'empty' && item.missing)
+          .map((item) => ({ key: item.key, label: item.label, message: item.missing })),
         availableMonths: availableMonths || [],
       }
     });
