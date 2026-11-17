@@ -134,3 +134,65 @@ today, so the profit shown is revenue minus the Petpooja vendor bills alone —
 which is why the margin looks high. The dashboard says so on the page. This is
 not a bug in the reporting; it is the cost of not having entered the standing
 costs yet.
+
+## The pages that exist now (17 Nov 2026)
+
+| Page | What it answers |
+|---|---|
+| `/finance` | the four finance modules |
+| `/finance/costs` | revenue channels and the cost breakdown for the month |
+| `/finance/costs/entry` | log a bill by hand |
+| `/finance/bills` | what the restaurant owes its suppliers, bill by bill, grouped by supplier |
+| `/finance/vendors` | the supplier list, with what is owed to each |
+| `/finance/costs/fixed` | the standing monthly costs |
+| `/finance/costs/petty` | the petty cash ledger |
+| `/finance/cashflow` | the month's cash movements **and** the money owed by customers |
+| `/finance/pnl` | the statement |
+
+**Bills** and **Suppliers** are the mirror image of the receivables: the bills
+page is money owed *to* suppliers, the cashflow page is money owed *by*
+customers.
+
+## The bill data speaks one language
+
+`lib/expenseHelpers.js` is the single place that knows what an expense row
+is. It exists because the manual entry form was broken in three ways at once
+and nothing caught it:
+
+- it sent `vendor_id`, a column the table has never had → `PGRST204`;
+- it never sent `cost_type`, which the table requires → `23502`;
+- it sent `""` where a date belongs → `22007`.
+
+The form also called `/api/finance/expenses/[id]`, which did not exist, so
+every Approve and Reject click was a 404. There is a route for one bill now.
+
+Two spellings were normalised in the data (migration
+`20261117150000_normalise_expense_vendor_and_payment_status.sql`):
+
+- the supplier name — Petpooja writes it with a `[Supplier]` tag, sometimes
+  missing, so the same supplier was two suppliers;
+- the payment state — `Paid`, `Unpaid` and `due` were three spellings of two
+  states, so a filter on it missed most of the bills.
+
+**The supplier list is built from the bills** (`syncVendorList()` in the sync
+engine), so a new supplier appears the morning after its first bill. The
+bills are the truth about who the restaurant buys from.
+
+**A bill is identified by (supplier, invoice number), compared without regard
+to capitalisation**, and the existing bills are fetched by invoice number in
+batches of 150. Looking them up by supplier name was wrong: the name is
+written by a third party and can change its capitalisation or its tag between
+one day and the next, and a bill would then be written twice.
+
+## The dashboards say what is missing
+
+`lib/financePosition.js` returns, for a month, the money owed by customers,
+the money owed to suppliers, and a **readiness** list — each part of the
+picture marked `ok`, `empty` or `pending`. The dashboard and the P&L both
+show it.
+
+This matters because a profit shown without its fixed costs is not a real
+profit, and the page used to show a confident large number with no warning
+that half the costs were simply not in the books yet.
+
+Related: [[petpooja-hosted-sync]], [[database-access-and-migration-state]]
