@@ -47,9 +47,13 @@ export async function GET(request) {
     const receivables = receivableRows || [];
 
     // One line per customer, biggest first.
+    //
+    // An invoice with no customer name on it still has an invoice number,
+    // and that is what identifies it — so it is filed under its own number
+    // rather than lumped in with every other unnamed invoice.
     const byCustomer = new Map();
     for (const row of receivables) {
-      const name = row.customer_name || 'Unnamed customer';
+      const name = row.customer_name || `Invoice ${row.invoice_no || '—'}`;
       const line = byCustomer.get(name) || {
         customer: name,
         amount: 0,
