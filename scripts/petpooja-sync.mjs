@@ -401,6 +401,15 @@ function tempFolders() {
   return ['/tmp', RUN_TMP_DIR];
 }
 
+// Is this a core dump the browser left behind?
+//
+// A browser that dies writes a core dump the size of its own memory — about
+// 900MB on this host — and the disk is 512MB. One crash is enough to fill it,
+// and then every browser after it fails for the wrong reason.
+function isCoreDump(name) {
+  return name.startsWith('core.chromium') || name.startsWith('core.headless');
+}
+
 // Remove what the browser left behind.
 //
 // The disk on the serverless host is small, and every browser leaves a
@@ -410,6 +419,16 @@ function clearRunTemp(force = false) {
   for (const folder of tempFolders()) {
     try {
       for (const name of readdirSync(folder)) {
+        // Core dumps are always safe to remove: they are only written by a
+        // browser that has already died.
+        if (isCoreDump(name)) {
+          try {
+            rmSync(join(folder, name), { recursive: true, force: true });
+          } catch {
+            // Already gone.
+          }
+          continue;
+        }
         if (!name.startsWith('playwright')) continue;
         const path = join(folder, name);
         try {
@@ -880,6 +899,15 @@ export async function runPetpoojaSync(options = {}) {
     // browser behave in ways that look like nothing to do with the disk.
     const cleared = cleanStaleProfiles();
     if (cleared > 0) console.log(`  🧹 Cleared ${cleared} leftover browser profile(s) from /tmp.`);
+
+    // Chromium's own words about why it died. Playwright prints what the
+    // browser says when this is on, and the browser says what killed it — a
+    // signal, a failed check, a missing library. That is the difference
+    // between a crash and an out-of-memory kill.
+    if (process.env.PETPOOJA_BROWSER_DEBUG) {
+      process.env.DEBUG = process.env.DEBUG || 'pw:browser*';
+    }
+
     browser = await chromium.launch(launchOptions);
 
     // When the browser dies, the reason matters: out of memory looks exactly

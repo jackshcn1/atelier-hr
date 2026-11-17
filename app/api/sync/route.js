@@ -21,6 +21,8 @@ import { NextResponse } from 'next/server';
 // folder, and the browser package then records the same one for the browser's
 // shared libraries and fonts.
 import { useBrowserTempDir } from '../../../lib/browserTempDir.js';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import chromium from '@sparticuz/chromium';
 import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
 import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.mjs';
@@ -127,7 +129,25 @@ async function handle(req) {
     // expensive enough to stop the page from ever painting. Turning it off
     // also skips unpacking it.
     chromium.setGraphicsMode = false;
-    process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH = await chromium.executablePath();
+    const browserBinary = await chromium.executablePath();
+
+    // Chromium writes a core dump when it dies, and on this host that dump is
+    // about 900MB on a 512MB disk. One crash fills the disk, and then every
+    // browser after it fails for the wrong reason — it looks like the browser
+    // cannot start, when in fact there is simply no room left.
+    //
+    // The dump is switched off by starting the browser through a one-line
+    // wrapper that sets the core limit to zero. The wrapper replaces itself
+    // with the browser, so the browser keeps its own process id.
+    let browserPath = browserBinary;
+    try {
+      const launcher = join('/tmp/atelier-petpooja', 'chromium-no-core');
+      writeFileSync(launcher, '#!/bin/sh\nulimit -c 0\nexec "$@"\n', { mode: 0o755 });
+      browserPath = launcher;
+    } catch {
+      // No permission or no shell — the browser is started as it is.
+    }
+    process.env.PETPOOJA_CHROMIUM_EXECUTABLE_PATH = browserPath;
 
     // Optional period override for backfills: ?start=YYYY-MM-DD&end=YYYY-MM-DD
     const params = new URL(req.url).searchParams;
@@ -137,6 +157,14 @@ async function handle(req) {
       process.env.SYNC_START_DATE = start;
       process.env.SYNC_END_DATE = end;
       push(`📅 Overriding period: ${start} → ${end}`);
+    }
+
+    // ?debug=1 makes the browser say out loud why it died. Chromium's own
+    // output names the signal and the check that failed, which is the only
+    // way to tell a crash from an out-of-memory kill.
+    if (params.get('debug') === '1') {
+      process.env.PETPOOJA_BROWSER_DEBUG = '1';
+      push('🔎 Browser debug output is on.');
     }
 
     // Chromium flags.
