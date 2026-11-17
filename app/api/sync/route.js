@@ -16,6 +16,7 @@
  *   POST with  x-sync-secret: <SYNC_SECRET>           (GitHub Actions / manual)
  */
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 // The browser's temporary folder has to be decided BEFORE the browser package
 // is loaded, so this import comes before it on purpose: loading it sets the
 // folder, and the browser package then records the same one for the browser's
@@ -26,6 +27,8 @@ import { join } from 'node:path';
 import chromium from '@sparticuz/chromium';
 import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/petpooja-sync.mjs';
 import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.mjs';
+import { fetchGoogleSheetsData, googleSheetsConfigured } from '../../../lib/googleSheetsService.js';
+import { parseInvoiceSheet, writeInvoiceSheet } from '../../../lib/invoiceSheet.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,6 +120,19 @@ async function handle(req) {
     logs.push(line);
     originalLog(line);
   };
+
+  // The accountant's invoice sheet.
+  //
+  // It is a Google Sheet, not a Petpooja report, so it needs no browser and
+  // no login — it is one API call. `?sheet=1` pulls it and stops there.
+  //
+  // It is its own request on purpose. The Petpooja groups each take a
+  // serverless call of their own, and this one takes about a second, so
+  // giving it its own call keeps it clear of the browser work and clear of
+  // the time limit.
+  if (new URL(req.url).searchParams.get('sheet') === '1') {
+    return await pullInvoiceSheet(push, started);
+  }
 
   // The sync engine writes its progress straight to the console. Tee it into
   // the response so the scheduler's summary shows which reports were fetched,
@@ -405,4 +421,97 @@ export async function GET(req) {
 
 export async function POST(req) {
   return handle(req);
+}
+
+/**
+ * Pull the accountant's invoice sheet and write it into the books.
+ *
+ * The sheet is the only place an amount is written. A line that is already
+ * in the ledger — the same invoice number — is left alone, so a bill that
+ * exists both in Petpooja and in the sheet is counted once.
+ *
+ * The service account and the sheet's own settings are read from the
+ * environment:
+ *
+ *   GOOGLE_SERVICE_ACCOUNT_EMAIL   the service account
+ *   GOOGLE_PRIVATE_KEY             its key (the PEM content) — or
+ *   GOOGLE_PRIVATE_KEY_PATH        its key (a file on a local machine)
+ *   INVOICE_SHEET_SPREADSHEET_ID   the sheet — or GOOGLE_SHEETS_SPREADSHEET_ID
+ *   INVOICE_SHEET_NAME             the tab — default 'Invoices'
+ *   INVOICE_SHEET_RANGE            the columns — default 'A:K'
+ */
+async function pullInvoiceSheet(push, started) {
+  // Not configured is not a failure. The nightly run has to keep working
+  // whether or not the sheet has been set up yet, and the log line says
+  // plainly that the sheet was skipped.
+  if (!googleSheetsConfigured()) {
+    push('📄 The invoice sheet is not set up yet — nothing was pulled.');
+    push('   It needs GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY on the server.');
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: 'The invoice sheet is not configured.',
+      durationMs: Date.now() - started,
+    });
+  }
+
+  const spreadsheetId =
+    process.env.INVOICE_SHEET_SPREADSHEET_ID || process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  const sheetName = process.env.INVOICE_SHEET_NAME || 'Invoices';
+  const range = process.env.INVOICE_SHEET_RANGE || 'A:K';
+
+  if (!spreadsheetId) {
+    push('📄 The invoice sheet has no spreadsheet id — nothing was pulled.');
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: 'INVOICE_SHEET_SPREADSHEET_ID is not set.',
+      durationMs: Date.now() - started,
+    });
+  }
+
+  try {
+    push('📄 Reading the accountant invoice sheet...');
+    const rows = await fetchGoogleSheetsData({ spreadsheetId, sheetName, range });
+
+    const parsed = parseInvoiceSheet(rows);
+    if (!parsed.ok) {
+      push(`❌ The invoice sheet could not be read: ${parsed.error}`);
+      return NextResponse.json(
+        { ok: false, error: parsed.error, durationMs: Date.now() - started },
+        { status: 500 },
+      );
+    }
+
+    push(`📄 ${parsed.entries.length} invoice(s) on the sheet, ${parsed.skipped.length} row(s) skipped.`);
+    for (const row of parsed.skipped) {
+      push(`   ↷ Row ${row.line}: ${row.reason}`);
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    );
+    const written = await writeInvoiceSheet(supabase, parsed.entries);
+
+    push(
+      `✓ Invoice sheet: ${written.expensesWritten} bill(s) and ${written.pettyWritten} petty entr(ies) written, ` +
+        `${written.skippedExisting} already on record.`,
+    );
+
+    return NextResponse.json({
+      ok: true,
+      durationMs: Date.now() - started,
+      invoices: parsed.entries.length,
+      skippedRows: parsed.skipped,
+      ...written,
+    });
+  } catch (err) {
+    const message = err?.message || String(err);
+    push(`❌ The invoice sheet could not be pulled: ${message}`);
+    return NextResponse.json(
+      { ok: false, error: message, durationMs: Date.now() - started },
+      { status: 500 },
+    );
+  }
 }

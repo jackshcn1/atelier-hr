@@ -24,9 +24,13 @@ for (const line of readFileSync(new URL('../.env.local', import.meta.url), 'utf8
 }
 
 let passed = 0;
-function check(name, fn) {
+// The check is awaited, so a check whose body is async is really run and
+// really asserted. Without the await an async body returns a promise that
+// nobody waits for — the check reports success, and an error inside it
+// escapes as an unhandled rejection instead of failing the run.
+async function check(name, fn) {
   try {
-    fn();
+    await fn();
     passed += 1;
     console.log(`  ✓ ${name}`);
   } catch (error) {
@@ -41,6 +45,8 @@ const { GET: pnlGET, } = await import('../app/api/finance/pnl/route.js');
 const { GET: cashflowGET } = await import('../app/api/finance/cashflow/route.js');
 const { GET: expensesGET, POST: expensesPOST } = await import('../app/api/finance/expenses/route.js');
 const { GET: vendorsGET, POST: vendorsPOST } = await import('../app/api/finance/vendors/route.js');
+const { writeInvoiceSheet } = await import('../lib/invoiceSheet.js');
+const { createClient } = await import('@supabase/supabase-js');
 
 const req = (url) => new Request(`https://atelier.test${url}`);
 const post = (url, body) =>
@@ -54,7 +60,7 @@ const json = async (res) => ({ status: res.status, body: await res.json() });
 console.log('finance routes');
 
 const dash = await json(await dashboardGET(req('/api/finance/dashboard')));
-check('the dashboard answers with revenue, costs and the readiness of the month', () => {
+await check('the dashboard answers with revenue, costs and the readiness of the month', () => {
   if (dash.status !== 200) throw new Error(`status ${dash.status}`);
   const d = dash.body.data;
   if (typeof d.revenue.total !== 'number') throw new Error('no revenue total');
@@ -65,7 +71,7 @@ check('the dashboard answers with revenue, costs and the readiness of the month'
 });
 
 const pnl = await json(await pnlGET(req('/api/finance/pnl')));
-check('the P&L answers with the profit and names what is missing', () => {
+await check('the P&L answers with the profit and names what is missing', () => {
   if (pnl.status !== 200) throw new Error(`status ${pnl.status}`);
   const d = pnl.body.data;
   if (typeof d.net_profit !== 'number') throw new Error('no net profit');
@@ -75,7 +81,7 @@ check('the P&L answers with the profit and names what is missing', () => {
 });
 
 const cash = await json(await cashflowGET(req('/api/finance/cashflow')));
-check('the cashflow answers with the money owed by customers', () => {
+await check('the cashflow answers with the money owed by customers', () => {
   if (cash.status !== 200) throw new Error(`status ${cash.status}`);
   const d = cash.body.data;
   if (!d.receivables || !d.receivables.totals) throw new Error('no receivables');
@@ -87,7 +93,7 @@ check('the cashflow answers with the money owed by customers', () => {
 //
 // The cycle that ends in the month is the one that counts. It is a forecast
 // until the payroll for that cycle has been run, and the real figure after.
-check('the P&L carries the staff salary of the cycle ending in the month', () => {
+await check('the P&L carries the staff salary of the cycle ending in the month', () => {
   const d = pnl.body.data;
   if (!d.salary) throw new Error('no salary on the P&L');
   if (d.salary.state !== 'forecast' && d.salary.state !== 'actual') {
@@ -114,7 +120,7 @@ check('the P&L carries the staff salary of the cycle ending in the month', () =>
   }
 });
 
-check('the salary is an operating cost, not part of the cost of making a sale', () => {
+await check('the salary is an operating cost, not part of the cost of making a sale', () => {
   const d = pnl.body.data;
   if (d.cost_of_revenue >= d.operating_costs && d.salary.amount > 0) {
     throw new Error('the salary looks like it is sitting in the cost of revenue');
@@ -125,7 +131,7 @@ check('the salary is an operating cost, not part of the cost of making a sale', 
   }
 });
 
-check('the salary forecast is frozen at the first of the month after the cycle ends', () => {
+await check('the salary forecast is frozen at the first of the month after the cycle ends', () => {
   const d = pnl.body.data;
   const cycle = d.salary.cycle;
   const [year, month] = cycle.end.split('-').map(Number);
@@ -137,14 +143,14 @@ check('the salary forecast is frozen at the first of the month after the cycle e
   }
 });
 
-check('the readiness list says whether the salary is a forecast or a real figure', () => {
+await check('the readiness list says whether the salary is a forecast or a real figure', () => {
   const row = dash.body.data.readiness.find((r) => r.key === 'salary');
   if (!row) throw new Error('no salary row in the readiness list');
   if (row.state !== 'ok') throw new Error(`salary reported as "${row.state}": ${row.detail}`);
   if (!/forecast|actual/i.test(row.detail)) throw new Error(`the detail does not say which: ${row.detail}`);
 });
 
-check('a salary advance is cash out, not cost', () => {
+await check('a salary advance is cash out, not cost', () => {
   const d = pnl.body.data;
   if (d.salary.state !== 'forecast') return; // an actual cycle has no open advance
   const advanced = Number(d.salary.actual?.advanced || 0);
@@ -162,14 +168,14 @@ check('a salary advance is cash out, not cost', () => {
 const standingGET = (await import('../app/api/finance/fixed-costs/route.js')).GET;
 const standing = await json(await standingGET(req('/api/finance/fixed-costs?month=2026-11')));
 
-check('the standing costs answer with what the month is expected to cost', () => {
+await check('the standing costs answer with what the month is expected to cost', () => {
   if (standing.status !== 200) throw new Error(`status ${standing.status}`);
   if (!Array.isArray(standing.body.data)) throw new Error('no standing costs');
   if (!standing.body.totals) throw new Error('no totals');
   if (typeof standing.body.totals.recognised !== 'number') throw new Error('no recognised total');
 });
 
-check('a standing cost is counted once — the invoice replaces the expected amount', () => {
+await check('a standing cost is counted once — the invoice replaces the expected amount', () => {
   for (const row of standing.body.data) {
     if (row.received && row.invoiceTotal > 0) {
       if (row.amount !== row.invoiceTotal) {
@@ -183,7 +189,7 @@ check('a standing cost is counted once — the invoice replaces the expected amo
   }
 });
 
-check('the standing costs are counted as costs of the month', () => {
+await check('the standing costs are counted as costs of the month', () => {
   const d = pnl.body.data;
   const expected = standing.body.totals.recognised;
   if (Math.abs(d.operating_costs - (d.salary.amount + expected)) > 0.01) {
@@ -192,14 +198,14 @@ check('the standing costs are counted as costs of the month', () => {
 });
 
 const bills = await json(await expensesGET(req('/api/finance/expenses?view=bills')));
-check('the bills answer with what is owed to each supplier', () => {
+await check('the bills answer with what is owed to each supplier', () => {
   if (bills.status !== 200) throw new Error(`status ${bills.status}`);
   const d = bills.body.data;
   if (!Array.isArray(d.vendors)) throw new Error('no vendors');
   if (typeof d.totals.unpaid !== 'number') throw new Error('no unpaid total');
 });
 
-check('the dashboard counts the bills it says are on record', () => {
+await check('the dashboard counts the bills it says are on record', () => {
   // A head query returns the number in `count`, not in `data`. Reading the
   // wrong one made every month look as though it had no bills at all.
   const billsRow = dash.body.data.readiness.find((r) => r.key === 'bills');
@@ -211,7 +217,7 @@ check('the dashboard counts the bills it says are on record', () => {
   }
 });
 
-check('a credit note is a credit back, not a bill to pay', () => {
+await check('a credit note is a credit back, not a bill to pay', () => {
   const t = dash.body.data.payables.totals;
   if (t.credit > 0 && t.billCountTotal !== t.billCount && t.unpaid === t.credit) {
     throw new Error('the payable is the credit instead of the bills');
@@ -223,7 +229,7 @@ check('a credit note is a credit back, not a bill to pay', () => {
 });
 
 const exp = await json(await expensesGET(req('/api/finance/expenses')));
-check('every bill comes back with one payment spelling', () => {
+await check('every bill comes back with one payment spelling', () => {
   if (exp.status !== 200) throw new Error(`status ${exp.status}`);
   const rows = exp.body.data;
   if (!Array.isArray(rows) || rows.length === 0) throw new Error('no bills');
@@ -234,7 +240,7 @@ check('every bill comes back with one payment spelling', () => {
 });
 
 const vend = await json(await vendorsGET(req('/api/finance/vendors')));
-check('the supplier list answers with what is owed to each', () => {
+await check('the supplier list answers with what is owed to each', () => {
   if (vend.status !== 200) throw new Error(`status ${vend.status}`);
   const rows = vend.body.data;
   if (!Array.isArray(rows) || rows.length === 0) throw new Error('no suppliers');
@@ -255,7 +261,7 @@ const created = await json(await expensesPOST(post('/api/finance/expenses', {
 })));
 
 let testBillId = null;
-check('a bill typed by hand is accepted', () => {
+await check('a bill typed by hand is accepted', () => {
   if (created.status !== 200) throw new Error(`status ${created.status}: ${JSON.stringify(created.body).slice(0, 200)}`);
   if (created.body.data.amount !== 123.45) throw new Error('wrong amount');
   if (created.body.data.cost_type !== 'variable') throw new Error('wrong cost type');
@@ -263,7 +269,7 @@ check('a bill typed by hand is accepted', () => {
   testBillId = created.body.data.id;
 });
 
-check('the bill shows up in the supplier totals', async () => {
+await check('the bill shows up in the supplier totals', async () => {
   const after = await json(await vendorsGET(req('/api/finance/vendors')));
   const row = after.body.data.find((v) => v.name === 'Ambrosia - The Classic Bakehouse');
   if (!row) throw new Error('supplier missing');
@@ -275,7 +281,7 @@ if (testBillId) {
   const removed = await json(await billDELETE(req(`/api/finance/expenses/${testBillId}?id=${testBillId}`), {
     params: { id: testBillId },
   }));
-  check('the bill can be removed again', () => {
+  await check('the bill can be removed again', () => {
     if (!removed.body.success) throw new Error(JSON.stringify(removed.body).slice(0, 200));
   });
 }
@@ -283,15 +289,74 @@ if (testBillId) {
 // A supplier that is not on the list yet.
 const made = await json(await vendorsPOST(post('/api/finance/vendors', { name: 'Route Check Supplier' })));
 let madeId = null;
-check('a supplier can be added', () => {
+await check('a supplier can be added', () => {
   if (made.status !== 200) throw new Error(JSON.stringify(made.body).slice(0, 200));
   madeId = made.body.data.id;
 });
 if (madeId) {
   const { DELETE: vendorDELETE } = await import('../app/api/finance/vendors/route.js');
   await vendorDELETE(req(`/api/finance/vendors?id=${madeId}`), { method: 'DELETE' });
-  check('the supplier can be removed again', () => {
+  await check('the supplier can be removed again', () => {
     /* the delete above is the assertion */
+  });
+}
+
+// The accountant's invoice sheet, written into the live books.
+//
+// The parser is checked on its own in tests/invoice-sheet-verify.mjs. What is
+// checked here is the writing: that a sheet row lands in the ledger with the
+// right shape, and that the same invoice number is never written twice.
+const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const SHEET_BILL = {
+  bucket: 'fixed',
+  costType: 'fixed',
+  category: 'Outlet Rent',
+  vendor: 'Sheet Route Check',
+  invoiceNo: 'SHEET-CHECK-1',
+  description: 'Written by the sheet test',
+  amount: 999.99,
+  invoiceDate: '2026-11-17',
+  paymentStatus: 'unpaid',
+  paymentDate: null,
+  paymentMethod: 'NEFT',
+  reference: null,
+};
+
+let sheetBillId = null;
+await check('a bill from the sheet is written into the ledger', async () => {
+  const written = await writeInvoiceSheet(sb, [SHEET_BILL]);
+  if (written.expensesWritten !== 1) throw new Error(`wrote ${written.expensesWritten} bills, expected 1`);
+
+  const { data, error } = await sb
+    .from('expenses')
+    .select('id, amount, cost_type, category, vendor_name, invoice_number, invoice_date, payment_status')
+    .eq('invoice_number', SHEET_BILL.invoiceNo);
+  if (error) throw error;
+  if (!data || data.length !== 1) throw new Error(`the sheet bill is not in the ledger (${data?.length} found)`);
+
+  const row = data[0];
+  sheetBillId = row.id;
+  if (Number(row.amount) !== 999.99) throw new Error(`the amount is ${row.amount}`);
+  if (row.cost_type !== 'fixed') throw new Error(`the cost type is ${row.cost_type}`);
+  if (row.category !== 'Outlet Rent') throw new Error(`the category is ${row.category}`);
+  if (row.invoice_date !== '2026-11-17') throw new Error(`the date is ${row.invoice_date}`);
+  if (row.payment_status !== 'unpaid') throw new Error(`the payment state is ${row.payment_status}`);
+});
+
+await check('the same invoice on the sheet is not written twice', async () => {
+  const written = await writeInvoiceSheet(sb, [SHEET_BILL]);
+  if (written.expensesWritten !== 0) throw new Error(`wrote ${written.expensesWritten} bills again, expected 0`);
+  if (written.skippedExisting !== 1) throw new Error(`skipped ${written.skippedExisting}, expected 1`);
+
+  const { data } = await sb.from('expenses').select('id').eq('invoice_number', SHEET_BILL.invoiceNo);
+  if (!data || data.length !== 1) throw new Error(`the bill is on the ledger ${data?.length} times, expected once`);
+});
+
+if (sheetBillId) {
+  await sb.from('expenses').delete().eq('id', sheetBillId);
+  await check('the bill written by the test is removed again', async () => {
+    const { data } = await sb.from('expenses').select('id').eq('invoice_number', SHEET_BILL.invoiceNo);
+    if (data && data.length > 0) throw new Error('the test bill is still in the ledger');
   });
 }
 
