@@ -28,11 +28,13 @@ export async function middleware(request) {
   const { data: { user } } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login');
-  // The privacy policy is read by people who have no account here — Google's
-  // consent screen asks for it, and a policy behind a login is not a policy.
-  const isPrivacyPage = request.nextUrl.pathname === '/privacy';
+  // The privacy policy and the terms are read by people who have no account
+  // here — Google's consent screen asks for both, and a policy behind a
+  // login is no policy.
+  const isPublicPage =
+    request.nextUrl.pathname === '/privacy' || request.nextUrl.pathname === '/terms';
 
-  if (!user && !isLoginPage && !isPrivacyPage) {
+  if (!user && !isLoginPage && !isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

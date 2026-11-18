@@ -63,6 +63,7 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
    - Export (`/export`) — CSV data download
    - Settings (`/settings`) — System configuration, departments, and user management (`/settings/users`)
    - Privacy Policy (`/privacy`) — **public**, outside the login gate: Google's OAuth consent screen asks for a privacy policy URL, and a policy behind a login is no policy
+   - Terms of Service (`/terms`) — **public**, for the same reason
 
 ### Design System (Atelier Theme)
 - **Typography**: Newsreader (Editorial Serif) for titles/figures, Inter for UI text
