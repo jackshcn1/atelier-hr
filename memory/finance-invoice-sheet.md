@@ -192,6 +192,18 @@ key never appears in a command line or in the shell history.
 The customer-feedback sheet uses the `GOOGLE_SHEETS_*` names, so the invoice
 sheet has its own — one service account can open both.
 
+### The site's own entry form
+
+`/finance/costs/new` — one page for all three kinds of cost, with the
+**supplier as a type-ahead** over the supplier list: type, and the suppliers
+that match come up; a name that is not on the list can be added there and
+then, and it is on the list for next time.
+
+Submitting writes a row into the sheet and then pulls it into the books — the
+same pull the nightly run does, so there is one way into the books. The row is
+placed by **heading**, so a question added to the Form cannot shift it into
+the wrong column.
+
 ### Reading and writing the sheet from here
 
 ```
