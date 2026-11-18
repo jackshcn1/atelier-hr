@@ -67,3 +67,7 @@ memory/maintenance-module-status.md
 
 # shared secret for the hosted Petpooja sync endpoint — NEVER commit
 .vercel-sync-secret
+
+# Google service account key file — NEVER commit
+scripts/google-service-account.json
+scripts/*service-account*.json
