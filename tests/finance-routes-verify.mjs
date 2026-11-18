@@ -559,5 +559,89 @@ if (sheetPettyId) {
   });
 }
 
+// The site's own expense form.
+//
+// The sheet is the record: the form writes a row into it, and the sheet is
+// then pulled into the books. This checks that whole path, and that the row
+// is removed again afterwards so the sheet is left as it was.
+const { POST: sheetPOST } = await import('../app/api/finance/expenses/sheet/route.js');
+const { fetchGoogleSheetsData, googleSheetsClient } = await import('../lib/googleSheetsService.js');
+
+const SHEET_ID = '1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig';
+const SHEET_TAB = 'Form Responses 1';
+
+let sheetEntryId = null;
+
+await check('an entry from the site form goes into the sheet and the books', async () => {
+  const res = await sheetPOST(
+    new Request('https://atelier.test/api/finance/expenses/sheet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'fixed',
+        costType: 'Outlet Rent',
+        vendor: 'Site Form Check',
+        amount: 1234.56,
+        invoiceDate: '2026-11-17',
+        paidOn: '2026-11-18',
+        description: 'Written by the site form test',
+      }),
+    }),
+  );
+  const body = await res.json();
+  if (!body.success) throw new Error(body.error);
+
+  sheetEntryId = body.data.entryId;
+  if (!sheetEntryId) throw new Error('the entry was not given an id');
+
+  // It is in the sheet.
+  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: 'A:V' });
+  const inSheet = rows.some((row) => (row || []).includes(sheetEntryId));
+  if (!inSheet) throw new Error('the row is not in the sheet');
+
+  // And in the books.
+  const { data } = await sb
+    .from('expenses')
+    .select('vendor_name, category, amount, invoice_date, payment_status, cost_type')
+    .eq('source_key', `id:${sheetEntryId.toLowerCase()}`);
+  if (!data || data.length !== 1) throw new Error(`the bill is not in the books (${data?.length} found)`);
+
+  const row = data[0];
+  if (row.vendor_name !== 'Site Form Check') throw new Error(`the supplier is ${row.vendor_name}`);
+  if (row.category !== 'Outlet Rent') throw new Error(`the category is ${row.category}`);
+  if (row.cost_type !== 'fixed') throw new Error(`the cost type is ${row.cost_type}`);
+  if (Number(row.amount) !== 1234.56) throw new Error(`the amount is ${row.amount}`);
+  if (row.invoice_date !== '2026-11-17') throw new Error(`the date is ${row.invoice_date}`);
+  if (row.payment_status !== 'paid') throw new Error(`the payment state is ${row.payment_status}`);
+});
+
+await check('the row the site form wrote is taken out of the sheet again', async () => {
+  if (!sheetEntryId) throw new Error('nothing was written');
+
+  const client = googleSheetsClient();
+  const sheet = await client.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties' });
+  const tab = (sheet.data.sheets || []).map((s) => s.properties).find((p) => p.title === SHEET_TAB);
+
+  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: 'A:V' });
+  const at = rows.findIndex((row) => (row || []).includes(sheetEntryId));
+  if (at === -1) throw new Error('the row is not in the sheet any more');
+
+  await client.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [
+        { deleteDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: at, endIndex: at + 1 } } },
+      ],
+    },
+  });
+
+  const after = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: 'A:V' });
+  if (after.some((row) => (row || []).includes(sheetEntryId))) {
+    throw new Error('the row is still in the sheet');
+  }
+
+  await sb.from('expenses').delete().eq('source_key', `id:${sheetEntryId.toLowerCase()}`);
+});
+
 console.log(`\n${passed} check(s) passed`);
 if (process.exitCode) console.error('\nSome checks failed.');
