@@ -496,6 +496,7 @@ async function pullInvoiceSheet(push, started) {
 
     push(
       `✓ Invoice sheet: ${written.expensesWritten} bill(s) and ${written.pettyWritten} petty entr(ies) written, ` +
+        `${written.expensesUpdated + written.pettyUpdated} updated, ` +
         `${written.skippedExisting} already on record.`,
     );
 

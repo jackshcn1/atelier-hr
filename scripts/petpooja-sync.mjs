@@ -1248,7 +1248,7 @@ export async function runPetpoojaSync(options = {}) {
     for (let i = 0; i < invoiceNumbers.length; i += batchSize) {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note')
+        .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note, source')
         .in('invoice_number', invoiceNumbers.slice(i, i + batchSize));
       if (error) throw error;
       found.push(...(data || []));
@@ -1280,7 +1280,7 @@ export async function runPetpoojaSync(options = {}) {
       unnamedVendors.length > 0
         ? supabase
             .from('expenses')
-            .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note')
+            .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note, source')
             .in('vendor_name', unnamedVendors)
         : Promise.resolve({ data: [] }),
     ]);
@@ -1292,11 +1292,24 @@ export async function runPetpoojaSync(options = {}) {
       if (!existingByKey.has(key)) existingByKey.set(key, row);
     }
 
+    // A bill the accountant typed into their sheet may have the supplier
+    // spelled a different way from the way Petpooja spells it. It is still the
+    // same bill, so it is found by its invoice number — otherwise the same
+    // bill would be written twice, once for each spelling.
+    const sheetByInvoice = new Map();
+    for (const row of byInvoice.data || []) {
+      if (row.source !== 'sheet') continue;
+      const number = String(row.invoice_number || '').trim().toLowerCase();
+      if (number && !sheetByInvoice.has(number)) sheetByInvoice.set(number, row);
+    }
+
     const toInsert = new Map();
     const toUpdate = [];
     for (const row of rows) {
       const key = keyOf(row.vendor_name, row.invoice_number);
-      const found = existingByKey.get(key);
+      const found =
+        existingByKey.get(key) ||
+        sheetByInvoice.get(String(row.invoice_number || '').trim().toLowerCase());
       if (!found) {
         if (!toInsert.has(key)) toInsert.set(key, row);
         continue;
@@ -1308,7 +1321,11 @@ export async function runPetpoojaSync(options = {}) {
         (found.invoice_date || null) !== (row.invoice_date || null) ||
         (found.payment_status || null) !== (row.payment_status || null) ||
         Number(found.debit_note || 0) !== Number(row.debit_note || 0);
-      if (changed) toUpdate.push({ id: found.id, row });
+      // A bill that came from the sheet is always written again, because the
+      // Petpooja bill is the record — even when only the supplier's spelling
+      // differs.
+      const fromSheet = found.source === 'sheet';
+      if (changed || fromSheet) toUpdate.push({ id: found.id, row });
     }
 
     let inserted = 0;
@@ -2659,7 +2676,8 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
               payment_mode: invoice.payment_mode || null,
               bank_reference: invoice.bank_reference || null,
               created_by: null, // System-generated
-              approved_by: null
+              approved_by: null,
+              source: 'petpooja', // this bill is the Petpooja one, not the sheet's
             }));
             await syncExpenseRows(invoicePayloads, 'purchase invoice(s)');
 
@@ -2721,7 +2739,8 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
               payment_mode: null,
               bank_reference: null,
               created_by: null,
-              approved_by: null
+              approved_by: null,
+              source: 'petpooja', // this bill is the Petpooja one, not the sheet's
             }));
             await syncExpenseRows(returnPayloads, 'debit note(s)');
 

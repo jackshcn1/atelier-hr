@@ -71,9 +71,11 @@ and `Pending`, `Unpaid` or `Due` is not.
 
 ## The four rules that stop double counting
 
-1. **A Petpooja bill is skipped by identity.** If `invoice_no` is already in
-   the bill ledger, the sheet row is ignored. So even if the accountant types
-   a Petpooja bill in, it is counted once — the Petpooja one. No reliance on
+1. **A bill is identified by its invoice number.** A row the sheet wrote is
+   **updated** when the sheet changes — that is how ticking a bill "Paid"
+   reaches the books. A row anybody else wrote — the Petpooja pull, or a
+   person on the site — is left alone, so even if the accountant types a
+   Petpooja bill in, it is counted once — the Petpooja one. No reliance on
    everyone remembering not to.
 2. **The bucket decides where an invoice lands.** Rent is `Fixed` and
    electricity is `Variable`, so they cannot both end up in the same place.
@@ -87,6 +89,27 @@ and `Pending`, `Unpaid` or `Due` is not.
 
 The same sheet row typed twice is also caught — the sheet is de-duplicated on
 `invoice_no` before anything is written.
+
+### Who wrote a row — the `source` column
+
+`expenses` and `petty_cash_ledger` both carry a `source` column:
+
+| value | who wrote it |
+|---|---|
+| `petpooja` | the Petpooja pull |
+| `sheet` | the accountant's invoice sheet |
+| `manual` | a person typing on the site |
+| `existing` | written before the column existed |
+
+It is what makes rule 1 work. The sheet **updates its own rows** and never
+writes over anybody else's, and it never adds a second row for an invoice
+number that is already in the books. The Petpooja pull marks its own rows
+`petpooja` every night, so the mark heals itself; a Petpooja bill that the
+accountant also typed into the sheet ends up as the Petpooja row, whichever
+arrived first.
+
+The petty ledger has no invoice-number column, so a sheet petty entry keeps
+its invoice number in `reference` — that is what makes it recognisable.
 
 ## The setup that is needed before any of it works
 

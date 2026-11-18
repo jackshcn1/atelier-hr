@@ -183,6 +183,10 @@ export async function POST(request) {
     const supabase = getSupabase();
     const body = await request.json();
     const row = cleanExpense(body);
+    // A bill typed in by a person is not the sheet's, so the sheet leaves it
+    // alone — the two are counted once, and the bill in the ledger is the
+    // record.
+    row.source = 'manual';
 
     if (!row.amount) {
       return Response.json({ success: false, error: 'An amount is needed.' }, { status: 400 });
