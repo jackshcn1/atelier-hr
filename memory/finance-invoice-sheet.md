@@ -271,7 +271,7 @@ own message: use a shared drive, or OAuth delegation. **Neither is available
 here** — this is a personal `gmail.com` account, so there is no shared drive
 to make and no Workspace domain to delegate to.
 
-So the invoice upload is made as the **restaurant's own Google account**:
+So the invoice upload is made as **a Google account of the restaurant's own**:
 
 | | |
 |---|---|
@@ -280,6 +280,26 @@ So the invoice upload is made as the **restaurant's own Google account**:
 | `app/api/google-drive/callback` | swaps the code for a refresh token and keeps it |
 | `app/api/google-drive/status` | says whether it is connected, and as which account |
 | `google_drive_tokens` | the refresh token — RLS on, no policies, service key only |
+
+### Two Cloud projects, on purpose
+
+The **service account** and the **OAuth client** live in **different Google
+Cloud projects**, and that is deliberate.
+
+- The service account (in the project that holds the key) reads and writes the
+  **sheets**. It is a machine identity; it owns nothing.
+- The OAuth client (in its own project) is the **app's identity**. It grants
+  nothing by itself — what grants Drive access is the *token*, and the token is
+  issued to whoever signs in at the consent screen.
+
+So the company Drive is never in scope: a project owner cannot mint a token for
+another account, and the connected account is one whose Drive holds only what
+the site needs. Everything outside the invoice folder is unreachable.
+
+The **full `drive` scope** is broad for whichever account connects — it means
+read and write over that account's whole Drive. Connect the narrowest account
+that can do the job, and if the account is one whose Drive holds company
+material, connect a different one instead.
 
 The person connects once, in **Settings → Google Drive**. After that the
 upload goes in as that account: the file is owned by the account, it lands in
