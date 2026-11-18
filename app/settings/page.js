@@ -15,6 +15,10 @@ export default function SettingsPage() {
   const [accommodationDeposit, setAccommodationDeposit] = useState('');
   const [depositsSaved, setDepositsSaved] = useState(false);
 
+  // Google Drive — the account that invoices are uploaded as.
+  const [drive, setDrive] = useState({ connected: false, email: null, configured: false });
+  const [driveNote, setDriveNote] = useState('');
+
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -25,6 +29,23 @@ export default function SettingsPage() {
     supabase.from('deposit_settings').select('*').eq('id', 1).single().then(({ data }) => {
       if (data) { setUniformDeposit(data.uniform_deposit_amount); setAccommodationDeposit(data.accommodation_deposit_amount); }
     });
+  }, []);
+
+  // Is the restaurant's Google account connected, and what did Google say
+  // when the person came back from the sign-in?
+  useEffect(() => {
+    fetch('/api/google-drive/status')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) setDrive(d.data);
+        else setDriveNote(d.error || 'The connection could not be checked.');
+      })
+      .catch(() => setDriveNote('The connection could not be checked.'));
+
+    const said = new URLSearchParams(window.location.search).get('drive');
+    if (said === 'connected') setDriveNote('Google Drive is connected.');
+    else if (said === 'declined') setDriveNote('The Google sign-in was cancelled. Nothing was changed.');
+    else if (said === 'failed') setDriveNote('The Google sign-in did not go through. Try again.');
   }, []);
 
   async function savePayroll(e) {
@@ -96,6 +117,40 @@ export default function SettingsPage() {
             <button type="submit" className="btn-primary text-xs">Save</button>
             {depositsSaved && <span className="text-good text-xs ml-3">✓ Saved</span>}
           </form>
+        </section>
+
+        <section className="panel panel-body">
+          <h2 className="panel-title mb-2">Google Drive — invoice uploads</h2>
+          <p className="text-sm text-ink-muted mb-4">
+            A bill typed in by hand can have the invoice attached to it. The file is
+            stored in the restaurant's own Drive folder, and the bill keeps the link
+            to it. Google will not let the service account store files, so the
+            restaurant's own Google account connects here, once — after that the
+            upload goes in as that account.
+          </p>
+
+          {drive.connected ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="pill-good text-xs">✓ Connected</span>
+              <span className="text-sm text-ink-muted">{drive.email || 'the restaurant’s Google account'}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 flex-wrap">
+              <a
+                href="/api/google-drive/connect?next=%2Fsettings"
+                className="btn-primary text-xs inline-flex items-center gap-2"
+              >
+                Connect Google Drive
+              </a>
+              <span className="text-xs text-ink-muted">
+                {drive.configured
+                  ? 'Opens Google’s own sign-in — you only have to agree once.'
+                  : 'The Google sign-in is not set up on the server yet.'}
+              </span>
+            </div>
+          )}
+
+          {driveNote && <p className="text-xs text-ink-muted mt-3">{driveNote}</p>}
         </section>
       </div>
     </div>

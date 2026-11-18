@@ -580,6 +580,35 @@ await check('a file that is not an invoice is turned away', async () => {
   if (result.success) throw new Error('the upload was accepted');
 });
 
+await check('the upload is refused until the Google account is connected', async () => {
+  const { data: connected } = await sb
+    .from('google_drive_tokens')
+    .select('refresh_token, account_email')
+    .eq('provider', 'google');
+  const isConnected = (connected || []).some((row) => row.refresh_token);
+
+  if (isConnected) {
+    // The account is connected, so the upload would put a real file in the
+    // restaurant's Drive. That is checked by hand, not by a test.
+    if (!connected[0].account_email) throw new Error('the connection does not say which account it is');
+    return;
+  }
+
+  const body = new FormData();
+  body.append('file', new Blob(['%PDF-1.4 test'], { type: 'application/pdf' }), 'test-invoice.pdf');
+  body.append('name', 'test-invoice.pdf');
+
+  const res = await attachmentPOST(
+    new Request('https://atelier.test/api/finance/expenses/attachment', { method: 'POST', body }),
+  );
+  if (res.status !== 503) throw new Error(`the upload was answered with ${res.status}, expected 503`);
+
+  const result = await res.json();
+  if (result.success) throw new Error('the upload was accepted without a connection');
+  if (!result.connectUrl) throw new Error('the answer does not say how to connect');
+  if (!/not connected/i.test(result.error)) throw new Error(`the answer does not say why: ${result.error}`);
+});
+
 await check('a bill keeps the link to its invoice', async () => {
   const link = 'https://drive.google.com/file/d/test-file-id/view';
   const res = await expensesPOST(

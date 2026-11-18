@@ -254,5 +254,49 @@ machine. Confirmed three ways: the runtime's own error, `mcp-runtime-names.json`
 it needs no personal connector to stay connected, and it can read *and* write
 — which the nightly pull and the site's expense form both need.
 
+## The service account cannot store files — the invoice upload is different
+
+The service account reads and writes the **sheet** perfectly well. It cannot
+**store a file**: Google gives a service account no Drive storage of its own,
+so an upload it makes is refused with
+
+```
+Service Accounts do not have storage quota.
+```
+
+Sharing the invoice folder with it does not help — the folder is visible
+(the account becomes an Editor on it), but the new file would still be owned
+by the account, and there is nowhere to keep it. Google says the same in its
+own message: use a shared drive, or OAuth delegation. **Neither is available
+here** — this is a personal `gmail.com` account, so there is no shared drive
+to make and no Workspace domain to delegate to.
+
+So the invoice upload is made as the **restaurant's own Google account**:
+
+| | |
+|---|---|
+| `lib/googleUserDrive.js` | the OAuth client, the consent link, the token, the upload |
+| `app/api/google-drive/connect` | sends the person to Google's sign-in |
+| `app/api/google-drive/callback` | swaps the code for a refresh token and keeps it |
+| `app/api/google-drive/status` | says whether it is connected, and as which account |
+| `google_drive_tokens` | the refresh token — RLS on, no policies, service key only |
+
+The person connects once, in **Settings → Google Drive**. After that the
+upload goes in as that account: the file is owned by the account, it lands in
+the invoice folder, and the bill keeps the link.
+
+The **scope** is the full `drive`, not the narrower `drive.file`, because the
+invoice folder is the accountant's own — `drive.file` only sees files this
+site created and could not write into that folder.
+
+**The refresh token is the secret.** It is never sent to the browser, never
+written to a log, and never committed. The access token is not stored at all:
+it is fetched from the refresh token each time and thrown away.
+
+**A "Testing" consent screen expires the refresh token after seven days.**
+The consent screen has to be in **Production** status, with the restaurant's
+account added as a **test user** — that is enough for one account, and it
+does not need Google's verification.
+
 Related: [[finance-calendar-month]], [[finance-salary-and-standing-costs]],
 [[petpooja-hosted-sync]]
