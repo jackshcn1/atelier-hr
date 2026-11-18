@@ -1,4 +1,4 @@
-import { uploadInvoiceToDrive } from '../../../../../lib/googleUserDrive.js';
+import { uploadInvoiceToDrive, isDeadConnection, clearConnection } from '../../../../../lib/googleUserDrive.js';
 import { INVOICE_FOLDER_ID } from '../../../../../lib/googleDrive.js';
 
 // The invoice upload.
@@ -91,6 +91,23 @@ export async function POST(request) {
           error:
             "The restaurant's Google account is not connected yet. Open Settings → Google Drive and " +
             'press "Connect Google Drive", then attach the invoice again.',
+          connectUrl: '/api/google-drive/connect',
+        },
+        { status: 503 },
+      );
+    }
+
+    // The connection was there and has stopped working — Google expires the
+    // token of an app whose consent screen is in Testing status, and a person
+    // can revoke it. The token is forgotten, so the site asks to connect again.
+    if (isDeadConnection(error)) {
+      await clearConnection().catch(() => {});
+      return Response.json(
+        {
+          success: false,
+          error:
+            'The Google connection has stopped working — it may have expired or been revoked. ' +
+            'Open Settings → Google Drive and press "Connect Google Drive" again.',
           connectUrl: '/api/google-drive/connect',
         },
         { status: 503 },

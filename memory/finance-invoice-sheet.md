@@ -298,6 +298,15 @@ The consent screen has to be in **Production** status, with the restaurant's
 account added as a **test user** — that is enough for one account, and it
 does not need Google's verification.
 
+To publish to Production, Google's new Auth Platform asks the consent screen
+for **a homepage URL and a privacy policy URL**. The privacy policy is a real
+public page on the site — `/privacy` — and the middleware lets it through
+without a sign-in, because a policy behind a login is no policy.
+
+**A dead connection says so.** Google turns the connection away with
+`invalid_grant` when the token has expired or been revoked; the site forgets
+the token and asks to connect again, rather than failing as a broken upload.
+
 ### Who can upload, and who can open the invoice
 
 The connection is **one setting for the whole site**, not a personal one — one
