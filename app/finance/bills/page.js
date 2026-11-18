@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { normalizePaymentStatus } from '../../../lib/expenseHelpers.js';
 
+// The link to the invoice itself. Only a Drive link is followed — anything
+// else is not a link we put there.
+const isDriveLink = (value) => String(value || '').startsWith('https://drive.google.com/');
+
 const FILTERS = [
   { value: 'unpaid', label: 'Not paid yet' },
   { value: 'paid', label: 'Paid' },
@@ -252,6 +256,16 @@ export default function BillsPage() {
                                   {bill.invoice_number || '—'}
                                   {bill.description && (
                                     <span className="block text-xs text-[#6b635c]">{bill.description}</span>
+                                  )}
+                                  {bill.invoice_attachment && isDriveLink(bill.invoice_attachment) && (
+                                    <a
+                                      href={bill.invoice_attachment}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block text-xs text-[#8b6f4e] underline mt-0.5"
+                                    >
+                                      See the invoice
+                                    </a>
                                   )}
                                 </td>
                                 <td className="table-cell text-[#6b635c]">{bill.invoice_date || '—'}</td>
