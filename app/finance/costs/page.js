@@ -22,8 +22,11 @@ export default function CostsExpensesPage() {
             </p>
           </div>
           <div className="flex gap-3 flex-wrap">
-            <Link href="/finance/costs/entry" className="btn-primary text-sm px-4 py-2">
-              + Log a Bill
+            <Link href="/finance/costs/new" className="btn-primary text-sm px-4 py-2">
+              + New Expense
+            </Link>
+            <Link href="/finance/costs/entry" className="btn-secondary text-sm px-4 py-2">
+              Log a Bill by Hand
             </Link>
             <Link href="/finance/bills" className="btn-secondary text-sm px-4 py-2">
               Bills
