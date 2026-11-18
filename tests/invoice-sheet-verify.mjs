@@ -158,6 +158,26 @@ check('a date written out is read as that date', () => {
   assert(broadband.invoiceDate === '2026-04-24', `the date is ${broadband.invoiceDate}`);
 });
 
+check('the link to the invoice is kept, so the bill can show it', () => {
+  const parsed = parseInvoiceSheet(sheet);
+  const rent = parsed.entries.find((e) => e.costTypeName === 'Outlet Rent');
+  assert(
+    rent.attachment === 'https://drive.google.com/open?id=1cPMD4yMDu28r_CIwr4HJTYdLt-jEqyUW',
+    `the link is ${rent.attachment}`,
+  );
+
+  const broadband = parsed.entries.find((e) => e.costTypeName === 'Airtel Broadband Monthly');
+  assert(broadband.attachment === '', `a row with no invoice has no link: ${broadband.attachment}`);
+});
+
+check('something that is not a link is not kept as one', () => {
+  const parsed = parseInvoiceSheet([
+    HEADINGS,
+    ['11/18/2026 10:32:02', 'a@b.com', 'Variable Cost', 'Gas', '6400', '5/23/2026', 'gas-invoice.pdf', ''],
+  ]);
+  assert(parsed.entries[0].attachment === '', `it is ${parsed.entries[0].attachment}`);
+});
+
 check('the paid-on date says the bill was paid', () => {
   const parsed = parseInvoiceSheet(sheet);
   const rent = parsed.entries.find((e) => e.costTypeName === 'Outlet Rent');
