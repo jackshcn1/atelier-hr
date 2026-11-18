@@ -94,24 +94,49 @@ The reading side exists (`lib/googleSheetsService.js` and
 `lib/invoiceSheet.js`) but it needs a Google **service account**:
 
 1. create a service account in Google Cloud and download its key;
-2. share the Sheet with the service account's email, as Viewer;
+2. share the Sheet with the service account's email, as **Editor** — the
+   site's expense form writes a row into the sheet, so Viewer is not enough;
 3. put the key on Vercel;
 4. lock the sheet's columns so the labels cannot drift.
 
+### The service account
+
+There is already one, set up for the customer-feedback pull:
+
+```
+variable-pay-feedback-sync@my-project-27246-510206.iam.gserviceaccount.com
+```
+
+in the Google Cloud project `my-project-27246-510206`. **Reuse it** — do not
+create a second one.
+
+### Getting the key onto this machine
+
+`scripts/petpooja-config.json` has the service account's address and a
+`GOOGLE_PRIVATE_KEY_PATH` that points at the **office computer**
+(`C:\Users\LENOVO\my-project-27246-510206-edce775e7ba3.json`). So the key is
+not on the Mac, and a new one has to be downloaded.
+
+Download a JSON key from Google Cloud and save it as:
+
+```
+scripts/google-service-account.json
+```
+
+That path is **gitignored**. A Google Cloud key file is JSON, not PEM — the
+`private_key` inside it has to be read out and its `\n` put back, which is
+what `scripts/google-sheet.mjs` does.
+
 ### The key on Vercel
 
-The key is best stored as the PEM **content** in an environment variable
-rather than a file path — Vercel has no file to point at. The helper takes
-either:
+`scripts/setup-google-sheets.sh` puts it there the same way the SMTP password
+is done: read from a file, handed to `vercel env add` through stdin, so the
+key never appears in a command line or in the shell history.
 
 | variable | what it holds |
 |---|---|
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | the service account's address |
-| `GOOGLE_PRIVATE_KEY` | the PEM **content** (preferred) |
-| `GOOGLE_PRIVATE_KEY_PATH` | a path to a key file (a local machine) |
-
-A PEM that was pasted into an environment variable arrives with its newlines
-written as the two characters `\n`, so the helper puts them back before use.
+| `GOOGLE_PRIVATE_KEY` | the private key, as the PEM content |
 
 ### The sheet's own settings
 
@@ -123,6 +148,18 @@ written as the two characters `\n`, so the helper puts them back before use.
 
 The customer-feedback sheet uses the `GOOGLE_SHEETS_*` names, so the invoice
 sheet has its own — one service account can open both.
+
+### Reading and writing the sheet from here
+
+```
+node scripts/google-sheet.mjs list
+node scripts/google-sheet.mjs read [spreadsheetId] [--sheet <tab>]
+node scripts/google-sheet.mjs append <spreadsheetId> --tab <tab> --row '<json>'
+```
+
+`list` is the "is my connection working?" check. `read` prints the headings
+and the rows **with the column letters**, so a layout can be read off instead
+of guessed at.
 
 ## How it runs
 
@@ -136,9 +173,25 @@ request answers `{"ok": true, "skipped": true}` and the nightly run carries
 on. A sheet that is set up but broken answers HTTP 500, so the scheduler
 retries it.
 
-A Composio connection to a personal Google account was considered and not
-chosen for this: an unattended nightly pull should not depend on a personal
-connector staying connected.
+## Composio does not work here — do not go back to it
+
+The desktop app has a Composio MCP server registered, but **it connects with
+zero tools**. The app launches `@composio/mcp@1.0.9` with no arguments; the
+package has no default command, so it prints its usage text and exits:
+
+```
+[mcp:composio:stderr] You need to specify a command
+```
+
+It needs `start --url <sse-url>`, and the URL lives in the app's account-side
+settings — the local connection key is a one-way hash
+(`project:f7c41bdd…`), so the endpoint cannot be reconstructed from this
+machine. Confirmed three ways: the runtime's own error, `mcp-runtime-names.json`
+(composio → 0 tools), and the connector catalogue (no Google tools).
+
+**Use the service account instead.** It is the credential production runs on,
+it needs no personal connector to stay connected, and it can read *and* write
+— which the nightly pull and the site's expense form both need.
 
 Related: [[finance-calendar-month]], [[finance-salary-and-standing-costs]],
 [[petpooja-hosted-sync]]
