@@ -91,18 +91,28 @@ fi
 echo "✓ Service account : $EMAIL"
 echo "✓ Key file        : $KEY_FILE"
 
-printf '%s' "$EMAIL" | vercel env add GOOGLE_SERVICE_ACCOUNT_EMAIL production --sensitive --force --yes
-vercel env add GOOGLE_PRIVATE_KEY production --sensitive --force --yes < /tmp/.atelier-google-key.pem
+# The service account and the key, for production and for the development
+# environment. **Not for preview** — a preview build can be made from a fork,
+# and the key must not go there.
+for target in production development; do
+  printf '%s' "$EMAIL" | vercel env add GOOGLE_SERVICE_ACCOUNT_EMAIL "$target" --sensitive --force --yes
+  vercel env add GOOGLE_PRIVATE_KEY "$target" --sensitive --force --yes < /tmp/.atelier-google-key.pem
+done
+
+# Which sheet to read, and which tab of it.
+printf '%s' "${INVOICE_SHEET_SPREADSHEET_ID:-1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig}" \
+  | vercel env add INVOICE_SHEET_SPREADSHEET_ID production --force --yes
+printf '%s' "${INVOICE_SHEET_NAME:-Form Responses 1}" \
+  | vercel env add INVOICE_SHEET_NAME production --force --yes
+printf '%s' "${INVOICE_SHEET_RANGE:-A:V}" \
+  | vercel env add INVOICE_SHEET_RANGE production --force --yes
 
 rm -f /tmp/.atelier-google-key.pem
 
-echo "✓ Both variables are now on Vercel production."
+echo "✓ The service account and the sheet's settings are on Vercel."
 echo ""
 echo "Redeploying so the running app picks them up..."
 vercel redeploy "$PROJECT_URL" --no-wait
 
 echo ""
 echo "✓ Done. The nightly pull will read the sheet from now on."
-echo "  Remember to add these two variables as well:"
-echo "    INVOICE_SHEET_SPREADSHEET_ID  1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig"
-echo "    INVOICE_SHEET_NAME            the tab the expenses are on"
