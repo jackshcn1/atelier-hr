@@ -31,7 +31,10 @@
 #
 #      (that path is gitignored, so it will never be committed)
 #
-#   2. Share both sheets with the service account as a **Viewer**:
+#   2. Share both sheets with the service account as an **Editor**:
+#
+#        (Viewer is enough to read, but the site's expense form writes a row
+#         into the sheet, so it needs to be able to write)
 #
 #        the accountant's expense sheet
 #          https://docs.google.com/spreadsheets/d/1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig

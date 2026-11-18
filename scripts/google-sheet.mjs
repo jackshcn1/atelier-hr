@@ -20,7 +20,7 @@
  *       Lists the spreadsheets the service account can see. This is the
  *       "is my connection working?" check.
  *
- *   node scripts/google-sheet.mjs read [spreadsheetId] [--sheet <tab>] [--range <A1>]
+ *   node scripts/google-sheet.mjs read [spreadsheetId] [--sheet <tab>] [--gid <number>] [--range <A1>]
  *       Prints the headings and the rows of a sheet.
  *
  *   node scripts/google-sheet.mjs append <spreadsheetId> --tab <tab> --row <json>
@@ -49,7 +49,9 @@ const CONFIG_PATH = join(here, 'petpooja-config.json');
 const LOCAL_KEY_PATH = join(here, 'google-service-account.json');
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/spreadsheets.readonly',
+  // Read and write. The site's expense form appends a row to the sheet, so a
+  // read-only scope would let the nightly pull work and the form fail.
+  'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.readonly',
 ];
 
@@ -199,7 +201,7 @@ async function listSpreadsheets(drive) {
   }
 }
 
-async function readSheet(sheets, spreadsheetId, sheetName, range) {
+async function readSheet(sheets, spreadsheetId, sheetName, range, gid) {
   const res = await sheets.spreadsheets.get({
     spreadsheetId,
     fields: 'properties.title,sheets.properties',
@@ -208,7 +210,21 @@ async function readSheet(sheets, spreadsheetId, sheetName, range) {
   console.log(`Spreadsheet: ${res.data.properties?.title || spreadsheetId}`);
   console.log(`Tabs: ${tabs.map((t) => `${t.title}(${t.gridProperties?.rowCount}x${t.gridProperties?.columnCount})`).join(', ')}\n`);
 
-  const target = sheetName || tabs[0]?.title;
+  // A tab can be named or numbered. The number is the one in the tab's link
+  // (the `gid=` in the address), which is what a screenshot of the link gives.
+  const target =
+    sheetName ||
+    (gid !== undefined && gid !== true
+      ? (tabs.find((t) => String(t.sheetId) === String(gid)) || {}).title
+      : undefined) ||
+    tabs[0]?.title;
+
+  if (!target) {
+    console.error(`No tab with the number ${gid} on this spreadsheet.`);
+    console.error(`The tabs are: ${tabs.map((t) => `${t.title} (${t.sheetId})`).join(', ')}`);
+    process.exit(1);
+  }
+
   const values = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `${target}!${range || 'A:Z'}`,
@@ -289,7 +305,7 @@ async function main() {
       await listSpreadsheets(drive);
     } else if (command === 'read') {
       const id = args._[1] || process.env.INVOICE_SHEET_SPREADSHEET_ID || '1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig';
-      await readSheet(sheets, id, args.sheet, args.range);
+      await readSheet(sheets, id, args.sheet, args.range, args.gid);
     } else if (command === 'append') {
       const id = args._[1];
       if (!id) throw new Error('append needs a spreadsheet id.');
@@ -305,7 +321,8 @@ async function main() {
       console.error(
         `Google refused the request (403).\n` +
           `   The service account has to be given access to the sheet:\n` +
-          `   Share it with ${credentials.email} as a Viewer.`,
+          `   Share it with ${credentials.email} as an Editor — the site's\n` +
+          `   expense form writes rows into it, so Viewer is not enough.`,
       );
     } else if (status === 404) {
       console.error(

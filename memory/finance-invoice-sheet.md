@@ -94,7 +94,8 @@ The reading side exists (`lib/googleSheetsService.js` and
 `lib/invoiceSheet.js`) but it needs a Google **service account**:
 
 1. create a service account in Google Cloud and download its key;
-2. share the Sheet with the service account's email, as Viewer;
+2. share the Sheet with the service account's email, as **Editor** — the
+   site's expense form writes a row into the sheet, so Viewer is not enough;
 3. put the key on Vercel;
 4. lock the sheet's columns so the labels cannot drift.
 
