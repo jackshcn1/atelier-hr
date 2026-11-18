@@ -58,6 +58,10 @@ export async function POST(request) {
     // A cash entry is money in; everything else is money out.
     row.type = row.type === 'deposit' ? 'deposit' : 'expense';
 
+    // A petty entry typed in by a person is not the sheet's, so the sheet
+    // leaves it alone.
+    row.source = 'manual';
+
     const amount = Number(row.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       return Response.json({ success: false, error: 'An amount above zero is needed.' }, { status: 400 });

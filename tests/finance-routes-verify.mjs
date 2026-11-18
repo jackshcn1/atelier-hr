@@ -305,7 +305,9 @@ if (madeId) {
 //
 // The parser is checked on its own in tests/invoice-sheet-verify.mjs. What is
 // checked here is the writing: that a sheet row lands in the ledger with the
-// right shape, and that the same invoice number is never written twice.
+// right shape, that the same invoice number is never written twice, and that
+// a bill the sheet wrote is *updated* when the sheet changes — which is how
+// ticking a bill "Paid" in the sheet reaches the books.
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const SHEET_BILL = {
   bucket: 'fixed',
@@ -322,14 +324,31 @@ const SHEET_BILL = {
   reference: null,
 };
 
+const SHEET_PETTY = {
+  bucket: 'petty',
+  costType: 'petty',
+  category: 'Cleaning',
+  vendor: 'Sheet Route Check',
+  invoiceNo: 'SHEET-CHECK-2',
+  description: 'Petty written by the sheet test',
+  amount: 350,
+  invoiceDate: '2026-11-17',
+  paymentStatus: 'paid',
+  paymentDate: '2026-11-17',
+  paymentMethod: 'Cash',
+  reference: null,
+};
+
 let sheetBillId = null;
+let sheetPettyId = null;
+
 await check('a bill from the sheet is written into the ledger', async () => {
   const written = await writeInvoiceSheet(sb, [SHEET_BILL]);
   if (written.expensesWritten !== 1) throw new Error(`wrote ${written.expensesWritten} bills, expected 1`);
 
   const { data, error } = await sb
     .from('expenses')
-    .select('id, amount, cost_type, category, vendor_name, invoice_number, invoice_date, payment_status')
+    .select('id, amount, cost_type, category, vendor_name, invoice_number, invoice_date, payment_status, source')
     .eq('invoice_number', SHEET_BILL.invoiceNo);
   if (error) throw error;
   if (!data || data.length !== 1) throw new Error(`the sheet bill is not in the ledger (${data?.length} found)`);
@@ -341,15 +360,144 @@ await check('a bill from the sheet is written into the ledger', async () => {
   if (row.category !== 'Outlet Rent') throw new Error(`the category is ${row.category}`);
   if (row.invoice_date !== '2026-11-17') throw new Error(`the date is ${row.invoice_date}`);
   if (row.payment_status !== 'unpaid') throw new Error(`the payment state is ${row.payment_status}`);
+  if (row.source !== 'sheet') throw new Error(`the source is ${row.source}, expected sheet`);
 });
 
 await check('the same invoice on the sheet is not written twice', async () => {
   const written = await writeInvoiceSheet(sb, [SHEET_BILL]);
   if (written.expensesWritten !== 0) throw new Error(`wrote ${written.expensesWritten} bills again, expected 0`);
-  if (written.skippedExisting !== 1) throw new Error(`skipped ${written.skippedExisting}, expected 1`);
+  if (written.expensesUpdated !== 0) throw new Error(`updated ${written.expensesUpdated}, expected 0`);
+  if (written.unchanged !== 1) throw new Error(`unchanged ${written.unchanged}, expected 1`);
 
   const { data } = await sb.from('expenses').select('id').eq('invoice_number', SHEET_BILL.invoiceNo);
   if (!data || data.length !== 1) throw new Error(`the bill is on the ledger ${data?.length} times, expected once`);
+});
+
+await check('a bill marked paid on the sheet is updated in the books', async () => {
+  const written = await writeInvoiceSheet(sb, [
+    { ...SHEET_BILL, paymentStatus: 'paid', paymentDate: '2026-11-18' },
+  ]);
+  if (written.expensesUpdated !== 1) throw new Error(`updated ${written.expensesUpdated}, expected 1`);
+
+  const { data } = await sb
+    .from('expenses')
+    .select('payment_status, payment_date')
+    .eq('invoice_number', SHEET_BILL.invoiceNo);
+  if (!data || data.length !== 1) throw new Error(`the sheet bill is on the ledger ${data?.length} times`);
+  if (data[0].payment_status !== 'paid') throw new Error(`the payment state is ${data[0].payment_status}`);
+  if (data[0].payment_date !== '2026-11-18') throw new Error(`the payment date is ${data[0].payment_date}`);
+});
+
+await check('a bill somebody else wrote is not written again by the sheet', async () => {
+  // A bill typed in by hand, under an invoice number the sheet does not use.
+  const { data: made, error } = await sb
+    .from('expenses')
+    .insert({
+      category: 'Other',
+      cost_type: 'variable',
+      entry_type: 'actual',
+      status: 'approved',
+      amount: 500,
+      debit_note: 0,
+      vendor_name: 'Typed In By Hand',
+      invoice_number: 'SHEET-CHECK-3',
+      invoice_date: '2026-11-17',
+      payment_status: 'unpaid',
+      source: 'manual',
+    })
+    .select('id, amount, source');
+  if (error) throw error;
+
+  try {
+    const written = await writeInvoiceSheet(sb, [
+      { ...SHEET_BILL, invoiceNo: 'SHEET-CHECK-3' },
+    ]);
+    if (written.skippedExisting !== 1) throw new Error(`skipped ${written.skippedExisting}, expected 1`);
+    if (written.expensesWritten !== 0) throw new Error(`wrote ${written.expensesWritten}, expected 0`);
+
+    const { data } = await sb
+      .from('expenses')
+      .select('id, amount, source')
+      .eq('invoice_number', 'SHEET-CHECK-3');
+    if (!data || data.length !== 1) throw new Error(`the bill is on the ledger ${data?.length} times, expected once`);
+    if (data[0].source !== 'manual') throw new Error(`the bill is now the sheet's: ${data[0].source}`);
+    if (Number(data[0].amount) !== 500) throw new Error(`the hand-written bill was changed to ${data[0].amount}`);
+  } finally {
+    await sb.from('expenses').delete().eq('id', made[0].id);
+  }
+});
+
+await check('a bill the sheet wrote is still updated when somebody else has one too', async () => {
+  // The same invoice number, written twice: once by the sheet and once by
+  // hand. The sheet updates its own row and leaves the hand-written one alone.
+  const { data: made, error } = await sb
+    .from('expenses')
+    .insert({
+      category: 'Other',
+      cost_type: 'variable',
+      entry_type: 'actual',
+      status: 'approved',
+      amount: 500,
+      debit_note: 0,
+      vendor_name: 'Typed In By Hand',
+      invoice_number: SHEET_BILL.invoiceNo,
+      invoice_date: '2026-11-17',
+      payment_status: 'unpaid',
+      source: 'manual',
+    })
+    .select('id');
+  if (error) throw error;
+
+  try {
+    const written = await writeInvoiceSheet(sb, [
+      { ...SHEET_BILL, paymentStatus: 'paid', paymentDate: '2026-11-19' },
+    ]);
+    if (written.expensesUpdated !== 1) throw new Error(`updated ${written.expensesUpdated}, expected 1`);
+    if (written.expensesWritten !== 0) throw new Error(`wrote ${written.expensesWritten}, expected 0`);
+
+    const { data } = await sb
+      .from('expenses')
+      .select('source, amount, payment_status, payment_date')
+      .eq('invoice_number', SHEET_BILL.invoiceNo);
+    const sheetRow = data.find((row) => row.source === 'sheet');
+    const handRow = data.find((row) => row.source === 'manual');
+    if (!sheetRow) throw new Error('the sheet lost its own row');
+    if (sheetRow.payment_status !== 'paid') throw new Error(`the sheet row is ${sheetRow.payment_status}`);
+    if (sheetRow.payment_date !== '2026-11-19') throw new Error(`the sheet row's date is ${sheetRow.payment_date}`);
+    if (!handRow) throw new Error('the hand-written bill is gone');
+    if (Number(handRow.amount) !== 500) throw new Error(`the hand-written bill was changed to ${handRow.amount}`);
+  } finally {
+    await sb.from('expenses').delete().eq('id', made[0].id);
+  }
+});
+
+await check('a petty entry from the sheet is written, and kept', async () => {
+  const written = await writeInvoiceSheet(sb, [SHEET_PETTY]);
+  if (written.pettyWritten !== 1) throw new Error(`wrote ${written.pettyWritten} petty entries, expected 1`);
+
+  const { data, error } = await sb
+    .from('petty_cash_ledger')
+    .select('id, amount, vendor_name, reference, source')
+    .eq('reference', SHEET_PETTY.invoiceNo);
+  if (error) throw error;
+  if (!data || data.length !== 1) throw new Error(`the petty entry is not in the ledger (${data?.length} found)`);
+
+  sheetPettyId = data[0].id;
+  if (Number(data[0].amount) !== 350) throw new Error(`the amount is ${data[0].amount}`);
+  if (data[0].source !== 'sheet') throw new Error(`the source is ${data[0].source}, expected sheet`);
+});
+
+await check('a petty entry changed on the sheet is updated, not written again', async () => {
+  const written = await writeInvoiceSheet(sb, [{ ...SHEET_PETTY, amount: 375 }]);
+  if (written.pettyUpdated !== 1) throw new Error(`updated ${written.pettyUpdated}, expected 1`);
+  if (written.pettyWritten !== 0) throw new Error(`wrote ${written.pettyWritten} again, expected 0`);
+
+  const { data } = await sb
+    .from('petty_cash_ledger')
+    .select('amount')
+    .eq('reference', SHEET_PETTY.invoiceNo);
+  if (!data || data.length !== 1) throw new Error(`the petty entry is on the ledger ${data?.length} times`);
+  if (Number(data[0].amount) !== 375) throw new Error(`the amount is ${data[0].amount}`);
 });
 
 if (sheetBillId) {
@@ -357,6 +505,14 @@ if (sheetBillId) {
   await check('the bill written by the test is removed again', async () => {
     const { data } = await sb.from('expenses').select('id').eq('invoice_number', SHEET_BILL.invoiceNo);
     if (data && data.length > 0) throw new Error('the test bill is still in the ledger');
+  });
+}
+
+if (sheetPettyId) {
+  await sb.from('petty_cash_ledger').delete().eq('id', sheetPettyId);
+  await check('the petty entry written by the test is removed again', async () => {
+    const { data } = await sb.from('petty_cash_ledger').select('id').eq('reference', SHEET_PETTY.invoiceNo);
+    if (data && data.length > 0) throw new Error('the test petty entry is still in the ledger');
   });
 }
 
