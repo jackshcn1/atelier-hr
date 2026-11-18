@@ -14,81 +14,99 @@ pest control, marketing — come in through a Google Sheet the accountant
 fills in. The system reads it.
 
 **The reader is built** (`lib/invoiceSheet.js`, wired into the nightly run as
-`?sheet=1`). **It is dormant** until the Google service account is set up —
-without the key it answers "skipped" and the nightly run carries on. The
-column set below is what the reader expects; it is waiting on the owner's
-word-for-word confirmation.
+`?sheet=1`) and it has read the real sheet — the columns below are the sheet
+as it is, not a guess. The service account is set up and the sheet is shared
+with it, so the nightly pull reads it.
+
+To pull it by hand: `node scripts/import-invoice-sheet.mjs`.
 
 ## The mechanic
 
-A **Google Form** whose answers land in a Sheet. The system reads the Sheet
-on the nightly run and on demand. The form is the accountant's front end, so
-the column names are the form's question labels.
+A **Google Form** whose answers land in a Sheet — "Expense Entries
+(Responses)", tab "Form Responses 1". The system reads the Sheet on the
+nightly run and on demand, and the site's own expense form writes a row into
+it. The Sheet is the record; the books follow it.
 
-## The columns
+## The columns — as the sheet really is
 
-| # | Column | Type | Required | Why it is there |
-|---|---|---|---|---|
-| 1 | `invoice_date` | date | yes | which month the invoice lands in |
-| 2 | `vendor` | dropdown | yes | who was paid |
-| 3 | `invoice_no` | text | yes | **the identity of the invoice** — this is what stops the same bill being counted twice |
-| 4 | `description` | text | no | what it was for |
-| 5 | `amount` | number | yes | the invoice amount |
-| 6 | `bucket` | dropdown | yes | **where it goes: Variable / Fixed / Petty / Exclude** |
-| 7 | `category` | dropdown | yes | Electricity, Gas, Water, Rent, Pest control, Marketing, … |
-| 8 | `payment_status` | dropdown | yes | Paid / Pending — Pending shows under money owed |
-| 9 | `payment_date` | date | if Paid | when it was paid |
-| 10 | `payment_method` | dropdown | no | Cash / UPI / NEFT / RTGS / Card |
-| 11 | `reference` | text | no | UTR or transaction reference, to match the bank statement |
+The sheet is a **Form's response sheet**, so it has one row per entry and
+**three blocks of columns**, and the entry's type decides which block holds
+it. Column C ("Type of Expense") is the switch.
 
-Google Forms adds its own timestamp column, which the row id falls back to.
+| | Column | What it holds |
+|---|---|---|
+| A | Timestamp | when the entry was made — **the row's identity** |
+| B | Email Address | who filled the form |
+| C | Type of Expense | `Variable Cost` / `Fixed Cost` / petty |
+| D | Variable Cost Type | the category — Outlet Electricity, Gas, Waste Collection, Maintenance, Fire Extinguisher Service |
+| E | Amount (Variable Cost) | |
+| F | Date of Invoice (Variable Cost) | |
+| G | Invoice Attachment (if available) (Variable Cost) | the invoice, on Drive |
+| H | Invoice Paid on (ignore if not paid) (Variable Cost) | **empty means not paid** |
+| I | Fixed Cost Type | Outlet Rent, Airtel Broadband Monthly, Digital Marketing Monthly, Pest Control, Internal Signage Rent |
+| J | Amount (Fixed Cost) | |
+| K | Date of Invoice (Fixed Cost) | |
+| L | Invoice Upload (if available) (Fixed Cost) | |
+| M | Invoice Paid on (ignore if not paid) (Fixed Cost) | |
+| N | Petty expense or Cash top-up? | **Expense or Cash top-up** — a top-up is money *into* the float |
+| O | Date (Petty Expense) | |
+| P | Amount (Petty Expense) | |
+| Q | Name of Recipient (only for expense) | the petty supplier |
+| R | Purpose (only for expense) | |
+| S | Voucher upload (only for expense) | |
 
-**The columns are found by NAME, not by position.** A Form adds its own
-timestamp column, the accountant may add another, and the columns may be
-moved. The reader looks each one up by its heading, so a column that is
-reordered does not break it. A column has to be spelled one of the names the
-reader accepts — `SHEET_COLUMNS` in `lib/invoiceSheet.js` is the one list, and
-it accepts a few natural synonyms (`Supplier` for `vendor`, `Bill No` for
-`invoice_no`, `Paid On` for `payment_date`).
+### The three columns this system adds
 
-A heading is normalised before it is compared: lower case, and anything that
-is not a letter or a digit becomes an underscore. So `Invoice No.`,
-`invoice no` and `INVOICE_NO` all find the same column.
+| | Column | What it holds |
+|---|---|---|
+| T | Supplier | who the bill was paid to. **The Form has no supplier question for the variable and fixed blocks**, so this column is how the accountant says who it was — including for the entries that are already there. Until they do, the cost type stands in. |
+| U | Entry ID | the row's own identity, written by the site's form. A Form row has none, so the Timestamp stands in. |
+| V | Invoice Number | the invoice number, when there is one. |
 
-**The reader accepts the forms a Form produces.** A date may be `dd/mm/yyyy`
-or `yyyy-mm-dd`; an amount may carry a rupee sign and thousands separators
-(`₹ 12,500.00`); a payment state of `Paid`, `Settled` or `Cleared` is paid,
-and `Pending`, `Unpaid` or `Due` is not.
+`scripts/setup-invoice-sheet.mjs` adds these three columns to the tab.
 
-## What each bucket does
+**The columns are found by NAME, not by position.** The Form may add a
+question, the accountant may add a column, and the columns may be moved. The
+reader looks each one up by what its heading says, and a heading is
+normalised first: lower case, and anything that is not a letter or a digit
+becomes an underscore. `Amount (Variable Cost)` and `Amount (Fixed Cost)` are
+different columns with the same word in them, and the reader tells them apart
+by the block they name.
 
-| Bucket | Where it lands |
+**The reader accepts the forms a Form produces.** A date may be
+`yyyy-mm-dd`, `April 24, 2026`, or `5/1/2026` — and the Form's own date
+picker writes the **month first** ("3/31/2026" is on the sheet, and a 31
+cannot be a month), so a slash date is read as month/day/year. An amount may
+carry a rupee sign and thousands separators (`₹ 12,500.00`).
+
+## What each type does
+
+| Type | Where it lands |
 |---|---|
-| `Variable` | the month's cost of revenue — electricity, gas, water, marketing |
-| `Fixed` | the month's fixed costs — rent, pest control, insurance |
-| `Petty` | a petty cash expense — it comes off the float, and the float is checked against it |
-| `Exclude` | nowhere — a capital purchase, a loan, a duplicate |
+| `Variable Cost` | the month's cost of revenue — electricity, gas, waste, maintenance |
+| `Fixed Cost` | the month's standing costs — rent, pest control, broadband, marketing, signage |
+| petty | the petty cash float — an **Expense** comes off it, a **Cash top-up** goes into it |
 
 ## The four rules that stop double counting
 
-1. **A bill is identified by its invoice number.** A row the sheet wrote is
-   **updated** when the sheet changes — that is how ticking a bill "Paid"
-   reaches the books. A row anybody else wrote — the Petpooja pull, or a
-   person on the site — is left alone, so even if the accountant types a
-   Petpooja bill in, it is counted once — the Petpooja one. No reliance on
-   everyone remembering not to.
-2. **The bucket decides where an invoice lands.** Rent is `Fixed` and
-   electricity is `Variable`, so they cannot both end up in the same place.
-   This is the answer to "outlet rent shows in fixed and variable".
+1. **A row is identified by its own key, not by what it says.** The key is
+   the Entry ID this system writes, or — for a row typed in the Google Form —
+   the moment the entry was made. The amount and the date are *not* part of
+   it, because the accountant is allowed to correct those, and a bill must
+   still be found after it has been corrected. Otherwise a correction would
+   leave the old bill in the books and add the corrected one next to it.
+2. **The type decides where an invoice lands.** Rent is fixed and electricity
+   is variable, so they cannot both end up in the same place. This is the
+   answer to "outlet rent shows in fixed and variable".
 3. **The fixed-cost list stops holding amounts.** It becomes a list of the
    standing costs to remember — name, category, billing cycle — and the
    amount comes from the sheet. A standing cost with no row for the month
-   reads as **"not received yet"**, not as a stale number from March.
+   reads as **"not received yet"**, not as a stale number from March. The
+   sheet's cost type is matched to the standing cost by name, with the noise
+   words left out: "Airtel Broadband Monthly" finds "Airtel Broadband",
+   "Pest Control" finds "Sequire Pest Control".
 4. **Salary is never typed.** It comes from HRMS, forecast then actual, so
-   the bucket list has no "salary" option.
-
-The same sheet row typed twice is also caught — the sheet is de-duplicated on
-`invoice_no` before anything is written.
+   there is no "salary" type.
 
 ### Who wrote a row — the `source` column
 
@@ -103,7 +121,9 @@ The same sheet row typed twice is also caught — the sheet is de-duplicated on
 
 It is what makes rule 1 work. The sheet **updates its own rows** and never
 writes over anybody else's, and it never adds a second row for an invoice
-number that is already in the books. The Petpooja pull marks its own rows
+number that is already in the books. The `source_key` column says *which*
+sheet row a cost came from, and it is what finds that row again after a
+correction. The Petpooja pull marks its own rows
 `petpooja` every night, so the mark heals itself; a Petpooja bill that the
 accountant also typed into the sheet ends up as the Petpooja row, whichever
 arrived first.
