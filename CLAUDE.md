@@ -51,7 +51,7 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
    - Finance (`/finance`) — the four finance modules, on the calendar month
    - Costs & Expenses (`/finance/costs`) — revenue channels and the cost breakdown
    - New Expense (`/finance/costs/new`) — the accountant's entry form: variable / fixed / petty, with the supplier as a type-ahead that can add a new supplier. It writes a row into the accountant's Google Sheet, and the sheet is pulled into the books
-   - Bill Entry (`/finance/costs/entry`) — log a bill by hand (the fallback path)
+   - Bill Entry (`/finance/costs/entry`) — log a bill by hand (the fallback path): the category follows the kind of cost (fixed = the standing costs, closed; variable = the moving costs + Other), the supplier is a type-ahead that can add a new supplier, and the invoice itself can be attached — the file goes into the restaurant's Drive folder and the bill keeps the link
    - Standing Costs (`/finance/costs/fixed`) — the expected monthly costs; the month's invoice replaces the expected amount
    - Petty Cash (`/finance/costs/petty`) — Cash entry (money in) or Expense (money out)
    - Bills (`/finance/bills`) — what the restaurant owes its suppliers, bill by bill
@@ -101,6 +101,7 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - **Executive Employee Dossier**: Segmented tabbed profile layout (`Job & Hierarchy`, `Personal & ID`, `Compensation & Slips`, `Assets & Facilities`, `Compliance & Training`, `Notes & Record`, `Exit & Offboarding`), interactive 1:1 square photo cropper with zoom/pan, unified asset inventory with deposit status, and full multi-section master record print dossier.
 - **Recruitment Pipeline**: Atelier design system layout with headcount positions, active pipeline tracking, candidate evaluation scoring, and stage transitions.
 - **Exit Clearance & Resignation Gateway**: Mandatory resignation letter upload gate to move employees to "Serving Notice Period" (`on-notice`), mandatory exit clearance checklist completion gate before marking employees as "Exited Staff" (`status = exited`), statutory Gratuity auto-calculation formula (`(15 * Basic+DA * Years) / 26` with 5-year floor), deposit refund tracking with refund dates and toggles, asset tag serial verification, and full lifetime exit archive embedded into the personnel dossier.
+- **Bill Entry with the Invoice Attached**: A bill typed in by hand can have the invoice itself attached — a PDF or a photograph, up to ten megabytes — which goes into the restaurant's own Google Drive folder and is kept as a link on the bill. `lib/googleDrive.js` does the upload; the Drive API has to be switched on in the Google Cloud project and the service account given access to the folder.
 - **Personalized & Master Variable Pay Policy Documents**: Real-time customized variable pay target document (`/documents/my-variable-pay-target`) calculating dynamic Fixed vs Variable CTC ratios, weighted metric component rupee distributions, and an Executive Master Directory (`/documents/master-variable-pay-policy`) compiling all role-based schemes into a single real-time reference.
 
 ---
