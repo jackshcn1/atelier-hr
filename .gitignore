@@ -75,3 +75,4 @@ scripts/*service-account*.json
 # Google OAuth client file (the client secret is in it) — NEVER commit
 scripts/google-oauth-client.json
 scripts/*oauth-client*.json
+scripts/client_secret_*.json
