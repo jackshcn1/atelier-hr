@@ -55,11 +55,17 @@ it. Column C ("Type of Expense") is the switch.
 | R | Purpose (only for expense) | |
 | S | Voucher upload (only for expense) | |
 
+The attachment column holds the invoice on Drive, and the pull carries that
+link into the bill's **`invoice_attachment`** column — the same column a bill
+uploaded through the site uses — so **See the invoice** works on the bills page
+for a bill that came in through the Form. The bank reference stays the invoice
+number, so the two are never mixed up.
+
 ### The three columns this system adds
 
 | | Column | What it holds |
 |---|---|---|
-| T | Supplier | who the bill was paid to. **The Form has no supplier question for the variable and fixed blocks**, so this column is how the accountant says who it was — including for the entries that are already there. Until they do, the cost type stands in. |
+| T | Supplier | who the bill was paid to. **The Form has no supplier question for the variable and fixed blocks**, so this column is how the accountant says who it was — including for the entries that are already there. Until they do, the cost type stands in. Seven of the nineteen rows already name their supplier — Airtel, Sequire Pest Control and Triads, the three the books could prove. |
 | U | Entry ID | the row's own identity, written by the site's form. A Form row has none, so the Timestamp stands in. |
 | V | Invoice Number | the invoice number, when there is one. |
 
