@@ -609,6 +609,74 @@ await check('the upload is refused until the Google account is connected', async
   if (!/not connected/i.test(result.error)) throw new Error(`the answer does not say why: ${result.error}`);
 });
 
+// The invoice, served to whoever is signed in.
+//
+// The file lives in the restaurant's Drive, owned by the connected account, so
+// the site serves it rather than sending Drive's own link — a colleague
+// without a Google account, or with a different one, would be turned away by
+// Drive. The file id is looked up from the bill, never taken from the
+// request, so this route cannot be used to read anything else in that Drive.
+const { GET: invoiceGET } = await import('../app/api/finance/expenses/invoice/[id]/route.js');
+
+await check('the invoice is served through the site', async () => {
+  const res = await invoiceGET(
+    new Request('https://atelier.test/api/finance/expenses/invoice/00000000-0000-0000-0000-000000000000'),
+    { params: { id: '00000000-0000-0000-0000-000000000000' } },
+  );
+  if (res.status !== 404) throw new Error(`a bill that is not there was answered with ${res.status}`);
+});
+
+await check('a Drive file id on its own is not enough', async () => {
+  const fileId = '1cPMD4yMDu28r_CIwr4HJTYdLt-jEqyUW';
+  const res = await invoiceGET(
+    new Request(`https://atelier.test/api/finance/expenses/invoice/${fileId}`),
+    { params: { id: fileId } },
+  );
+  if (res.status !== 404) throw new Error(`a file id was answered with ${res.status}, expected 404`);
+});
+
+await check('the invoice of a bill is fetched through the connected account', async () => {
+  const { data: connected } = await sb
+    .from('google_drive_tokens')
+    .select('refresh_token')
+    .eq('provider', 'google');
+  const isConnected = (connected || []).some((row) => row.refresh_token);
+
+  const link = 'https://drive.google.com/file/d/test-file-id/view';
+  const res = await expensesPOST(
+    post('/api/finance/expenses', {
+      category: 'Other',
+      cost_type: 'variable',
+      amount: 323,
+      vendor_name: 'Invoice Check',
+      invoice_date: '2026-11-17',
+      payment_status: 'unpaid',
+      invoice_attachment: link,
+    }),
+  );
+  const created = await json(res);
+  if (!created.body.success) throw new Error(JSON.stringify(created.body).slice(0, 200));
+
+  try {
+    const invoice = await invoiceGET(
+      new Request(`https://atelier.test/api/finance/expenses/invoice/${created.body.data.id}`),
+      { params: { id: created.body.data.id } },
+    );
+
+    if (isConnected) {
+      // The account is connected, so it goes looking for the file — and that
+      // file id is not a real one, so it cannot be served.
+      if (invoice.status === 200) throw new Error('a file that does not exist was served');
+    } else {
+      if (invoice.status !== 503) throw new Error(`it was answered with ${invoice.status}, expected 503`);
+      const body = await invoice.json();
+      if (!/not connected/i.test(body.error)) throw new Error(`the answer does not say why: ${body.error}`);
+    }
+  } finally {
+    await sb.from('expenses').delete().eq('id', created.body.data.id);
+  }
+});
+
 await check('a bill keeps the link to its invoice', async () => {
   const link = 'https://drive.google.com/file/d/test-file-id/view';
   const res = await expensesPOST(

@@ -258,14 +258,28 @@ export default function BillsPage() {
                                     <span className="block text-xs text-[#6b635c]">{bill.description}</span>
                                   )}
                                   {bill.invoice_attachment && isDriveLink(bill.invoice_attachment) && (
-                                    <a
-                                      href={bill.invoice_attachment}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="block text-xs text-[#8b6f4e] underline mt-0.5"
-                                    >
-                                      See the invoice
-                                    </a>
+                                    <>
+                                      {/* The site serves the file, so it opens for
+                                          anyone signed in — a colleague without a
+                                          Google account, or with a different one,
+                                          would be turned away by Drive. */}
+                                      <a
+                                        href={`/api/finance/expenses/invoice/${bill.id}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="block text-xs text-[#8b6f4e] underline mt-0.5"
+                                      >
+                                        See the invoice
+                                      </a>
+                                      <a
+                                        href={bill.invoice_attachment}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="block text-xs text-[#8b6f4e] underline mt-0.5"
+                                      >
+                                        Open in Drive
+                                      </a>
+                                    </>
                                   )}
                                 </td>
                                 <td className="table-cell text-[#6b635c]">{bill.invoice_date || '—'}</td>

@@ -298,5 +298,21 @@ The consent screen has to be in **Production** status, with the restaurant's
 account added as a **test user** — that is enough for one account, and it
 does not need Google's verification.
 
+### Who can upload, and who can open the invoice
+
+The connection is **one setting for the whole site**, not a personal one — one
+row in `google_drive_tokens`. Every signed-in person can attach an invoice;
+the upload is made with the restaurant's token, so the file is owned by the
+connected account whoever pressed the button. Only the **Connect** button is
+admin-only, because connecting hands the site read/write over that account.
+
+The file is owned by the connected Google account, so **Drive's own link
+turns away a colleague** whose Google account is not that one — and an
+employee with no Google account cannot open it at all. So the site serves the
+file instead: `/api/finance/expenses/invoice/[id]` looks the file id up
+**from the bill** (never from the request) and streams it to whoever is
+signed in. The bills page shows that link as **See the invoice**, and keeps
+**Open in Drive** beside it for the person who owns the account.
+
 Related: [[finance-calendar-month]], [[finance-salary-and-standing-costs]],
 [[petpooja-hosted-sync]]
