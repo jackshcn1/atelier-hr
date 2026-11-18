@@ -67,6 +67,8 @@ export default function ExpenseEntryForm() {
   const [file, setFile] = useState(null);
   const [attachment, setAttachment] = useState(null);
   const [uploading, setUploading] = useState(false);
+  // Set when the upload failed because the Google account is not connected.
+  const [connectUrl, setConnectUrl] = useState(null);
 
   // The fixed costs are the standing costs — the ones the restaurant expects
   // to pay every month. That list is closed: a fixed bill is one of them, and
@@ -139,10 +141,12 @@ export default function ExpenseEntryForm() {
 
         if (!result.success) {
           setMessage(`Error: ${result.error}`);
+          setConnectUrl(result.connectUrl || null);
           return;
         }
         link = result.data.link;
         setAttachment(result.data);
+        setConnectUrl(null);
       }
 
       const response = await fetch('/api/finance/expenses', {
@@ -307,6 +311,18 @@ export default function ExpenseEntryForm() {
                       ? `Attached — ${attachment.name}`
                       : 'A PDF or a photograph of the invoice. It goes into the restaurant\u2019s Drive folder, and the bill keeps the link to it.'}
                   </p>
+                  {connectUrl && (
+                    <p className="text-xs text-[#8b6f4e] mt-2">
+                      <a
+                        href={`${connectUrl}?next=${encodeURIComponent('/finance/costs/entry')}`}
+                        className="underline"
+                      >
+                        Connect Google Drive
+                      </a>{' '}
+                      — the restaurant’s Google account has to be connected once before an
+                      invoice can be uploaded.
+                    </p>
+                  )}
                 </div>
 
                 <div className="field md:col-span-2">

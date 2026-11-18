@@ -1,4 +1,5 @@
-import { uploadToDrive, INVOICE_FOLDER_ID, driveReady } from '../../../../../lib/googleDrive.js';
+import { uploadInvoiceToDrive } from '../../../../../lib/googleUserDrive.js';
+import { INVOICE_FOLDER_ID } from '../../../../../lib/googleDrive.js';
 
 // The invoice upload.
 //
@@ -6,14 +7,20 @@ import { uploadToDrive, INVOICE_FOLDER_ID, driveReady } from '../../../../../lib
 // photograph of it. The file goes into the restaurant's own Drive folder, and
 // the bill keeps the link to it.
 //
-// Two things have to be in place on the Google side, and both are said plainly
-// when they are not:
+// The upload is made as the restaurant's **own Google account**, not as the
+// service account: Google gives a service account no Drive storage of its
+// own, so a file it creates is refused with "Service Accounts do not have
+// storage quota". The account connects once, through Google's own sign-in
+// (Settings → Google Drive), and from then on the upload goes in as that
+// account — the file is owned by the account, it lands in the folder, and
+// the person can open it.
+//
+// Two things have to be in place on the Google side, and both are said
+// plainly when they are not:
 //
 //   1. the **Drive API** has to be switched on in the Google Cloud project
 //      `my-project-27246-510206` (the Sheets API alone cannot store files);
-//   2. the service account has to be given access to the invoice folder —
-//      "Anyone with the link, Editor" is enough, and it is the same account
-//      the sheet is shared with.
+//   2. the restaurant's Google account has to be connected, in Settings.
 
 const ALLOWED = {
   'application/pdf': 'pdf',
@@ -38,14 +45,6 @@ function fileName(name, extension) {
 
 export async function POST(request) {
   try {
-    const ready = driveReady();
-    if (!ready.ok) {
-      return Response.json(
-        { success: false, error: `The Google key is not set up: ${ready.reason}` },
-        { status: 503 },
-      );
-    }
-
     const form = await request.formData();
     const file = form.get('file');
     const name = String(form.get('name') || '').trim();
@@ -74,7 +73,7 @@ export async function POST(request) {
       );
     }
 
-    const uploaded = await uploadToDrive({
+    const uploaded = await uploadInvoiceToDrive({
       folderId: INVOICE_FOLDER_ID,
       name: fileName(name || file.name, extension),
       mimeType: type,
@@ -83,6 +82,21 @@ export async function POST(request) {
 
     return Response.json({ success: true, data: uploaded });
   } catch (error) {
+    // The account has not been connected yet — that is the one thing the
+    // person can fix themselves, so it says exactly what to do.
+    if (error?.code === 'NOT_CONNECTED') {
+      return Response.json(
+        {
+          success: false,
+          error:
+            "The restaurant's Google account is not connected yet. Open Settings → Google Drive and " +
+            'press "Connect Google Drive", then attach the invoice again.',
+          connectUrl: '/api/google-drive/connect',
+        },
+        { status: 503 },
+      );
+    }
+
     const status = error?.response?.status;
     if (status === 403) {
       const raw = String(error?.message || '');
@@ -95,8 +109,9 @@ export async function POST(request) {
             ? 'The Drive API is not switched on for the project. Turn it on at ' +
               'https://console.cloud.google.com/apis/library/drive.googleapis.com?project=my-project-27246-510206 ' +
               'and try again.'
-            : 'Google refused the upload (403). The service account has to be given access to the ' +
-              'invoice folder — share it with variable-pay-feedback-sync@my-project-27246-510206.iam.gserviceaccount.com.',
+            : 'Google refused the upload (403). The connected account may not have access to the ' +
+              'invoice folder — check that the folder is shared with ' +
+              'ateliernextplate@gmail.com.',
         },
         { status: 503 },
       );
@@ -106,8 +121,8 @@ export async function POST(request) {
         {
           success: false,
           error:
-            'The invoice folder was not found. The service account has to be given access to it — ' +
-            'share it with variable-pay-feedback-sync@my-project-27246-510206.iam.gserviceaccount.com.',
+            'The invoice folder was not found. The connected account has to have access to it — ' +
+            'share the folder with ateliernextplate@gmail.com.',
         },
         { status: 503 },
       );
