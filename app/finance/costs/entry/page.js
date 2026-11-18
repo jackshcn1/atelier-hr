@@ -2,24 +2,39 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import SupplierPicker from '../../../components/SupplierPicker';
 
-// The categories a cost can fall under. These are the buckets the P&L and
-// the cost breakdown group by.
-const CATEGORIES = [
-  'Rent',
-  'Salaries',
-  'Electricity',
+// Log a Bill — a bill the Petpooja pull does not know about.
+//
+// The category follows the kind of cost: a fixed bill is one of the standing
+// costs, and a variable bill is one of the costs that move with the business.
+// The supplier is a type-ahead over the supplier list, and the invoice itself
+// can be attached — the file goes into the restaurant's own Drive folder.
+
+const PAYMENT_MODES = ['UPI', 'NEFT', 'RTGS', 'Cash', 'Credit Card'];
+
+// The variable costs — the ones that move with the business.
+const VARIABLE_CATEGORIES = [
+  'Outlet Electricity',
   'Gas',
-  'Water',
-  'Internet',
-  'Vendor',
+  'Waste Collection',
   'Maintenance',
-  'Marketing',
+  'Fire Extinguisher Service',
+  'Water',
   'Office Supplies',
   'Other',
 ];
 
-const PAYMENT_MODES = ['UPI', 'NEFT', 'RTGS', 'Cash', 'Credit Card'];
+// The fixed costs — the standing costs, if the list cannot be fetched.
+const FIXED_FALLBACK = [
+  'Outlet Rent',
+  'Airtel Broadband',
+  'Digital Marketing Retainer',
+  'Sequire Pest Control',
+  'Internal Signage Rental',
+  'Staff Accommodation Rent',
+  'Petpooja Annual Bill',
+];
 
 const BLANK = {
   category: '',
@@ -35,41 +50,70 @@ const BLANK = {
   payment_date: '',
   payment_mode: '',
   bank_reference: '',
+  invoice_attachment: '',
 };
 
 export default function ExpenseEntryForm() {
-  const [vendors, setVendors] = useState([]);
   const [formData, setFormData] = useState(BLANK);
-  const [otherVendor, setOtherVendor] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [saved, setSaved] = useState(null);
 
+  // The categories for each kind of cost.
+  const [fixedCategories, setFixedCategories] = useState(FIXED_FALLBACK);
+  const [variableCategories, setVariableCategories] = useState(VARIABLE_CATEGORIES);
+
+  // The invoice itself.
+  const [file, setFile] = useState(null);
+  const [attachment, setAttachment] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  // The fixed costs are the standing costs — the ones the restaurant expects
+  // to pay every month. That list is closed: a fixed bill is one of them, and
+  // it is what ticks the standing cost off for the month.
   useEffect(() => {
-    fetch('/api/finance/vendors')
+    fetch('/api/finance/fixed-costs')
       .then((r) => r.json())
       .then((d) => {
-        if (d.success) setVendors(d.data);
+        if (!d.success || !Array.isArray(d.data)) return;
+        const names = d.data.map((row) => row.category || row.name).filter(Boolean);
+        if (names.length > 0) setFixedCategories(names);
       })
       .catch(() => {});
   }, []);
+
+  // The variable costs the sheet already uses, so the list keeps up with what
+  // is actually being entered.
+  useEffect(() => {
+    fetch('/api/finance/expenses/sheet')
+      .then((r) => r.json())
+      .then((d) => {
+        const used = d?.data?.costTypes?.variable || [];
+        if (used.length === 0) return;
+        setVariableCategories([
+          ...used,
+          ...VARIABLE_CATEGORIES.filter((name) => !used.includes(name)),
+        ]);
+      })
+      .catch(() => {});
+  }, []);
+
+  const categories = formData.cost_type === 'fixed' ? fixedCategories : variableCategories;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Picking "another supplier" clears the vendor that was chosen, so the
-  // name typed in is the one that is used.
-  const handleVendorChoice = (e) => {
-    const value = e.target.value;
-    if (value === '__other__') {
-      setOtherVendor(true);
-      setFormData((prev) => ({ ...prev, vendor_name: '' }));
-      return;
-    }
-    setOtherVendor(false);
-    setFormData((prev) => ({ ...prev, vendor_name: value }));
+  // Switching the kind of cost changes the categories — so a category that
+  // does not belong to the new kind is cleared.
+  const handleCostType = (value) => {
+    const options = value === 'fixed' ? fixedCategories : variableCategories;
+    setFormData((prev) => ({
+      ...prev,
+      cost_type: value,
+      category: options.includes(prev.category) ? prev.category : '',
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -79,10 +123,32 @@ export default function ExpenseEntryForm() {
     setSaved(null);
 
     try {
+      // The invoice goes up first, so the bill is saved with its link.
+      let link = attachment?.link || '';
+      if (file && !link) {
+        setUploading(true);
+        const body = new FormData();
+        body.append('file', file);
+        body.append('name', file.name);
+        const uploaded = await fetch('/api/finance/expenses/attachment', {
+          method: 'POST',
+          body,
+        });
+        const result = await uploaded.json();
+        setUploading(false);
+
+        if (!result.success) {
+          setMessage(`Error: ${result.error}`);
+          return;
+        }
+        link = result.data.link;
+        setAttachment(result.data);
+      }
+
       const response = await fetch('/api/finance/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, invoice_attachment: link }),
       });
 
       const result = await response.json();
@@ -91,15 +157,21 @@ export default function ExpenseEntryForm() {
         setSaved(result.data);
         setMessage('Bill saved.');
         setFormData({ ...BLANK, cost_type: formData.cost_type });
+        setFile(null);
+        setAttachment(null);
       } else {
         setMessage(`Error: ${result.error}`);
       }
     } catch (error) {
       setMessage('Network error occurred');
     } finally {
+      setUploading(false);
       setIsSubmitting(false);
     }
   };
+
+  const inputClass =
+    'w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]';
 
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
@@ -133,7 +205,7 @@ export default function ExpenseEntryForm() {
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, cost_type: option.value }))}
+                        onClick={() => handleCostType(option.value)}
                         className={`px-4 py-2 rounded-control text-sm border ${
                           formData.cost_type === option.value
                             ? 'bg-[#1e1812] text-white border-[#1e1812]'
@@ -145,7 +217,9 @@ export default function ExpenseEntryForm() {
                     ))}
                   </div>
                   <p className="text-xs text-[#6b635c] mt-1.5">
-                    Variable costs go with the cost of making a sale. Fixed costs are the same every month.
+                    {formData.cost_type === 'variable'
+                      ? 'Variable costs go with the cost of making a sale. Fixed costs are the same every month.'
+                      : 'Fixed costs are the standing costs — the ones the restaurant expects to pay every month.'}
                   </p>
                 </div>
 
@@ -156,52 +230,25 @@ export default function ExpenseEntryForm() {
                     value={formData.category}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   >
                     <option value="">Select Category</option>
-                    {CATEGORIES.map((cat) => (
+                    {categories.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+                  <p className="text-xs text-[#6b635c] mt-1.5">
+                    {formData.cost_type === 'fixed'
+                      ? 'The standing costs. Picking one here ticks it off for the month.'
+                      : 'The costs that move with the business.'}
+                  </p>
                 </div>
 
-                <div className="field">
-                  <label className="field-label block text-sm font-medium mb-2">Vendor</label>
-                  {otherVendor ? (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        name="vendor_name"
-                        value={formData.vendor_name}
-                        onChange={handleInputChange}
-                        placeholder="Supplier name"
-                        required
-                        className="flex-1 px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { setOtherVendor(false); setFormData((prev) => ({ ...prev, vendor_name: '' })); }}
-                        className="btn-secondary text-xs px-3"
-                      >
-                        Pick
-                      </button>
-                    </div>
-                  ) : (
-                    <select
-                      name="vendor_name"
-                      value={formData.vendor_name}
-                      onChange={handleVendorChoice}
-                      required
-                      className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
-                    >
-                      <option value="">Select Vendor</option>
-                      {vendors.map((v) => (
-                        <option key={v.id} value={v.name}>{v.name}</option>
-                      ))}
-                      <option value="__other__">Another supplier…</option>
-                    </select>
-                  )}
-                </div>
+                <SupplierPicker
+                  value={formData.vendor_name}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, vendor_name: value }))}
+                  id="vendor"
+                />
 
                 <div className="field">
                   <label className="field-label block text-sm font-medium mb-2">Amount (₹)</label>
@@ -214,7 +261,7 @@ export default function ExpenseEntryForm() {
                     step="0.01"
                     min="0.01"
                     required
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   />
                 </div>
 
@@ -226,7 +273,7 @@ export default function ExpenseEntryForm() {
                     value={formData.invoice_number}
                     onChange={handleInputChange}
                     placeholder="Invoice #"
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   />
                 </div>
 
@@ -237,8 +284,29 @@ export default function ExpenseEntryForm() {
                     name="invoice_date"
                     value={formData.invoice_date}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   />
+                </div>
+
+                <div className="field md:col-span-2">
+                  <label className="field-label block text-sm font-medium mb-2">
+                    The invoice itself
+                  </label>
+                  <input
+                    type="file"
+                    name="invoice_file"
+                    accept="application/pdf,image/jpeg,image/png"
+                    onChange={(e) => {
+                      setFile(e.target.files?.[0] || null);
+                      setAttachment(null);
+                    }}
+                    className="w-full text-sm text-[#6b635c] file:mr-3 file:px-4 file:py-2 file:rounded-control file:border file:border-[#ebe8e4] file:bg-white file:text-sm file:text-[#1e1812]"
+                  />
+                  <p className="text-xs text-[#6b635c] mt-1.5">
+                    {attachment
+                      ? `Attached — ${attachment.name}`
+                      : 'A PDF or a photograph of the invoice. It goes into the restaurant\u2019s Drive folder, and the bill keeps the link to it.'}
+                  </p>
                 </div>
 
                 <div className="field md:col-span-2">
@@ -249,7 +317,7 @@ export default function ExpenseEntryForm() {
                     onChange={handleInputChange}
                     placeholder="What this bill was for..."
                     rows="2"
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   />
                 </div>
 
@@ -283,7 +351,7 @@ export default function ExpenseEntryForm() {
                     name="payment_date"
                     value={formData.payment_date}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   />
                 </div>
 
@@ -293,7 +361,7 @@ export default function ExpenseEntryForm() {
                     name="payment_mode"
                     value={formData.payment_mode}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   >
                     <option value="">Select Mode</option>
                     {PAYMENT_MODES.map((mode) => (
@@ -310,19 +378,25 @@ export default function ExpenseEntryForm() {
                     value={formData.bank_reference}
                     onChange={handleInputChange}
                     placeholder="UTR / Reference #"
-                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                    className={inputClass}
                   />
                 </div>
               </div>
 
               <div className="flex gap-4 pt-4">
-                <button type="submit" disabled={isSubmitting} className="btn-primary px-6 py-3 disabled:opacity-50">
-                  {isSubmitting ? 'Saving...' : 'Save Bill'}
+                <button type="submit" disabled={isSubmitting || uploading} className="btn-primary px-6 py-3 disabled:opacity-50">
+                  {uploading ? 'Uploading the invoice…' : isSubmitting ? 'Saving...' : 'Save Bill'}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => { setFormData({ ...BLANK, cost_type: formData.cost_type }); setOtherVendor(false); setMessage(''); setSaved(null); }}
+                  onClick={() => {
+                    setFormData({ ...BLANK, cost_type: formData.cost_type });
+                    setFile(null);
+                    setAttachment(null);
+                    setMessage('');
+                    setSaved(null);
+                  }}
                   className="btn-secondary px-6 py-3"
                 >
                   Clear Form

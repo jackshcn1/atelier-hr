@@ -559,6 +559,81 @@ if (sheetPettyId) {
   });
 }
 
+// The invoice itself — a PDF or a photograph, on Drive.
+//
+// The upload itself needs the Drive API and access to the folder, which are
+// set up by hand, so what is checked here is the part that is ours: that a
+// file that is not an invoice is turned away, and that a bill keeps the link
+// to its invoice.
+const { POST: attachmentPOST } = await import('../app/api/finance/expenses/attachment/route.js');
+
+await check('a file that is not an invoice is turned away', async () => {
+  const body = new FormData();
+  body.append('file', new Blob(['just some text'], { type: 'text/plain' }), 'note.txt');
+  body.append('name', 'note.txt');
+
+  const res = await attachmentPOST(
+    new Request('https://atelier.test/api/finance/expenses/attachment', { method: 'POST', body }),
+  );
+  if (res.status !== 400) throw new Error(`the upload was answered with ${res.status}, expected 400`);
+  const result = await res.json();
+  if (result.success) throw new Error('the upload was accepted');
+});
+
+await check('a bill keeps the link to its invoice', async () => {
+  const link = 'https://drive.google.com/file/d/test-file-id/view';
+  const res = await expensesPOST(
+    post('/api/finance/expenses', {
+      category: 'Other',
+      cost_type: 'variable',
+      amount: 321,
+      vendor_name: 'Attachment Check',
+      invoice_date: '2026-11-17',
+      payment_status: 'unpaid',
+      invoice_attachment: link,
+    }),
+  );
+  const result = await json(res);
+  if (!result.body.success) throw new Error(JSON.stringify(result.body).slice(0, 200));
+
+  try {
+    const { data } = await sb
+      .from('expenses')
+      .select('invoice_attachment')
+      .eq('id', result.body.data.id);
+    if (!data || data.length !== 1) throw new Error('the bill is not in the ledger');
+    if (data[0].invoice_attachment !== link) throw new Error(`the link is ${data[0].invoice_attachment}`);
+  } finally {
+    await sb.from('expenses').delete().eq('id', result.body.data.id);
+  }
+});
+
+await check('a link that is not a link is not stored', async () => {
+  const res = await expensesPOST(
+    post('/api/finance/expenses', {
+      category: 'Other',
+      cost_type: 'variable',
+      amount: 322,
+      vendor_name: 'Attachment Check',
+      invoice_date: '2026-11-17',
+      payment_status: 'unpaid',
+      invoice_attachment: 'javascript:alert(1)',
+    }),
+  );
+  const result = await json(res);
+  if (!result.body.success) throw new Error(JSON.stringify(result.body).slice(0, 200));
+
+  try {
+    const { data } = await sb
+      .from('expenses')
+      .select('invoice_attachment')
+      .eq('id', result.body.data.id);
+    if (data[0].invoice_attachment) throw new Error(`it stored ${data[0].invoice_attachment}`);
+  } finally {
+    await sb.from('expenses').delete().eq('id', result.body.data.id);
+  }
+});
+
 // The site's own expense form.
 //
 // The sheet is the record: the form writes a row into it, and the sheet is

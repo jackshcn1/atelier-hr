@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import SupplierPicker from '../../../components/SupplierPicker';
 
 // A new expense — variable, fixed or petty.
 //
@@ -35,24 +36,10 @@ const inputClass =
 
 export default function NewExpensePage() {
   const [form, setForm] = useState(BLANK);
-  const [vendors, setVendors] = useState([]);
   const [costTypes, setCostTypes] = useState({ variable: [], fixed: [] });
-  const [suggestions, setSuggestions] = useState([]);
-  const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState('');
   const [saved, setSaved] = useState(null);
   const [busy, setBusy] = useState(false);
-  const supplierBox = useRef(null);
-
-  // The suppliers on the list.
-  useEffect(() => {
-    fetch('/api/finance/vendors')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success) setVendors(d.data || []);
-      })
-      .catch(() => {});
-  }, []);
 
   // The cost types the sheet already uses — so the form offers what is
   // already in use. If the sheet cannot be read, the field is still free text.
@@ -66,63 +53,6 @@ export default function NewExpensePage() {
   }, []);
 
   const set = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
-
-  // ---- the supplier type-ahead ------------------------------------------
-  const matches = useMemo(() => {
-    const typed = form.vendor.trim().toLowerCase();
-    if (!typed) return [];
-    return vendors
-      .filter((v) => v.name.toLowerCase().includes(typed))
-      .slice(0, 8);
-  }, [form.vendor, vendors]);
-
-  // A name that is not on the list yet.
-  const isNewSupplier = useMemo(() => {
-    const typed = form.vendor.trim().toLowerCase();
-    if (!typed) return false;
-    return !vendors.some((v) => v.name.toLowerCase() === typed);
-  }, [form.vendor, vendors]);
-
-  const onSupplierChange = (value) => {
-    set('vendor', value);
-    setSuggestions([]);
-    setMessage('');
-  };
-
-  const pickSupplier = (name) => {
-    onSupplierChange(name);
-    setSuggestions([]);
-  };
-
-  const addSupplier = async () => {
-    const name = form.vendor.trim();
-    if (!name) return;
-    setAdding(true);
-    setMessage('');
-    try {
-      const response = await fetch('/api/finance/vendors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const result = await response.json();
-
-      if (result.success) {
-        // It is on the list now — for this entry and for every entry after it.
-        setVendors((prev) =>
-          [...prev, result.data].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        setSuggestions([]);
-        setMessage(`${name} added to the supplier list.`);
-      } else {
-        setMessage(`Could not add ${name}: ${result.error}`);
-      }
-    } catch (error) {
-      setMessage(`Could not add ${name}.`);
-    } finally {
-      setAdding(false);
-    }
-  };
 
   // ---- saving ------------------------------------------------------------
   const handleSubmit = async (event) => {
@@ -147,7 +77,6 @@ export default function NewExpensePage() {
             : 'Bill saved to the sheet and added to the books.',
         );
         setForm({ ...BLANK, type: form.type });
-        setSuggestions([]);
       } else {
         setMessage(result.error || 'Could not save the entry.');
       }
@@ -267,54 +196,12 @@ export default function NewExpensePage() {
               )}
 
               {/* ---- the supplier ----------------------------------------- */}
-              <div className="field" ref={supplierBox}>
-                <label className="field-label block text-sm font-medium mb-2">
-                  {isPetty ? 'Paid to' : 'Supplier'}
-                </label>
-                <input
-                  type="text"
-                  name="vendor"
-                  value={form.vendor}
-                  onChange={(e) => onSupplierChange(e.target.value)}
-                  onFocus={() => setSuggestions(matches)}
-                  onBlur={() => setTimeout(() => setSuggestions([]), 150)}
-                  placeholder="Start typing the name…"
-                  required
-                  autoComplete="off"
-                  className={inputClass}
-                />
-
-                {suggestions.length > 0 && (
-                  <div className="mt-1 border border-[#ebe8e4] rounded-control bg-white overflow-hidden">
-                    {suggestions.map((vendor) => (
-                      <button
-                        key={vendor.id ?? vendor.name}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => pickSupplier(vendor.name)}
-                        className="block w-full text-left px-3 py-2 text-sm hover:bg-[#f6f4f2]"
-                      >
-                        {vendor.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {isNewSupplier && (
-                  <button
-                    type="button"
-                    onClick={addSupplier}
-                    disabled={adding}
-                    className="btn-secondary text-xs px-3 py-1.5 mt-2 inline-flex items-center gap-1.5"
-                  >
-                    {adding ? 'Adding…' : `+ Add “${form.vendor.trim()}” as a new supplier`}
-                  </button>
-                )}
-                <p className="text-xs text-[#6b635c] mt-1.5">
-                  Start typing and the suppliers that match come up. A name that is not on
-                  the list can be added here, and it is on the list for next time.
-                </p>
-              </div>
+              <SupplierPicker
+                value={form.vendor}
+                onChange={(value) => set('vendor', value)}
+                label={isPetty ? 'Paid to' : 'Supplier'}
+                id="vendor"
+              />
 
               {/* ---- amount and date --------------------------------------- */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
