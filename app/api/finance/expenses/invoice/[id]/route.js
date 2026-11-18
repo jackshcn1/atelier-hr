@@ -1,5 +1,10 @@
 import { getSupabase } from '../../../../../../lib/supabaseServer.js';
-import { downloadFromDrive, driveFileId } from '../../../../../../lib/googleUserDrive.js';
+import {
+  downloadFromDrive,
+  driveFileId,
+  isDeadConnection,
+  clearConnection,
+} from '../../../../../../lib/googleUserDrive.js';
 
 // The invoice itself, served to whoever is signed in.
 //
@@ -70,6 +75,18 @@ export async function GET(request, { params }) {
           error:
             "The restaurant's Google account is not connected yet. Open Settings → Google Drive " +
             'and press "Connect Google Drive".',
+        },
+        { status: 503 },
+      );
+    }
+    if (isDeadConnection(error)) {
+      await clearConnection().catch(() => {});
+      return Response.json(
+        {
+          success: false,
+          error:
+            'The Google connection has stopped working — it may have expired or been revoked. ' +
+            'Open Settings → Google Drive and press "Connect Google Drive" again.',
         },
         { status: 503 },
       );

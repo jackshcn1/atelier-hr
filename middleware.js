@@ -28,8 +28,11 @@ export async function middleware(request) {
   const { data: { user } } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login');
+  // The privacy policy is read by people who have no account here — Google's
+  // consent screen asks for it, and a policy behind a login is not a policy.
+  const isPrivacyPage = request.nextUrl.pathname === '/privacy';
 
-  if (!user && !isLoginPage) {
+  if (!user && !isLoginPage && !isPrivacyPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
