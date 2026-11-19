@@ -89,7 +89,7 @@ export async function POST(request) {
         {
           success: false,
           error:
-            "The restaurant's Google account is not connected yet. Open Settings → Google Drive and " +
+            'A Google account is not connected to the site yet. Open Settings → Google Drive and ' +
             'press "Connect Google Drive", then attach the invoice again.',
           connectUrl: '/api/google-drive/connect',
         },
@@ -127,8 +127,8 @@ export async function POST(request) {
               'https://console.cloud.google.com/apis/library/drive.googleapis.com?project=atelier-hr-drive ' +
               'and try again.'
             : 'Google refused the upload (403). The connected account may not have access to the ' +
-              'invoice folder — check that the folder is shared with ' +
-              'ateliernextplate@gmail.com.',
+              'invoice folder — share the folder with the connected account ' +
+              '(Settings → Google Drive shows which one it is).',
         },
         { status: 503 },
       );
@@ -139,7 +139,8 @@ export async function POST(request) {
           success: false,
           error:
             'The invoice folder was not found. The connected account has to have access to it — ' +
-            'share the folder with ateliernextplate@gmail.com.',
+            'share the folder with the connected account ' +
+            '(Settings → Google Drive shows which one it is).',
         },
         { status: 503 },
       );

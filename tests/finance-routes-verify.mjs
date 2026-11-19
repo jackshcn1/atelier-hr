@@ -46,6 +46,8 @@ const { GET: cashflowGET } = await import('../app/api/finance/cashflow/route.js'
 const { GET: expensesGET, POST: expensesPOST } = await import('../app/api/finance/expenses/route.js');
 const { GET: vendorsGET, POST: vendorsPOST } = await import('../app/api/finance/vendors/route.js');
 const { writeInvoiceSheet } = await import('../lib/invoiceSheet.js');
+const { monthCosts } = await import('../lib/financeCosts.js');
+const { financePeriod } = await import('../lib/financePeriod.js');
 const { createClient } = await import('@supabase/supabase-js');
 
 const req = (url) => new Request(`https://atelier.test${url}`);
@@ -120,14 +122,33 @@ await check('the P&L carries the staff salary of the cycle ending in the month',
   }
 });
 
-await check('the salary is an operating cost, not part of the cost of making a sale', () => {
+await check('the salary is an operating cost, not part of the cost of making a sale', async () => {
   const d = pnl.body.data;
-  if (d.cost_of_revenue >= d.operating_costs && d.salary.amount > 0) {
-    throw new Error('the salary looks like it is sitting in the cost of revenue');
-  }
   // Gross profit must not have the salary taken out of it.
   if (d.gross_profit !== d.revenue - d.cost_of_revenue) {
     throw new Error('the gross profit has the salary in it');
+  }
+  // The two buckets together are the whole of the month's costs.
+  if (Math.abs(d.total_expenses - (d.cost_of_revenue + d.operating_costs)) > 0.01) {
+    throw new Error('the cost of revenue and the operating costs do not add up to the total');
+  }
+  // And the salary sits inside the operating costs, not inside the cost of
+  // making a sale: the operating costs are the standing costs, the petty cash
+  // and the salary — and nothing else.
+  //
+  // This used to be a guess (that the cost of revenue is smaller than the
+  // operating costs), which stopped being true the month the month's purchases
+  // grew past them. The real question is answered here instead.
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const costs = await monthCosts(client, financePeriod(d.period.key));
+  const expectedOperating = costs.fixed + costs.petty + d.salary.amount;
+  if (Math.abs(d.operating_costs - expectedOperating) > 0.01) {
+    throw new Error(
+      `the operating costs are ${d.operating_costs}, not the standing costs, petty cash and salary (${expectedOperating})`,
+    );
+  }
+  if (Math.abs(d.cost_of_revenue - costs.variable) > 0.01) {
+    throw new Error('the cost of revenue is not the variable costs of the month');
   }
 });
 
