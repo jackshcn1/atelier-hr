@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import FinanceMonthPicker, { monthFromLocation, setMonthInLocation } from './FinanceMonthPicker';
+import FinanceMonthPicker, {
+  monthFromLocation,
+  setMonthInLocation,
+  rangeFromLocation,
+  setRangeInLocation,
+} from './FinanceMonthPicker';
+import { monthLabel } from '../../lib/financePeriod.js';
 
 /**
  * The finance dashboard, reported on a plain calendar month.
@@ -10,6 +16,11 @@ import FinanceMonthPicker, { monthFromLocation, setMonthInLocation } from './Fin
  * The 20th-19th pay cycle is what salary and variable pay are built on; this
  * is the other question — how is this calendar month going? — so the window
  * is the calendar month, and it starts again on the 1st.
+ *
+ * It can also report on several months at once — the last three, six or
+ * twelve — which is the question an owner asks over time rather than on one
+ * month's page. The month stays the last month of the span, so the arrows
+ * move the whole window.
  *
  * Every figure on this page is a real number read from the books. The
  * "YTD / Forecasted" lines that used to sit at the bottom of each panel were
@@ -21,17 +32,23 @@ export default function FinanceDashboard() {
   const [loading, setLoading] = useState(true);
   const [drilldown, setDrilldown] = useState(null);
   const [month, setMonth] = useState(null);
+  const [range, setRange] = useState(1);
 
-  const load = useCallback(async (target) => {
+  const load = useCallback(async (target, span) => {
     setLoading(true);
     try {
-      const query = target ? `?month=${encodeURIComponent(target)}` : '';
+      const params = new URLSearchParams();
+      if (target) params.set('month', target);
+      if (span && span > 1) params.set('range', String(span));
+      const query = params.toString() ? `?${params.toString()}` : '';
       const res = await fetch(`/api/finance/dashboard${query}`);
       const json = await res.json();
       if (json.success) {
         setData(json.data);
         setMonth(json.data.period.key);
+        setRange(json.data.range?.months || 1);
         setMonthInLocation(json.data.period.key);
+        setRangeInLocation(json.data.range?.months || 1);
       }
     } catch {
       /* the empty state below says so */
@@ -41,7 +58,7 @@ export default function FinanceDashboard() {
   }, []);
 
   useEffect(() => {
-    load(monthFromLocation());
+    load(monthFromLocation(), rangeFromLocation());
   }, [load]);
 
   if (loading) return <div className="text-sm text-[#6b635c] p-6 animate-pulse">Loading telemetry...</div>;
@@ -55,6 +72,20 @@ export default function FinanceDashboard() {
   // belongs in the total the three bars and the salary line are shares of —
   // otherwise the panel would show a salary and then a total without it.
   const totalCosts = data.costs.total + (data.salary?.amount || 0);
+
+  // A span of months rather than one month.
+  //
+  // The month named is the last month of the span, so the arrows move the
+  // whole window. Everything on the page is then the sum of those months,
+  // except the money owed by customers, which is where things stand today.
+  const months = data.range?.months || 1;
+  const isRange = months > 1;
+  const spanName = isRange ? `the last ${months} months` : `for ${period.label}`;
+  const missingRevenueMonths = (data.revenue.missingMonths || []).map((key) => monthLabel(key));
+
+  // Are all the sales figures behind this view in? If not, the profit is
+  // what is on record so far, not a settled figure.
+  const revenueIncomplete = data.revenue.synced === false;
 
   const DrilldownModal = ({ title, items, onClose }) => (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -119,24 +150,49 @@ export default function FinanceDashboard() {
           <p className="text-sm text-[#6b635c]">
             {period.label}
             <span className="text-[#8b6f4e]">
-              {' '}· {period.isCurrentMonth ? `month so far (1 – ${period.through})` : 'complete month'}
+              {' '}· {isRange ? `last ${months} months` : period.isCurrentMonth ? `month so far (1 – ${period.through})` : 'complete month'}
             </span>
           </p>
           <p className="text-xs text-[#8b6f4e] mt-1">
-            Calendar month, refreshed on the 1st. The 20–19 pay cycle still drives salary and variable pay.
+            {isRange
+              ? 'The months added up, ending at the month named. The 20–19 pay cycle still drives salary and variable pay.'
+              : 'Calendar month, refreshed on the 1st. The 20–19 pay cycle still drives salary and variable pay.'}
           </p>
         </div>
         <FinanceMonthPicker
           month={period.key}
           currentMonth={period.key}
           available={data.availableMonths || []}
-          onChange={(key) => load(key)}
+          range={months}
+          onRangeChange={(count) => load(month, count)}
+          onChange={(key) => load(key, months)}
         />
       </div>
 
       <div className="flex justify-end">
-        <div className={`px-5 py-3 rounded-xl border flex items-center gap-3 shadow-sm ${isProfit ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-          <span className="text-xs font-medium uppercase tracking-wider">{isProfit ? 'Net Profit' : 'Net Loss'} for {period.label}</span>
+        {/*
+            A profit is only a real profit when the sales figures behind it are
+            in. If some months of the span have not been pulled from Petpooja
+            yet, the figure below is what is on record — so it says so, and
+            says it in amber rather than in a confident red.
+        */}
+        <div
+          className={`px-5 py-3 rounded-xl border flex items-center gap-3 shadow-sm ${
+            revenueIncomplete
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : isProfit
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+          }`}
+        >
+          <span className="text-xs font-medium uppercase tracking-wider">
+            {revenueIncomplete
+              ? `${isProfit ? 'Net Profit' : 'Net Loss'} on record`
+              : isProfit
+                ? 'Net Profit'
+                : 'Net Loss'}{' '}
+            {spanName}
+          </span>
           <span className="text-lg font-serif font-bold">
             {isProfit ? '+' : ''}{formatINR(Math.abs(data.net_pl))}
           </span>
@@ -153,15 +209,17 @@ export default function FinanceDashboard() {
           standing costs are for the whole month. */}
       {period.isCurrentMonth && data.revenue.asOf && (
         <p className="text-xs text-[#8b6f4e] -mt-1">
-          The revenue above covers 1 – {period.through} {period.label}, while the salary and the standing
-          costs are for the whole month. The month's profit settles at month end.
+          {isRange
+            ? `The revenue above covers 1 – ${period.through} ${monthLabel(period.key)}, while the salary and the standing costs are for the whole month. The month's profit settles at month end.`
+            : `The revenue above covers 1 – ${period.through} ${period.label}, while the salary and the standing costs are for the whole month. The month's profit settles at month end.`}
         </p>
       )}
 
       {data.revenue.synced === false && (
         <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
-          Revenue for {period.label} has not been pulled from Petpooja yet. The nightly sync fills this in —
-          the figures below are the costs that are already on record.
+          {isRange
+            ? `Revenue has not been pulled from Petpooja for ${missingRevenueMonths.length} of the ${months} months (${missingRevenueMonths.join(', ')}). The nightly sync fills this in — the figures below are the costs that are already on record.`
+            : `Revenue for ${period.label} has not been pulled from Petpooja yet. The nightly sync fills this in — the figures below are the costs that are already on record.`}
         </div>
       )}
 
@@ -204,26 +262,26 @@ export default function FinanceDashboard() {
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#f2efec]">
               <h3 className="font-serif text-xl font-medium text-[#1e1812]">Revenue Channels</h3>
               <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">
-                {period.label}
+                {isRange ? `last ${months} months` : period.label}
               </span>
             </div>
             <Meter
               label="Dine-in"
               actual={data.revenue.breakdown.dine_in}
               total={data.revenue.total}
-              onClick={() => setDrilldown({ title: `Revenue — ${period.label}`, items: revenueItems })}
+              onClick={() => setDrilldown({ title: `Revenue — ${isRange ? `last ${months} months` : period.label}`, items: revenueItems })}
             />
             <Meter
               label="Pick Up"
               actual={data.revenue.breakdown.pick_up}
               total={data.revenue.total}
-              onClick={() => setDrilldown({ title: `Revenue — ${period.label}`, items: revenueItems })}
+              onClick={() => setDrilldown({ title: `Revenue — ${isRange ? `last ${months} months` : period.label}`, items: revenueItems })}
             />
             <Meter
               label="Delivery"
               actual={data.revenue.breakdown.delivery}
               total={data.revenue.total}
-              onClick={() => setDrilldown({ title: `Revenue — ${period.label}`, items: revenueItems })}
+              onClick={() => setDrilldown({ title: `Revenue — ${isRange ? `last ${months} months` : period.label}`, items: revenueItems })}
             />
           </div>
           <div className="mt-8 pt-4 border-t border-[#ebe8e4] flex flex-col gap-2 bg-[#faf8f6] p-4 rounded-xl">
@@ -233,7 +291,9 @@ export default function FinanceDashboard() {
             </div>
             <div className="text-xs text-[#6b635c] text-right">
               {data.revenue.asOf
-                ? `Petpooja sales, ${period.start} → ${data.revenue.asOf}`
+                ? isRange
+                  ? `Petpooja sales over the last ${months} months, to ${data.revenue.asOf}`
+                  : `Petpooja sales, ${period.start} → ${data.revenue.asOf}`
                 : 'Not synced yet for this month'}
             </div>
           </div>
@@ -244,7 +304,7 @@ export default function FinanceDashboard() {
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#f2efec]">
               <h3 className="font-serif text-xl font-medium text-[#1e1812]">Cost Breakdown</h3>
               <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">
-                {period.label}
+                {isRange ? `last ${months} months` : period.label}
               </span>
             </div>
             <Meter
@@ -276,9 +336,11 @@ export default function FinanceDashboard() {
                   <span className="font-semibold text-[#1e1812]">{formatINR(data.salary.amount)}</span>
                 </div>
                 <p className="text-[11px] text-[#8b6f4e]">
-                  {data.salary.state === 'actual'
-                    ? `Actual — the payroll for ${data.salary.cycle.start} → ${data.salary.cycle.end} has been processed`
-                    : `Forecast — every active employee a full month, for ${data.salary.cycle.start} → ${data.salary.cycle.end}`}
+                  {isRange
+                    ? `${data.salary.state === 'actual' ? 'Actual' : 'Forecast'} — the salary of each of the ${months} months, added up`
+                    : data.salary.state === 'actual'
+                      ? `Actual — the payroll for ${data.salary.cycle.start} → ${data.salary.cycle.end} has been processed`
+                      : `Forecast — every active employee a full month, for ${data.salary.cycle.start} → ${data.salary.cycle.end}`}
                 </p>
               </div>
             )}
@@ -289,7 +351,11 @@ export default function FinanceDashboard() {
               <span className="text-lg font-serif font-bold text-rose-800">{formatINR(totalCosts)}</span>
             </div>
             <div className="text-xs text-[#6b635c] text-right">
-              {period.isCurrentMonth ? `Costs recorded 1 – ${period.through} ${period.label}` : `Costs recorded in ${period.label}`}
+              {isRange
+                ? `Costs recorded over the last ${months} months`
+                : period.isCurrentMonth
+                  ? `Costs recorded 1 – ${period.through} ${period.label}`
+                  : `Costs recorded in ${period.label}`}
             </div>
           </div>
         </div>
@@ -304,7 +370,7 @@ export default function FinanceDashboard() {
           <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#f2efec]">
             <h3 className="font-serif text-xl font-medium text-[#1e1812]">Money owed by customers</h3>
             <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">
-              {period.label}
+              {isRange ? 'as of now' : period.label}
             </span>
           </div>
           {data.receivables?.totals?.customerCount > 0 ? (
@@ -349,7 +415,7 @@ export default function FinanceDashboard() {
           <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#f2efec]">
             <h3 className="font-serif text-xl font-medium text-[#1e1812]">Money owed to suppliers</h3>
             <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">
-              {period.label}
+              {isRange ? `last ${months} months` : period.label}
             </span>
           </div>
           {data.payables?.totals?.billCount > 0 ? (
@@ -367,7 +433,7 @@ export default function FinanceDashboard() {
                 </div>
               </div>
               <p className="text-sm text-[#6b635c]">
-                {data.payables.totals.billCount} unpaid bill(s) from the {period.label} bills.
+                {data.payables.totals.billCount} unpaid bill(s) from the {isRange ? `${months} months` : period.label} bills.
               </p>
               {data.payables.totals.credit > 0 && (
                 <p className="text-sm text-[#6b635c] mt-1">
