@@ -9,6 +9,7 @@
 - [Petpooja Hosted Sync](petpooja-hosted-sync.md) — why the sync runs on Vercel (Petpooja blocks datacenter IPs), the four report groups, hosting rules and constraints
 - [The Thousand-Row Rule](finance-thousand-row-rule.md) — the database stops a plain read at 1,000 rows and says nothing; a read that means "every row" has to page for it
 - [Cancelled Petpooja Documents](petpooja-cancelled-documents.md) — a cancelled document is not a bill; Petpooja keeps them with an "Unpaid" column and they came in as money owed
+- [The Twice-Weekly Purchase Refresh](petpooja-purchase-refresh.md) — the last 90 days of purchases are re-read on Mondays and Thursdays, so a bill Petpooja edited, paid, cancelled or deleted is in the books within days
 - [Finance Salary & Standing Costs](finance-salary-and-standing-costs.md) — salary forecast frozen at the 1st after the cycle ends, replaced by the real payroll; standing costs as a checklist the invoice replaces
 - [Maintenance Module Status](maintenance-module-status.md) — architecture, access/link details, and mandatory workflow rules (browser verify, GATES.md ledger, plain-English steps) — local-only, contains credentials
 - [Maintenance Module Framework](maintenance-module-framework.md) — locked: derived-status + rejected revert + completed picker + save guard + POC picker (filter/search/add-with-dup-guard) + migrations

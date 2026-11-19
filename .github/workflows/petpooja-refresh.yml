@@ -1,0 +1,149 @@
+name: Petpooja Purchase Refresh
+
+# The nightly run pulls the pay cycle that is running, so a bill is looked at
+# for a month after its date and never again. Petpooja lets a bill be edited
+# or cancelled up to 90 days after its date, so the books drift away from what
+# Petpooja says:
+#
+#   - a bill cancelled after its cycle closed stayed in the books as money owed;
+#   - a payment recorded in Petpooja was never seen, so the bill stayed unpaid;
+#   - an amount that was corrected stayed as it was;
+#   - a bill entered late was never seen at all.
+#
+# This job re-reads the last 90 days of purchases twice a week and puts the
+# books right. It runs as its own workflow, with its own schedule, so the
+# nightly run is not slowed down and a failed refresh cannot disturb it.
+#
+# Schedule is UTC (GitHub cron is always UTC):
+#   23:30 UTC = 05:00 IST  ->  cron: '30 23 * * 1,4'   (Monday and Thursday)
+#
+# The browser work happens on Vercel, not here: Petpooja's edge blocks
+# datacenter IP ranges with a raw nginx 403, and a GitHub Actions runner
+# cannot reach billing.petpooja.com at all.
+on:
+  schedule:
+    - cron: '30 23 * * 1,4'
+
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'How many days back to refresh (default 90)'
+        required: false
+        default: '90'
+
+# Never let two refreshes overlap — they would race on the same rows.
+concurrency:
+  group: petpooja-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-purchases:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Refresh the last 90 days of purchases
+        env:
+          SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
+          SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
+          DAYS: ${{ inputs.days || '90' }}
+        run: |
+          set -u
+          if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
+            echo "::error::VERCEL_SYNC_URL and VERCEL_SYNC_SECRET must be configured as repository secrets."
+            exit 1
+          fi
+
+          # Only the two purchase groups:
+          #   9 = Purchase invoices (vendor bills)
+          #  10 = Purchase returns  (debit notes)
+          #
+          # The sales report is never pulled by a refresh — it would rewrite a
+          # closed month's revenue — and the receivables report is a snapshot
+          # that the nightly run already reads fresh every day.
+          #
+          # NOTE: do not name this variable GROUPS — `GROUPS` is a Bash
+          # built-in array holding the current user's group ids, so assigning
+          # to it is silently ignored and the loop would run whatever groups
+          # the runner user happens to belong to.
+          REFRESH_GROUPS="9 10"
+
+          # The Petpooja session is carried from one group to the next by the
+          # server itself, so the whole refresh needs only ONE login.
+          LAST_GROUP=$(echo "$REFRESH_GROUPS" | tr ' ' '\n' | tail -1)
+
+          FAILED=""
+          for G in $REFRESH_GROUPS; do
+            echo ""
+            echo "=== Refresh group $G ==="
+
+            # `finance=1` leaves the variable-pay figures and the pay periods
+            # alone. `refresh=90` re-reads the last 90 days of purchases and
+            # puts the books right.
+            URL="$SYNC_URL?group=$G&refresh=$DAYS&finance=1"
+
+            # Every group but the last hands the session on to its successor.
+            if [ "$G" != "$LAST_GROUP" ]; then
+              URL="$URL&keepSession=1"
+            fi
+
+            # A group gets three attempts. The browser on the serverless host
+            # dies at random now and then, and a fresh browser usually clears
+            # it within a minute.
+            GROUP_OK=0
+            for ATTEMPT in 1 2 3; do
+              if [ "$ATTEMPT" != "1" ]; then
+                echo "::warning::Refresh group $G did not pass on attempt $((ATTEMPT - 1)) — waiting 30s and trying again."
+                sleep 30
+              fi
+
+              STATUS=$(curl -sS -o "response-refresh-$G.json" -w '%{http_code}' -X POST "$URL" \
+                -H "x-sync-secret: $SYNC_SECRET" \
+                -H 'Content-Type: application/json' \
+                --max-time 600) || STATUS="000"
+
+              echo "HTTP $STATUS"
+              # The tail, not the head: the error and the log lines that say
+              # which report failed are at the end of the JSON.
+              tail -c 4000 "response-refresh-$G.json" || true
+              echo ""
+
+              if [ "$STATUS" != "200" ]; then
+                echo "::error::Refresh group $G failed with HTTP $STATUS"
+                continue
+              fi
+
+              # A 200 is not enough: the endpoint must say it actually fetched
+              # reports. A group that matched nothing would otherwise look like
+              # a successful run.
+              if ! grep -q '"ok":true' "response-refresh-$G.json"; then
+                echo "::error::Refresh group $G did not report ok:true"
+                continue
+              fi
+              if grep -q 'All 0 reports downloaded' "response-refresh-$G.json"; then
+                echo "::error::Refresh group $G fetched no reports at all"
+                continue
+              fi
+              if grep -qE 'PARTIALLY COMPLETED|Petpooja Sync FAILED' "response-refresh-$G.json"; then
+                echo "::error::Refresh group $G did not complete all its reports"
+                continue
+              fi
+
+              GROUP_OK=1
+              break
+            done
+
+            if [ "$GROUP_OK" != "1" ]; then
+              FAILED="$FAILED $G"
+            fi
+
+            sleep 5
+          done
+
+          if [ -n "$FAILED" ]; then
+            echo "::error::The refresh did not finish for group(s):$FAILED"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ The last $DAYS days of purchases are refreshed."

@@ -24,6 +24,8 @@ import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
 import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
 import { cleanVendorName, mergePetpoojaBill } from '../lib/expenseHelpers.js';
+import { applyRefreshMisses, describeRefresh } from '../lib/purchaseRefresh.js';
+import { readAllRows } from '../lib/supabaseServer.js';
 import { monthKeyOf, previousMonthKey, petpoojaMonthWindow, repeatsAnotherMonth } from '../lib/financePeriod.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
@@ -1436,6 +1438,54 @@ export async function runPetpoojaSync(options = {}) {
     return removed;
   }
 
+  /**
+   * Is this run the twice-weekly refresh of the last 90 days of purchases?
+   *
+   * The refresh re-reads a window that the nightly run never looks at, so
+   * that a bill Petpooja has edited, paid, cancelled or entered late is in
+   * the books within days rather than never.
+   */
+  function isPurchaseRefresh() {
+    const value = String(process.env.SYNC_PURCHASE_REFRESH ?? '').toLowerCase();
+    return value === '1' || value === 'true';
+  }
+
+  /**
+   * Put the books right after a refresh, and say what was found.
+   *
+   * Petpooja's report is the truth about the bills of the window. A bill that
+   * is in the books and not in the report is a bill Petpooja no longer has.
+   * A deleted document leaves no trace at all, so that is a weaker signal
+   * than a cancellation: the bill is flagged at the first refresh and
+   * removed only if it is still missing at the next one.
+   */
+  async function reconcileRefresh(supabase, { kind, reportRows, from, to }) {
+    const columns =
+      'id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note, source, description';
+
+    const bookRows = await readAllRows((fromRow, toRow) =>
+      supabase
+        .from('expenses')
+        .select(columns)
+        .gte('invoice_date', from)
+        .lte('invoice_date', to)
+        .in('source', ['petpooja', 'existing'])
+        .order('id')
+        .range(fromRow, toRow)
+    );
+
+    const summary = await applyRefreshMisses(supabase, {
+      kind,
+      reportRows,
+      bookRows: bookRows.filter((row) =>
+        kind === 'credit' ? Number(row.debit_note || 0) > 0 : Number(row.debit_note || 0) === 0
+      ),
+    });
+
+    for (const line of describeRefresh(summary, kind)) console.log(line);
+    return summary;
+  }
+
   function findEmployeeByName(name, empList) {
     if (!name) return null;
     const n = name.trim().toLowerCase();
@@ -2840,6 +2890,18 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
             // never happened.
             await removeCancelledBills(purchaseResult.cancelledDocs, 'bill(s)');
 
+            // The refresh says what Petpooja's report says, so a bill that has
+            // been changed, paid or deleted is put right.
+            if (isPurchaseRefresh()) {
+              console.log(`🔄 Refresh window: ${cycle.start} → ${cycle.end}`);
+              await reconcileRefresh(supabase, {
+                kind: 'bill',
+                reportRows: purchaseResult.invoices,
+                from: cycle.start,
+                to: cycle.end,
+              });
+            }
+
             successfulReports++;
           } else {
             console.log('  ℹ️ No purchase invoices found for this period');
@@ -2920,6 +2982,17 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
               })),
               'debit note(s)'
             );
+
+            // The refresh says what Petpooja's report says.
+            if (isPurchaseRefresh()) {
+              console.log(`🔄 Refresh window: ${cycle.start} → ${cycle.end}`);
+              await reconcileRefresh(supabase, {
+                kind: 'credit',
+                reportRows: returnsResult.returns,
+                from: cycle.start,
+                to: cycle.end,
+              });
+            }
 
             successfulReports++;
           } else {
