@@ -69,7 +69,24 @@ export default function FinanceMonthPicker({
   const sorted = [...options].filter(Boolean).sort().reverse();
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    // One line: how many months, then the month itself with its arrows. The
+    // dropdowns are sized to their content (`.field` is full width, which
+    // would push each one onto its own line).
+    <div className="flex items-center gap-2 flex-wrap justify-end">
+      {onRangeChange && (
+        <select
+          value={range}
+          onChange={(e) => onRangeChange(Number(e.target.value))}
+          className="field w-auto min-w-[9.5rem] text-sm py-1.5 px-2.5"
+          aria-label="How many months to report on"
+        >
+          <option value={1}>This month</option>
+          <option value={3}>Last 3 months</option>
+          <option value={6}>Last 6 months</option>
+          <option value={12}>Last 12 months</option>
+        </select>
+      )}
+
       <button
         type="button"
         onClick={() => onChange(previousMonthKey(month))}
@@ -81,7 +98,7 @@ export default function FinanceMonthPicker({
       <select
         value={month || ''}
         onChange={(e) => onChange(e.target.value)}
-        className="field text-sm py-1.5 px-2.5"
+        className="field w-auto min-w-[11rem] text-sm py-1.5 px-2.5"
         aria-label="Calendar month"
       >
         {sorted.map((key) => (
@@ -96,20 +113,6 @@ export default function FinanceMonthPicker({
       >
         →
       </button>
-
-      {onRangeChange && (
-        <select
-          value={range}
-          onChange={(e) => onRangeChange(Number(e.target.value))}
-          className="field text-sm py-1.5 px-2.5"
-          aria-label="How many months to report on"
-        >
-          <option value={1}>This month</option>
-          <option value={3}>Last 3 months</option>
-          <option value={6}>Last 6 months</option>
-          <option value={12}>Last 12 months</option>
-        </select>
-      )}
     </div>
   );
 }
