@@ -51,6 +51,7 @@ import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.
 import { fetchGoogleSheetsData, googleSheetsConfigured } from '../../../lib/googleSheetsService.js';
 import { parseInvoiceSheet, writeInvoiceSheet } from '../../../lib/invoiceSheet.js';
 import { parseBackfillRequest } from '../../../lib/syncBackfill.js';
+import { parseRefreshRequest } from '../../../lib/purchaseRefresh.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -241,6 +242,19 @@ async function handle(req) {
       push(`📅 Overriding period: ${start} → ${end}`);
     }
 
+    // Which reports this run is asked for.
+    //
+    // ?group=<n>   one report group — this is how the nightly workflow calls it,
+    //               one request per group, each with its own serverless run.
+    // ?reports=a,b an explicit set of report names.
+    // Neither one runs EVERY group in ONE function invocation. That is longer
+    // than a serverless function is allowed to run, so it ends in
+    // FUNCTION_INVOCATION_TIMEOUT at the 300s mark, and it writes the
+    // variable-pay metrics on the way, which are meant to stay frozen. Never
+    // call it that way, not even to "see if it works".
+    const group = params.get('group');
+    const reports = params.get('reports');
+
     // ?debug=1 makes the browser say out loud why it died. Chromium's own
     // output names the signal and the check that failed, which is the only
     // way to tell a crash from an out-of-memory kill.
@@ -249,13 +263,35 @@ async function handle(req) {
       push('🔎 Browser debug output is on.');
     }
 
+    // The twice-weekly refresh of the last 90 days of purchases.
+    //
+    // The nightly run pulls the pay cycle that is running, so a bill is looked
+    // at for a month after its date and never again. Petpooja lets a bill be
+    // edited or cancelled up to 90 days after its date, so the books drift.
+    // The refresh re-reads that window and puts them right.
+    //
+    // It is a finance run by definition: it must not touch the variable-pay
+    // figures, the pay periods or the sales report, so it forces finance-only
+    // on itself rather than trusting the caller to remember.
+    const refresh = parseRefreshRequest(params, {
+      groupReports: group ? REPORT_GROUPS[Number(group)] : null,
+    });
+    if (!refresh.ok) {
+      return NextResponse.json(
+        { ok: false, error: refresh.error, expected: refresh.expected },
+        { status: refresh.status || 400 },
+      );
+    }
+
     // ?finance=1 runs the finance side only.
     //
     // The variable-pay metrics are paused, so a finance run writes nothing to
     // them: only the revenue split, the vendor bills and the money owed by
     // customers. The pay periods are left alone too — closing a cycle is a
     // payroll decision, and it is not one this run is allowed to make.
-    const financeOnly = params.get('finance') === '1';
+    //
+    // A refresh is a finance run whether or not the caller said so.
+    const financeOnly = params.get('finance') === '1' || refresh.refresh;
     if (financeOnly) {
       process.env.SYNC_FINANCE_ONLY = '1';
       push('💼 Finance-only run — the variable-pay figures are left alone.');
@@ -341,8 +377,9 @@ async function handle(req) {
     // reports are split into groups that each fit. ?group=1..10 runs one
     // group; ?reports=captain,pax runs an explicit set; no parameter runs
     // everything (the local-computer path).
-    const group = params.get('group');
-    const reports = params.get('reports');
+    //
+    // The group and the report list are read further up, because the refresh
+    // has to know which reports it is being asked to pull.
 
     // Session hand-over between groups.
     //
@@ -396,6 +433,21 @@ async function handle(req) {
     if (reports) {
       process.env.SYNC_REPORTS = reports;
       push(`📦 Reports: ${reports}`);
+    }
+
+    // The refresh sets its own window and its own reports.
+    //
+    // The reports are set because a refresh with no group named would
+    // otherwise run every report in one function invocation — which is longer
+    // than a serverless function may run, and which would pull the sales
+    // report that a refresh must never touch.
+    if (refresh.refresh) {
+      process.env.SYNC_START_DATE = refresh.from;
+      process.env.SYNC_END_DATE = refresh.to;
+      process.env.SYNC_PURCHASE_REFRESH = '1';
+      process.env.SYNC_REPORTS = refresh.reports.join(',');
+      push(`🔄 Refresh: the last ${refresh.days} days of purchases (${refresh.from} → ${refresh.to}).`);
+      push(`🔄 Reports: ${refresh.reports.join(', ')}.`);
     }
 
     push('🌐 Starting Petpooja sync on Vercel...');
