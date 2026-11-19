@@ -11,7 +11,8 @@
     "test:finance": "node tests/expense-helpers-verify.mjs",
     "test:finance-routes": "node tests/finance-routes-verify.mjs",
     "test:invoice-sheet": "node tests/invoice-sheet-verify.mjs",
-    "test:drive": "node tests/google-drive-verify.mjs"
+    "test:drive": "node tests/google-drive-verify.mjs",
+    "verify:invoice": "node scripts/verify-invoice-upload.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
