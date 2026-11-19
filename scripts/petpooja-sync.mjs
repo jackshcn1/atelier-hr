@@ -24,7 +24,7 @@ import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
 import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
 import { cleanVendorName, mergePetpoojaBill } from '../lib/expenseHelpers.js';
-import { monthKeyOf, previousMonthKey, petpoojaMonthWindow } from '../lib/financePeriod.js';
+import { monthKeyOf, previousMonthKey, petpoojaMonthWindow, repeatsAnotherMonth } from '../lib/financePeriod.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -2175,55 +2175,84 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
       for (const window of targets) {
         const isComplete = window.through >= window.end;
         const queryCycle = { start: window.start, end: window.end, queryEnd: window.through };
-        try {
-          const rows = await fetchCustomReport(
-            'https://billing.petpooja.com/reports/executive_sales_summary/all',
-            `Executive Sales Summary (${window.key})`,
-            queryCycle,
-            'order type'
-          );
-          const parsed = parseExecutiveOrderTypes(rows);
-          if (!parsed.ok) {
-            console.error(`  ⚠️ Could not parse the calendar-month revenue for ${window.key}: ${parsed.error || 'unknown reason'}`);
-            continue;
+        // Two attempts: a report that did not take the date range can
+        // usually be made to take it the second time.
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+          try {
+            const rows = await fetchCustomReport(
+              'https://billing.petpooja.com/reports/executive_sales_summary/all',
+              `Executive Sales Summary (${window.key})`,
+              queryCycle,
+              'order type'
+            );
+            const parsed = parseExecutiveOrderTypes(rows);
+            if (!parsed.ok) {
+              console.error(`  ⚠️ Could not parse the calendar-month revenue for ${window.key}: ${parsed.error || 'unknown reason'}`);
+              break;
+            }
+
+            // The parser keeps the grand total beside the split, not inside it.
+            // It is added up here so the stored total can never disagree with
+            // the three numbers next to it.
+            const revenueTotal = Number(parsed.data.dine_in || 0)
+              + Number(parsed.data.pick_up || 0)
+              + Number(parsed.data.delivery || 0);
+
+            // A figure that is the same as another month's is not this month's.
+            //
+            // The report sometimes answers with its own default window instead
+            // of the one that was asked for, and a wrong month is worse than a
+            // missing one — a month with no figure is shown as missing, which
+            // is honest, while a month with the wrong figure is not.
+            const { data: monthsOnRecord } = await supabase
+              .from('finance_monthly_revenue')
+              .select('month, total');
+            if (repeatsAnotherMonth(revenueTotal, monthsOnRecord, window.key)) {
+              const other = (monthsOnRecord || []).find(
+                (row) => row.month !== window.key && Math.abs(Number(row.total || 0) - revenueTotal) < 0.01,
+              );
+              if (attempt < 2) {
+                console.error(
+                  `  ⚠️ The report answered with ${other?.month}'s figure for ${window.key} — pulling it again.`,
+                );
+                continue;
+              }
+              console.error(
+                `  ⚠️ The report answered with ${other?.month}'s figure for ${window.key} again — it was not written.`,
+              );
+              break;
+            }
+
+            const payload = {
+              month: window.key,
+              dine_in: parsed.data.dine_in,
+              pick_up: parsed.data.pick_up,
+              delivery: parsed.data.delivery,
+              total: revenueTotal,
+              window_start: window.start,
+              window_end: window.through,
+              is_complete: isComplete,
+              source: 'petpooja:executive_sales_summary',
+              synced_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            const { error } = await supabase
+              .from('finance_monthly_revenue')
+              .upsert(payload, { onConflict: 'month' });
+            if (error) throw error;
+
+            console.log(
+              `  📅 Calendar month ${window.key}: total ${revenueTotal} ` +
+              `(dine-in ${parsed.data.dine_in}, pick-up ${parsed.data.pick_up}, delivery ${parsed.data.delivery}) ` +
+              `covering ${window.start} → ${window.through}${isComplete ? ' — complete' : ' — month so far'}`
+            );
+            pulled += 1;
+          } catch (e) {
+            // A failed calendar-month pull must never fail the pay-cycle sync.
+            console.error(`  ⚠️ Could not sync the calendar-month revenue for ${window.key}: ${e.message}`);
           }
-
-          // The parser keeps the grand total beside the split, not inside it.
-          // It is added up here so the stored total can never disagree with
-          // the three numbers next to it.
-          const revenueTotal = Number(parsed.data.dine_in || 0)
-            + Number(parsed.data.pick_up || 0)
-            + Number(parsed.data.delivery || 0);
-
-          const payload = {
-            month: window.key,
-            dine_in: parsed.data.dine_in,
-            pick_up: parsed.data.pick_up,
-            delivery: parsed.data.delivery,
-            total: revenueTotal,
-            window_start: window.start,
-            window_end: window.through,
-            is_complete: isComplete,
-            source: 'petpooja:executive_sales_summary',
-            synced_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          const { error } = await supabase
-            .from('finance_monthly_revenue')
-            .upsert(payload, { onConflict: 'month' });
-          if (error) throw error;
-
-          console.log(
-            `  📅 Calendar month ${window.key}: total ${revenueTotal} ` +
-            `(dine-in ${parsed.data.dine_in}, pick-up ${parsed.data.pick_up}, delivery ${parsed.data.delivery}) ` +
-            `covering ${window.start} → ${window.through}${isComplete ? ' — complete' : ' — month so far'}`
-          );
-          pulled += 1;
-        } catch (e) {
-          // A failed calendar-month pull must never fail the pay-cycle sync.
-          console.error(`  ⚠️ Could not sync the calendar-month revenue for ${window.key}: ${e.message}`);
         }
-      }
+        }
       return { pulled, asked: targets.length };
     }
 
