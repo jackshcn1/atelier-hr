@@ -59,6 +59,8 @@ const TO = value('to', '2026-10');
 const DRY = flag('dry-run');
 const VERIFY_ONLY = flag('verify');
 const SKIP_SALES = list('skip-sales');
+// Which kinds of report to pull: bills, returns, sales. All three by default.
+const KINDS = list('kinds');
 
 const LAST_DAY = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -139,16 +141,28 @@ async function readBooks(supabase) {
     .from('finance_monthly_revenue')
     .select('month, total, is_complete')
     .order('month');
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('invoice_date, amount, debit_note, source, cost_type');
   const { data: receivables } = await supabase
     .from('finance_receivables')
     .select('month, amount');
 
+  // The table is read in pages: the database answers a query with at most a
+  // thousand rows, and the bills now run to more than two thousand — so one
+  // plain read would quietly leave out half the year.
+  const expenses = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error } = await supabase
+      .from('expenses')
+      .select('invoice_date, amount, debit_note, source, cost_type')
+      .order('id')
+      .range(from, from + 999);
+    if (error) throw error;
+    expenses.push(...(page || []));
+    if (!page || page.length < 1000) break;
+  }
+
   const months = new Set();
   for (const row of revenue || []) months.add(row.month);
-  for (const row of expenses || []) {
+  for (const row of expenses) {
     if (row.invoice_date) months.add(String(row.invoice_date).slice(0, 7));
   }
 
@@ -236,9 +250,14 @@ const beforeByMonth = new Map((revenueBefore || []).map((r) => [r.month, r]));
 const plan = [];
 for (const key of months) {
   const { start, end } = windowOf(key);
-  plan.push({ key, kind: 'bills', query: `reports=purchase_invoices&from=${start}&to=${end}&finance=1` });
-  plan.push({ key, kind: 'returns', query: `reports=purchase_returns&from=${start}&to=${end}&finance=1` });
-  if (!SKIP_SALES.includes(key)) {
+  const wanted = (kind) => KINDS.length === 0 || KINDS.includes(kind);
+  if (wanted('bills')) {
+    plan.push({ key, kind: 'bills', query: `reports=purchase_invoices&from=${start}&to=${end}&finance=1` });
+  }
+  if (wanted('returns')) {
+    plan.push({ key, kind: 'returns', query: `reports=purchase_returns&from=${start}&to=${end}&finance=1` });
+  }
+  if (wanted('sales') && !SKIP_SALES.includes(key)) {
     plan.push({ key, kind: 'sales', query: `reports=executive&revenueMonth=${key}&from=${start}&to=${end}&finance=1` });
   }
 }
