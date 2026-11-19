@@ -63,6 +63,20 @@ export async function GET(req) {
       source: revenueRow?.source || null,
     };
 
+    // The sales are not always pulled for today — the sync runs in the
+    // morning — so the month is measured against the day the figures
+    // actually cover. A forecast measured against a day that has no sales in
+    // it would be out by that day.
+    const coveredThrough =
+      revenueRow?.window_end && revenueRow.window_end.slice(0, 7) === period.key
+        ? revenueRow.window_end
+        : period.through;
+    const elapsed = elapsedFraction({
+      isCurrentMonth: period.isCurrentMonth,
+      through: coveredThrough,
+      end: period.end,
+    });
+
     const costs = await monthCosts(supabase, period);
 
     // Staff salary.
@@ -122,6 +136,8 @@ export async function GET(req) {
           start: period.start,
           end: period.end,
           through: period.through,
+          // The day the figures behind this page actually reach to.
+          coveredThrough,
           isCurrentMonth: period.isCurrentMonth,
           isComplete: period.isComplete,
           previousKey: period.previousKey,
@@ -146,7 +162,7 @@ export async function GET(req) {
           to: period.key,
           label: period.label,
         }, {
-          elapsed: { [period.key]: elapsedFraction(period) },
+          elapsed: { [period.key]: elapsed },
         }),
         ...position,
         readiness,

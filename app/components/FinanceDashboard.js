@@ -215,7 +215,8 @@ export default function FinanceDashboard() {
   // reached by now, and where it is heading at this rate.
   const paceHint = (actual, forecast, expected, { project = true } = {}) => {
     if (!isRunning || !forecast || !expected) return null;
-    const bits = [`${formatINR(expected)} expected by the ${ordinal(period.through.slice(-2))}`];
+    const through = period.coveredThrough || period.through;
+    const bits = [`${formatINR(expected)} expected by the ${ordinal(through.slice(-2))}`];
     if (project) {
       bits.push(`on this pace the month ends at ${formatINR((actual * forecast) / expected)}`);
     }
@@ -387,8 +388,8 @@ export default function FinanceDashboard() {
       {period.isCurrentMonth && data.revenue.asOf && (
         <p className="text-xs text-[#8b6f4e] -mt-1">
           {isRange
-            ? `The revenue above covers 1 – ${period.through} ${monthLabel(period.key)}, while the salary and the standing costs are for the whole month. The month's profit settles at month end.`
-            : `The revenue above covers 1 – ${period.through} ${period.label}, while the salary and the standing costs are for the whole month. The month's profit settles at month end.`}
+            ? `The revenue above covers 1 – ${period.coveredThrough || period.through} ${monthLabel(period.key)}, while the salary and the standing costs are for the whole month. The month's profit settles at month end.`
+            : `The revenue above covers 1 – ${period.coveredThrough || period.through} ${period.label}, while the salary and the standing costs are for the whole month. The month's profit settles at month end.`}
         </p>
       )}
 
