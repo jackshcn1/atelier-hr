@@ -222,4 +222,16 @@ await check('the forecast is never better than a guess dressed up as a fact', ()
   assert.ok(built.basis.level.total > 0, 'the level');
 });
 
+await check('a month is measured against the day the figures reach to', () => {
+  // A month that is over is all of it.
+  assert.equal(elapsedFraction({ isCurrentMonth: false, through: '2026-10-31', end: '2026-10-31' }), 1);
+  // A month still running is only part way through.
+  assert.equal(
+    elapsedFraction({ isCurrentMonth: true, through: '2026-11-19', end: '2026-11-30' }),
+    19 / 30
+  );
+  // And never more than the whole month.
+  assert.equal(elapsedFraction({ isCurrentMonth: true, through: '2026-11-30', end: '2026-11-30' }), 1);
+});
+
 console.log(`\n${passed} check(s) passed`);
