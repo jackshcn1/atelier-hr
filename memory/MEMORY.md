@@ -11,6 +11,7 @@
 - [Cancelled Petpooja Documents](petpooja-cancelled-documents.md) — a cancelled document is not a bill; Petpooja keeps them with an "Unpaid" column and they came in as money owed
 - [The Twice-Weekly Purchase Refresh](petpooja-purchase-refresh.md) — the last 90 days of purchases are re-read on Mondays and Thursdays, so a bill Petpooja edited, paid, cancelled or deleted is in the books within days
 - [Finance Salary & Standing Costs](finance-salary-and-standing-costs.md) — salary forecast frozen at the 1st after the cycle ends, replaced by the real payroll; standing costs as a checklist the invoice replaces
+- [The Finance Forecast](finance-forecast.md) — the Costs & Expenses bars fill with actual against the month's forecast; the level, the festival factors and the cost ratio it is built from, and how well it was tested
 - [Maintenance Module Status](maintenance-module-status.md) — architecture, access/link details, and mandatory workflow rules (browser verify, GATES.md ledger, plain-English steps) — local-only, contains credentials
 - [Maintenance Module Framework](maintenance-module-framework.md) — locked: derived-status + rejected revert + completed picker + save guard + POC picker (filter/search/add-with-dup-guard) + migrations
 - [Maintenance Module Lock](../maintenance-lock-summary.txt) — job POC section (stage picker + bin icon + single-line flex), DB migrations applied (join table + stage col on pocs + stage col on join), deploy Ready (atelier-hr-inky.vercel.app)

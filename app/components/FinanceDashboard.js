@@ -11,6 +11,61 @@ import FinanceMonthPicker, {
 import { monthLabel } from '../../lib/financePeriod.js';
 
 /**
+ * How a bar is coloured.
+ *
+ * The measure is the figure against where the month should have reached by
+ * now. More revenue is good and less cost is good, so the two read
+ * differently — a revenue bar that is short is a warning, a cost bar that is
+ * long is one.
+ */
+const BAR_COLOR = {
+  good: 'bg-emerald-600',
+  warn: 'bg-[#c08a3e]',
+  bad: 'bg-rose-600',
+  none: 'bg-[#c9c2ba]',
+};
+
+/** 'up' — more is better. 'down' — less is better. */
+function paceStatus(actual, expectation, direction) {
+  if (!expectation || expectation <= 0) return 'none';
+  const ratio = actual / expectation;
+  if (direction === 'up') {
+    if (ratio >= 0.9) return 'good';
+    if (ratio >= 0.75) return 'warn';
+    return 'bad';
+  }
+  if (ratio <= 1.1) return 'good';
+  if (ratio <= 1.25) return 'warn';
+  return 'bad';
+}
+
+/** How far a figure is from its forecast, in the way that reads well. */
+function varianceText(actual, forecast) {
+  if (!forecast) return '';
+  const diff = actual - forecast;
+  const percent = Math.round(Math.abs(diff / forecast) * 100);
+  if (percent === 0) return 'on forecast';
+  return `${diff > 0 ? '+' : '−'}${percent}%`;
+}
+
+function varianceTone(actual, forecast, direction) {
+  if (!forecast || !actual) return 'text-[#8b6f4e]';
+  const diff = actual - forecast;
+  // Within a couple of per cent, it is on forecast — not a miss.
+  if (Math.abs(diff / forecast) <= 0.02) return 'text-[#6b635c]';
+  const good = direction === 'up' ? diff > 0 : diff < 0;
+  return good ? 'text-emerald-700' : 'text-rose-700';
+}
+
+/** The day's number as an ordinal — the 19th, the 1st, the 23rd. */
+function ordinal(day) {
+  const num = Number(day);
+  if (!Number.isFinite(num)) return day;
+  if (num % 100 >= 11 && num % 100 <= 13) return `${num}th`;
+  return `${num}${['th', 'st', 'nd', 'rd'][num % 10] || 'th'}`;
+}
+
+/**
  * The finance dashboard, reported on a plain calendar month.
  *
  * The 20th-19th pay cycle is what salary and variable pay are built on; this
@@ -87,6 +142,13 @@ export default function FinanceDashboard() {
   // what is on record so far, not a settled figure.
   const revenueIncomplete = data.revenue.synced === false;
 
+  // The forecast: what this month was expected to look like, and how much of
+  // the month has happened. A month in progress is measured against what it
+  // should have reached by now, not against the whole month.
+  const forecast = data.forecast || null;
+  const fc = forecast?.view || null;
+  const isRunning = !isRange && period.isCurrentMonth && !!fc;
+
   const DrilldownModal = ({ title, items, onClose }) => (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto">
@@ -110,11 +172,19 @@ export default function FinanceDashboard() {
     </div>
   );
 
-  // A bar shows how much of the month's total it is. There is no invented
-  // forecast to compare against any more — the bar is the share of the month.
-  const Meter = ({ label, actual, total, onClick }) => {
-    const percentage = total > 0 ? Math.min((actual / total) * 100, 100) : 0;
-    const color = onClick ? 'bg-[#8b6f4e]' : 'bg-[#6b635c]';
+  // A bar shows how much of the month's forecast has been met.
+  //
+  // The bar is the actual against the forecast: if the month was forecast at
+  // ₹1,00,000 and ₹40,000 has come in, the bar is 40% full. The marker is
+  // where the month should have reached by now, so a bar that is behind can
+  // be told apart from a bar that is simply early in the month.
+  const ForecastMeter = ({ label, actual, forecast, expected, direction, hint, onClick }) => {
+    const fill = forecast > 0 ? Math.min((actual / forecast) * 100, 100) : 0;
+    const marker = expected != null && forecast > 0
+      ? Math.min((expected / forecast) * 100, 100)
+      : null;
+    const color = BAR_COLOR[paceStatus(actual, expected ?? forecast, direction)];
+
     return (
       <button
         className="mb-4 w-full text-left hover:bg-[#faf8f6] p-2 rounded-lg transition"
@@ -125,13 +195,118 @@ export default function FinanceDashboard() {
           <span className="text-[#6b635c]">{label}</span>
           <span className="font-semibold text-[#1e1812]">{formatINR(actual)}</span>
         </div>
-        <div className="w-full bg-[#f2efec] h-3 rounded-full overflow-hidden">
-          <div className={`h-full ${color}`} style={{ width: `${percentage}%` }} />
+        <div className="relative w-full h-3 bg-[#f2efec] rounded-full">
+          <div className={`h-full rounded-full ${color}`} style={{ width: `${fill}%` }} />
+          {marker !== null && marker < 99 && (
+            <div className="absolute top-0 h-full w-[2px] bg-[#1e1812]/70" style={{ left: `${marker}%` }} />
+          )}
         </div>
         <div className="text-[11px] text-[#8b6f4e] mt-1">
-          {total > 0 ? `${percentage.toFixed(0)}% of the month's ${formatINR(total)}` : 'No figure for this month yet'}
+          {forecast > 0
+            ? `${fill.toFixed(0)}% of the ${formatINR(forecast)} forecast`
+            : 'No forecast for this month yet'}
         </div>
+        {hint && <div className="text-[11px] text-[#6b635c] mt-0.5">{hint}</div>}
       </button>
+    );
+  };
+
+  // What a month in progress says under the bar: where it should have
+  // reached by now, and where it is heading at this rate.
+  const paceHint = (actual, forecast, expected, { project = true } = {}) => {
+    if (!isRunning || !forecast || !expected) return null;
+    const bits = [`${formatINR(expected)} expected by the ${ordinal(period.through.slice(-2))}`];
+    if (project) {
+      bits.push(`on this pace the month ends at ${formatINR((actual * forecast) / expected)}`);
+    }
+    return bits.join(' · ');
+  };
+
+  // One figure in the month-by-month table: what it came to, and what it
+  // was expected to come to.
+  //
+  // A month that is still running is shown as it is heading, not as it
+  // stands — nineteen days of sales measured against a whole month would
+  // read as a disaster. A month that has not happened yet shows the
+  // forecast on its own.
+  const forecastCell = (row, kind, direction) => {
+    const forecast = row.forecast[kind];
+    const actual = row.actual[kind];
+    const projected = row.projected?.[kind];
+
+    if (projected) {
+      return (
+        <>
+          <div className="font-medium">
+            {formatINR(projected)}
+            <span className={`text-[11px] ml-1 ${varianceTone(projected, forecast, direction)}`}>
+              {varianceText(projected, forecast)}
+            </span>
+          </div>
+          <div className="text-[11px] text-[#6b635c]">on this pace · {formatINR(actual)} so far</div>
+          <div className="text-[11px] text-[#8b6f4e]">forecast {formatINR(forecast)}</div>
+        </>
+      );
+    }
+
+    if (!actual) {
+      return (
+        <>
+          <div className="font-medium">{formatINR(forecast)}</div>
+          <div className="text-[11px] text-[#8b6f4e]">expected</div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div className="font-medium">
+          {formatINR(actual)}
+          <span className={`text-[11px] ml-1 ${varianceTone(actual, forecast, direction)}`}>
+            {varianceText(actual, forecast)}
+          </span>
+        </div>
+        <div className="text-[11px] text-[#8b6f4e]">forecast {formatINR(forecast)}</div>
+      </>
+    );
+  };
+
+  // The profit is the difference of two figures, so it is compared in rupees
+  // rather than in per cent — a percentage of a small forecast reads badly.
+  const netCell = (row) => {
+    const forecast = row.forecast.revenue - row.forecast.costs;
+    const actual = row.actual.revenue - row.actual.costs;
+    const projected = row.projected ? row.projected.revenue - row.projected.costs : null;
+    const shown = projected ?? actual;
+    const diff = shown - forecast;
+    const tone = Math.abs(diff) <= Math.abs(forecast) * 0.02
+      ? 'text-[#6b635c]'
+      : diff > 0
+        ? 'text-emerald-700'
+        : 'text-rose-700';
+
+    if (!row.actual.revenue && !projected) {
+      return (
+        <>
+          <div className="font-medium text-emerald-700">{formatINR(forecast)}</div>
+          <div className="text-[11px] text-[#8b6f4e]">expected</div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div className="font-medium">
+          {shown < 0 ? `−${formatINR(Math.abs(shown))}` : formatINR(shown)}
+          <span className={`text-[11px] ml-1 ${tone}`}>
+            {diff >= 0 ? '+' : '−'}{formatINR(Math.abs(diff))}
+          </span>
+        </div>
+        {projected ? (
+          <div className="text-[11px] text-[#6b635c]">on this pace</div>
+        ) : null}
+        <div className="text-[11px] text-[#8b6f4e]">forecast {formatINR(forecast)}</div>
+      </>
     );
   };
 
@@ -267,22 +442,31 @@ export default function FinanceDashboard() {
                 {isRange ? `last ${months} months` : period.label}
               </span>
             </div>
-            <Meter
+            <ForecastMeter
               label="Dine-in"
               actual={data.revenue.breakdown.dine_in}
-              total={data.revenue.total}
+              forecast={fc?.revenue.dine_in}
+              expected={fc?.expected.revenue.dine_in}
+              direction="up"
+              hint={paceHint(data.revenue.breakdown.dine_in, fc?.revenue.dine_in, fc?.expected.revenue.dine_in)}
               onClick={() => setDrilldown({ title: `Revenue — ${isRange ? `last ${months} months` : period.label}`, items: revenueItems })}
             />
-            <Meter
+            <ForecastMeter
               label="Pick Up"
               actual={data.revenue.breakdown.pick_up}
-              total={data.revenue.total}
+              forecast={fc?.revenue.pick_up}
+              expected={fc?.expected.revenue.pick_up}
+              direction="up"
+              hint={paceHint(data.revenue.breakdown.pick_up, fc?.revenue.pick_up, fc?.expected.revenue.pick_up)}
               onClick={() => setDrilldown({ title: `Revenue — ${isRange ? `last ${months} months` : period.label}`, items: revenueItems })}
             />
-            <Meter
+            <ForecastMeter
               label="Delivery"
               actual={data.revenue.breakdown.delivery}
-              total={data.revenue.total}
+              forecast={fc?.revenue.delivery}
+              expected={fc?.expected.revenue.delivery}
+              direction="up"
+              hint={paceHint(data.revenue.breakdown.delivery, fc?.revenue.delivery, fc?.expected.revenue.delivery)}
               onClick={() => setDrilldown({ title: `Revenue — ${isRange ? `last ${months} months` : period.label}`, items: revenueItems })}
             />
           </div>
@@ -291,6 +475,16 @@ export default function FinanceDashboard() {
               <span className="text-sm font-semibold text-[#1e1812]">Total Revenue</span>
               <span className="text-lg font-serif font-bold text-emerald-800">{formatINR(data.revenue.total)}</span>
             </div>
+            {fc && (
+              <div className="flex justify-between items-center text-xs text-[#6b635c]">
+                <span>Forecast {formatINR(fc.revenue.total)}</span>
+                <span>
+                  {fc.revenue.total > 0
+                    ? `${((data.revenue.total / fc.revenue.total) * 100).toFixed(0)}% of forecast`
+                    : 'no forecast yet'}
+                </span>
+              </div>
+            )}
             <div className="text-xs text-[#6b635c] text-right">
               {data.revenue.asOf
                 ? isRange
@@ -298,6 +492,11 @@ export default function FinanceDashboard() {
                   : `Petpooja sales, ${period.start} → ${data.revenue.asOf}`
                 : 'Not synced yet for this month'}
             </div>
+            {fc && isRunning && (
+              <div className="text-xs text-[#6b635c] text-right">
+                {paceHint(data.revenue.total, fc.revenue.total, fc.expected.revenue.total)}
+              </div>
+            )}
           </div>
         </div>
 
@@ -309,22 +508,31 @@ export default function FinanceDashboard() {
                 {isRange ? `last ${months} months` : period.label}
               </span>
             </div>
-            <Meter
+            <ForecastMeter
               label="Fixed Costs"
               actual={data.costs.fixed}
-              total={totalCosts}
+              forecast={fc?.costs.fixed}
+              expected={fc?.expected.costs.fixed}
+              direction="down"
+              hint={isRunning ? 'Booked for the whole month, not day by day' : null}
               onClick={() => setDrilldown({ title: 'Fixed costs', items: data.costs.breakdown.fixed })}
             />
-            <Meter
+            <ForecastMeter
               label="Variable Costs"
               actual={data.costs.variable}
-              total={totalCosts}
+              forecast={fc?.costs.variable}
+              expected={fc?.expected.costs.variable}
+              direction="down"
+              hint={paceHint(data.costs.variable, fc?.costs.variable, fc?.expected.costs.variable)}
               onClick={() => setDrilldown({ title: 'Variable costs', items: data.costs.breakdown.variable })}
             />
-            <Meter
+            <ForecastMeter
               label="Petty Expenses"
               actual={data.costs.petty}
-              total={totalCosts}
+              forecast={fc?.costs.petty}
+              expected={fc?.expected.costs.petty}
+              direction="down"
+              hint={data.costs.petty === 0 ? 'Nothing entered yet this month' : null}
               onClick={() => setDrilldown({ title: 'Petty cash', items: data.costs.breakdown.petty })}
             />
 
@@ -344,6 +552,12 @@ export default function FinanceDashboard() {
                       ? `Actual — the payroll for ${data.salary.cycle.start} → ${data.salary.cycle.end} has been processed`
                       : `Forecast — every active employee a full month, for ${data.salary.cycle.start} → ${data.salary.cycle.end}`}
                 </p>
+                {fc && fc.costs.salary > 0 && Math.abs(fc.costs.salary - data.salary.amount) >= 1 && (
+                  <p className="text-[11px] text-[#6b635c] mt-0.5">
+                    The forecast for this cycle was {formatINR(fc.costs.salary)} —{' '}
+                    {data.salary.amount > fc.costs.salary ? 'more' : 'less'} than planned.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -352,6 +566,16 @@ export default function FinanceDashboard() {
               <span className="text-sm font-semibold text-[#1e1812]">Total Costs</span>
               <span className="text-lg font-serif font-bold text-rose-800">{formatINR(totalCosts)}</span>
             </div>
+            {fc && (
+              <div className="flex justify-between items-center text-xs text-[#6b635c]">
+                <span>Forecast {formatINR(fc.costs.total)}</span>
+                <span>
+                  {fc.costs.total > 0
+                    ? `${((totalCosts / fc.costs.total) * 100).toFixed(0)}% of forecast`
+                    : 'no forecast yet'}
+                </span>
+              </div>
+            )}
             <div className="text-xs text-[#6b635c] text-right">
               {isRange
                 ? `Costs recorded over the last ${months} months`
@@ -359,9 +583,84 @@ export default function FinanceDashboard() {
                   ? `Costs recorded 1 – ${period.through} ${period.label}`
                   : `Costs recorded in ${period.label}`}
             </div>
+            {fc && isRunning && (
+              <div className="text-xs text-[#6b635c] text-right">
+                Fixed costs and salary are booked for the whole month, so they are already counted in full.
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Month by month against the forecast.
+          The bars above say how this month is going. This says how every
+          month has gone against what it was expected to do — and what the
+          months ahead are forecast at. */}
+      {forecast?.series?.length > 0 && (
+        <div className="bg-white p-6 rounded-2xl border border-[#ebe8e4] shadow-sm">
+          <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#f2efec]">
+            <h3 className="font-serif text-xl font-medium text-[#1e1812]">
+              Month by month against the forecast
+            </h3>
+            <span className="text-xs font-medium px-2.5 py-1 bg-[#f6f4f2] text-[#8b6f4e] rounded-full">
+              Built from {forecast.basis.label}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[620px]">
+              <thead>
+                <tr className="table-head">
+                  <th className="text-left">Month</th>
+                  <th className="text-right">Revenue</th>
+                  <th className="text-right">Costs</th>
+                  <th className="text-right">Net profit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {forecast.series.map((row) => {
+                  const current = row.key === period.key;
+                  const upcoming = !row.actual.revenue && !row.projected && row.forecast.revenue > 0;
+                  return (
+                    <tr key={row.key} className={`border-t border-[#f2efec] ${current ? 'bg-[#faf8f6]' : ''}`}>
+                      <td className="py-3 pr-3 align-top">
+                        <div className="font-medium text-[#1e1812]">{row.label}</div>
+                        <div className="text-[11px] text-[#8b6f4e]">
+                          {upcoming
+                            ? row.note
+                              ? `forecast — ${row.note}`
+                              : 'forecast'
+                            : row.complete
+                              ? row.note || 'no festival'
+                              : 'still running'}
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-right align-top whitespace-nowrap">
+                        {forecastCell(row, 'revenue', 'up')}
+                      </td>
+                      <td className="py-3 px-2 text-right align-top whitespace-nowrap">
+                        {forecastCell(row, 'costs', 'down')}
+                      </td>
+                      <td className="py-3 pl-2 text-right align-top whitespace-nowrap">
+                        {netCell(row)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-xs text-[#8b6f4e] mt-4">
+            Built from {forecast.basis.label}. Revenue is the median of what each channel earned in those
+            months, with each month's festival effect taken out — December is forecast at 1.3 times a
+            normal month, for Christmas and New Year. Variable costs are forecast at the share of the
+            revenue they ran at over the last {forecast.basis.ratioWindow} months. Fixed costs are the
+            standing-cost list, petty cash is ₹15,000 a month, and staff salary is what the payroll for
+            that cycle was forecast to cost.
+          </p>
+        </div>
+      )}
 
       {/* Where the business stands.
           Money owed by customers is money that will come in; money owed to

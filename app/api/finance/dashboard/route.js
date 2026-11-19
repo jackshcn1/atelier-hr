@@ -1,9 +1,10 @@
 import { getSupabase } from '../../../../lib/supabaseServer.js';
-import { financePeriod, lastMonthKeys } from '../../../../lib/financePeriod.js';
+import { financePeriod, lastMonthKeys, elapsedFraction } from '../../../../lib/financePeriod.js';
 import { monthCosts } from '../../../../lib/financeCosts.js';
 import { monthPosition, monthReadiness } from '../../../../lib/financePosition.js';
 import { cycleEndingIn, salaryForCycle } from '../../../../lib/financeSalary.js';
 import { monthsOnRecord, rangeDashboard } from '../../../../lib/financeRange.js';
+import { forecastHistory, buildForecast } from '../../../../lib/financeForecast.js';
 
 // The finance dashboards report on the plain calendar month.
 //
@@ -18,6 +19,9 @@ import { monthsOnRecord, rangeDashboard } from '../../../../lib/financeRange.js'
 // `?range=N` widens the window: the month named is the last month of the
 // span, and the last N months are added up. The span is for the months that
 // are worth looking at together — the last three, six or twelve.
+//
+// The forecast — what this month was expected to look like — comes from
+// lib/financeForecast.js, which works it out from the months on record.
 export async function GET(req) {
   try {
     const supabase = getSupabase();
@@ -25,11 +29,14 @@ export async function GET(req) {
     const period = financePeriod(params.get('month'));
     const range = Math.min(Math.max(Number(params.get('range')) || 1, 1), 24);
 
+    // The months on record, read once for the forecast.
+    const history = await forecastHistory(supabase);
+
     // More than one month is a different question, and it is answered in
     // lib/financeRange.js — the same helpers, with the months added up.
     if (range > 1) {
       const periods = lastMonthKeys(period.key, range).map((key) => financePeriod(key));
-      const data = await rangeDashboard(supabase, periods);
+      const data = await rangeDashboard(supabase, periods, history);
       data.availableMonths = await monthsOnRecord(supabase, period.key);
       return Response.json({ success: true, data });
     }
@@ -132,6 +139,15 @@ export async function GET(req) {
         costs,
         salary,
         net_pl: netProfitOrLoss,
+        // What this month was expected to look like, and every month from the
+        // first one on record beside what was expected of it.
+        forecast: buildForecast(history, {
+          from: period.key,
+          to: period.key,
+          label: period.label,
+        }, {
+          elapsed: { [period.key]: elapsedFraction(period) },
+        }),
         ...position,
         readiness,
         // The parts of the month that are not filled in yet.
