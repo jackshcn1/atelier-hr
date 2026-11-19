@@ -5,7 +5,7 @@
  * The service account is the one already set up for the customer-feedback
  * pull:
  *
- *   variable-pay-feedback-sync@my-project-27246-510206.iam.gserviceaccount.com
+ *   variable-pay-feedback-sync@atelier-hr-drive.iam.gserviceaccount.com
  *
  * Its credentials come from `scripts/petpooja-config.json` (which is
  * gitignored and never deployed), or from the environment, or from a key file

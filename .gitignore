@@ -71,6 +71,7 @@ memory/maintenance-module-status.md
 # Google service account key file — NEVER commit
 scripts/google-service-account.json
 scripts/*service-account*.json
+scripts/atelier-hr-drive-*.json
 
 # Google OAuth client file (the client secret is in it) — NEVER commit
 scripts/google-oauth-client.json
