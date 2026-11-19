@@ -4,10 +4,45 @@ description: "How the Petpooja daily sync is hosted (Vercel), why it cannot run 
 metadata:
   node_type: memory
   type: project
-  modified: 2026-11-17T08:00:00.000Z
+  modified: 2026-11-19T09:00:00.000Z
 ---
 
 # Petpooja Hosted Sync (replaces the local-computer job)
+
+## The sync only ever pulls the current window — there is no backfill
+
+Checked against the live books on 19 Nov 2026, the data before October 2026
+is simply not there:
+
+| What | In the books |
+|---|---|
+| Sales (`finance_monthly_revenue`) | 2026-10 and 2026-11 only — March to September missing |
+| Purchases (`expenses`) | March–June only from the accountant's sheet (19 rows); July and August empty; September has one bill; October and November are full |
+| Purchase returns (`debit_note > 0`) | October and November only |
+| Receivables (`finance_receivables`) | November only |
+
+The reasons are in the code, not in the data:
+
+- **Sales** — `syncCalendarMonthRevenue()` pulls the Executive Sales Summary
+  for the **current calendar month and the one before it**. A month cannot be
+  asked for by name, so a sales backfill needs a small change first.
+- **Purchases and returns** — both are pulled with `cycle`, the **current pay
+  cycle** (20th–19th). `getActivePayrollCycle()` already honours
+  `SYNC_START_DATE` and `SYNC_END_DATE`, so a backfill is a loop over month
+  windows with no code change.
+- `finance=1` makes a run finance-only: it writes no payroll and no
+  variable-pay figures, so a backfill cannot disturb the frozen metrics.
+
+**Re-pulling a month is safe**: a bill is matched by (supplier, invoice
+number), and a bill that came from the accountant's sheet is also matched by
+its invoice number alone, so the Petpooja version updates that row instead of
+writing a second one.
+
+**How to apply:** the nightly job keeps the last month current — it does not
+fill history. If someone asks for an older month, say what is missing and
+backfill it deliberately (back up the database first, one window per request,
+because of the 300 s serverless cap) rather than assuming the books are
+complete.
 
 ## The constraint that shapes everything
 
