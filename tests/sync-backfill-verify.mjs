@@ -12,6 +12,7 @@
  */
 
 import { parseBackfillRequest } from '../lib/syncBackfill.js';
+import { repeatsAnotherMonth } from '../lib/financePeriod.js';
 
 let passed = 0;
 async function check(name, fn) {
@@ -82,6 +83,31 @@ await check('a window that has not happened yet is allowed — it simply reads n
   const result = ask('from=2099-01-01&to=2099-01-31', { financeOnly: true });
   if (!result.ok) throw new Error('the window was refused');
   if (result.from !== '2099-01-01') throw new Error('the window was not read');
+});
+
+await check('a sales figure that repeats another month is not written', () => {
+  // The Executive Sales Summary sometimes answers with the report's own
+  // default window: two different months came back with the very same total.
+  const onRecord = [
+    { month: '2026-10', total: 1827117.48 },
+    { month: '2026-11', total: 1123297.75 },
+  ];
+  // March came back with the same figure as April.
+  if (!repeatsAnotherMonth(21317.32, [...onRecord, { month: '2026-04', total: 21317.32 }], '2026-03')) {
+    throw new Error('a repeated figure was let through');
+  }
+  // A month's own figure is not a repeat of itself.
+  if (repeatsAnotherMonth(1827117.48, onRecord, '2026-10')) {
+    throw new Error('a month was mistaken for a repeat of itself');
+  }
+  // A month of its own is fine.
+  if (repeatsAnotherMonth(1573255.44, onRecord, '2026-03')) {
+    throw new Error('a good figure was refused');
+  }
+  // Nothing at all is not a repeat — a closed month is not a broken pull.
+  if (repeatsAnotherMonth(0, onRecord, '2026-03')) {
+    throw new Error('a month with no sales was called a repeat');
+  }
 });
 
 console.log(`\n${passed} check(s) passed`);
