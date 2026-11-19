@@ -1,4 +1,4 @@
-import { getSupabase } from '../../../../lib/supabaseServer.js';
+import { getSupabase, readAllRows } from '../../../../lib/supabaseServer.js';
 import { normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js';
 
 // The supplier list.
@@ -16,13 +16,22 @@ export async function GET(request) {
     const params = new URL(request.url).searchParams;
     const search = (params.get('search') || '').trim().toLowerCase();
 
-    const [{ data: vendors, error: vendorError }, { data: bills, error: billError }] = await Promise.all([
+    // Every bill, not the first thousand. A plain read stops at a thousand
+    // rows and says nothing when it does, so a supplier could be shown as
+    // owing less than it does.
+    const [vendorResult, bills] = await Promise.all([
       supabase.from('vendors').select('*').order('name', { ascending: true }),
-      supabase.from('expenses').select('vendor_name, amount, debit_note, payment_status, invoice_date'),
+      readAllRows((from, to) =>
+        supabase
+          .from('expenses')
+          .select('vendor_name, amount, debit_note, payment_status, invoice_date')
+          .order('id')
+          .range(from, to),
+      ),
     ]);
 
-    if (vendorError) throw vendorError;
-    if (billError) throw billError;
+    if (vendorResult.error) throw vendorResult.error;
+    const vendors = vendorResult.data || [];
 
     // What each supplier's bills add up to.
     const summary = new Map();

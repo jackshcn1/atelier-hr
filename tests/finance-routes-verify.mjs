@@ -47,6 +47,8 @@ const { GET: expensesGET, POST: expensesPOST } = await import('../app/api/financ
 const { GET: vendorsGET, POST: vendorsPOST } = await import('../app/api/finance/vendors/route.js');
 const { writeInvoiceSheet } = await import('../lib/invoiceSheet.js');
 const { monthCosts } = await import('../lib/financeCosts.js');
+const { readAllRows } = await import('../lib/supabaseServer.js');
+const { normalizePaymentStatus } = await import('../lib/expenseHelpers.js');
 const { financePeriod } = await import('../lib/financePeriod.js');
 const { createClient } = await import('@supabase/supabase-js');
 
@@ -365,6 +367,52 @@ await check('the supplier list answers with what is owed to each', () => {
   for (const row of rows) {
     if (!row.bills || typeof row.bills.unpaid !== 'number') throw new Error(`no bills on ${row.name}`);
   }
+});
+
+// A plain read stops at a thousand rows and says nothing when it does, so
+// the bills page was quietly showing a fraction of the bills — and a fraction
+// of what was owed — with no error anywhere to show for it.
+await check('every bill on record comes back, not the first thousand', async () => {
+  const { count } = await sb.from('expenses').select('id', { count: 'exact', head: true });
+  if (exp.body.data.length !== count) {
+    throw new Error(`${exp.body.data.length} bills came back, the table holds ${count}`);
+  }
+});
+
+await check('the supplier list counts every bill, not the first thousand', async () => {
+  const all = await readAllRows((from, to) =>
+    sb
+      .from('expenses')
+      .select('vendor_name, amount, debit_note, payment_status')
+      .order('id')
+      .range(from, to)
+  );
+
+  const expected = new Map();
+  for (const bill of all) {
+    const name = (bill.vendor_name || '').trim();
+    if (!name) continue;
+    const line = expected.get(name) || { count: 0, unpaid: 0, paid: 0 };
+    const amount = Number(bill.amount || 0) - Number(bill.debit_note || 0);
+    line.count += 1;
+    if (normalizePaymentStatus(bill.payment_status) === 'paid') line.paid += amount;
+    else line.unpaid += amount;
+    expected.set(name, line);
+  }
+
+  let checked = 0;
+  for (const row of vend.body.data) {
+    const line = expected.get(row.name);
+    if (!line) continue;
+    checked += 1;
+    if (row.bills.billCount !== line.count) {
+      throw new Error(`${row.name} counts ${row.bills.billCount} bills, the table holds ${line.count}`);
+    }
+    if (Math.abs(row.bills.unpaid - line.unpaid) > 1) {
+      throw new Error(`${row.name} is short by ₹${Math.round(line.unpaid - row.bills.unpaid)}`);
+    }
+  }
+  if (checked === 0) throw new Error('no supplier could be checked');
 });
 
 // A bill typed by hand, then removed again — the whole round trip.

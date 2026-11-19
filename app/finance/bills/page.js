@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { normalizePaymentStatus } from '../../../lib/expenseHelpers.js';
+import { monthLabel } from '../../../lib/financePeriod.js';
 
 // The link to the invoice itself. Only a Drive link is followed — anything
 // else is not a link we put there.
@@ -19,6 +20,7 @@ export default function BillsPage() {
   const [bills, setBills] = useState([]);
   const [totals, setTotals] = useState(null);
   const [filter, setFilter] = useState('unpaid');
+  const [month, setMonth] = useState('all');
   const [openVendor, setOpenVendor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -63,13 +65,33 @@ export default function BillsPage() {
     }
   };
 
+  // The months that have bills on record, newest first.
+  const months = useMemo(() => {
+    const keys = new Set();
+    for (const bill of bills) {
+      const key = String(bill.invoice_date || '').slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(key)) keys.add(key);
+    }
+    return [...keys].sort().reverse();
+  }, [bills]);
+
+  // The bills of the chosen month. A bill with no date belongs to no month,
+  // so it shows in "All months" only.
+  const scoped = useMemo(
+    () =>
+      month === 'all'
+        ? bills
+        : bills.filter((bill) => String(bill.invoice_date || '').slice(0, 7) === month),
+    [bills, month]
+  );
+
   // The bills, grouped by supplier.
   //
   // A credit note — goods sent back to a supplier — is not something you
   // owe. It is money coming back, so it is kept apart from the payable
   // instead of quietly netting it away.
   const grouped = new Map();
-  for (const bill of bills) {
+  for (const bill of scoped) {
     const name = (bill.vendor_name || '').trim() || 'Unknown vendor';
     const amount = Number(bill.amount || 0);
     const credit = Number(bill.debit_note || 0);
@@ -181,6 +203,28 @@ export default function BillsPage() {
           <Link href="/finance/costs/entry" className="btn-primary text-sm px-4 py-2 ml-auto">
             + Log a bill
           </Link>
+        </div>
+
+        <div className="flex items-center gap-3 mb-8 flex-wrap">
+          <label htmlFor="bills-month" className="text-sm text-[#6b635c]">
+            Month
+          </label>
+          <select
+            id="bills-month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="field w-auto min-w-[11rem] text-sm py-1.5 px-2.5"
+          >
+            <option value="all">All months</option>
+            {months.map((key) => (
+              <option key={key} value={key}>{monthLabel(key)}</option>
+            ))}
+          </select>
+          <p className="text-xs text-[#6b635c]">
+            {month === 'all'
+              ? 'Every bill on record, whatever its date.'
+              : `Only the bills dated ${monthLabel(month)} — the same window Petpooja reports on.`}
+          </p>
         </div>
 
         {message && <p className="mb-4 text-sm text-[#6b635c]">{message}</p>}

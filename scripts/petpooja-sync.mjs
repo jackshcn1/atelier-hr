@@ -2724,7 +2724,16 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
         // "Not found :(".
         const purchaseInvoiceUrl = 'https://inventory.petpooja.com/inventories/purchase_list/';
         const purchaseRows = await fetchCustomReport(purchaseInvoiceUrl, 'Purchase Invoices', cycle);
-  
+
+        // The raw export, when asked for.
+        //
+        // Petpooja's own words are worth keeping when a field is not reading
+        // the way it should: what the report actually says about a payment is
+        // the only way to tell a parsing mistake from a real figure.
+        if (String(process.env.SYNC_DUMP_ROWS || '').toLowerCase() === 'true') {
+          dumpReportRows('purchase-invoices', purchaseRows);
+        }
+
         if (purchaseRows && purchaseRows.length > 0) {
           const purchaseResult = parsePurchaseInvoices(purchaseRows, cycle);
           if (purchaseResult.ok && purchaseResult.invoices.length > 0) {
