@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { consentUrl, oauthConfigured } from '../../../../lib/googleUserDrive.js';
 import { currentProfile, isAdmin } from '../../../../lib/sessionUser.js';
 
-// Connect the restaurant's Google account to the site.
+// Connect a Google account to the site.
 //
 // A service account cannot store files in Drive — Google gives it no
 // storage of its own — so the upload is made as the restaurant's own Google

@@ -31,7 +31,7 @@ export default function SettingsPage() {
     });
   }, []);
 
-  // Is the restaurant's Google account connected, and what did Google say
+  // Is a Google account connected, and what did Google say
   // when the person came back from the sign-in?
   useEffect(() => {
     fetch('/api/google-drive/status')
@@ -123,16 +123,17 @@ export default function SettingsPage() {
           <h2 className="panel-title mb-2">Google Drive — invoice uploads</h2>
           <p className="text-sm text-ink-muted mb-4">
             A bill typed in by hand can have the invoice attached to it. The file is
-            stored in the restaurant's own Drive folder, and the bill keeps the link
-            to it. Google will not let the service account store files, so the
-            restaurant's own Google account connects here, once — after that the
-            upload goes in as that account.
+            stored in the Drive folder the invoices live in, and the bill keeps the
+            link to it. Google will not let the service account store files, so a
+            Google account connects here, once — after that the upload goes in as
+            that account. The account that connects is the one that owns the file,
+            so it has to be able to write to the invoice folder.
           </p>
 
           {drive.connected ? (
             <div className="flex items-center gap-3 flex-wrap">
               <span className="pill-good text-xs">✓ Connected</span>
-              <span className="text-sm text-ink-muted">{drive.email || 'the restaurant’s Google account'}</span>
+              <span className="text-sm text-ink-muted">{drive.email || 'the connected Google account'}</span>
             </div>
           ) : (
             <div className="flex items-center gap-3 flex-wrap">
