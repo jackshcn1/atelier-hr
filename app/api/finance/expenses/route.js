@@ -1,4 +1,4 @@
-import { getSupabase } from '../../../../lib/supabaseServer.js';
+import { getSupabase, readAllRows } from '../../../../lib/supabaseServer.js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
 import { cleanExpense, cleanExpensePatch, normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js';
 
@@ -31,7 +31,11 @@ export async function GET(request) {
     const costType = params.get('cost_type');
     const vendor = params.get('vendor');
 
-    let query = supabase.from('expenses').select('*').order('created_at', { ascending: false });
+    let query = supabase
+      .from('expenses')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
 
     if (status) query = query.eq('status', status);
     if (costType) query = query.eq('cost_type', costType);
@@ -48,10 +52,10 @@ export async function GET(request) {
         .lte('invoice_date', period.end);
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const rows = data || [];
+    // Every bill, not the first thousand. A plain read stops at a thousand
+    // rows and says nothing when it does, so the page was quietly showing a
+    // fraction of the bills and a fraction of what was owed.
+    const rows = await readAllRows((from, to) => query.range(from, to));
 
     // The payment filter is applied here rather than in the query, because
     // the values in the table have not always used the same spelling.
