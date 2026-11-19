@@ -1305,8 +1305,17 @@ export async function runPetpoojaSync(options = {}) {
 
     const toInsert = new Map();
     const toUpdate = [];
+    const seenKeys = new Set();
     for (const row of rows) {
       const key = keyOf(row.vendor_name, row.invoice_number);
+      // Two bills that share a supplier and an invoice number cannot both be
+      // written — the second would be taken for the first. That is worth
+      // saying out loud, because a bill that is quietly dropped is a bill
+      // that is quietly missing from the books.
+      if (seenKeys.has(key) && !toInsert.has(key)) {
+        console.warn(`  ⚠️ Two ${label} share the supplier and invoice number: ${row.vendor_name} / ${row.invoice_number}`);
+      }
+      seenKeys.add(key);
       const found =
         existingByKey.get(key) ||
         sheetByInvoice.get(String(row.invoice_number || '').trim().toLowerCase());
@@ -1364,6 +1373,67 @@ export async function runPetpoojaSync(options = {}) {
     unchanged = rows.length - inserted - updated;
     console.log(`  ✓ ${label}: ${inserted} new, ${updated} updated, ${unchanged} unchanged`);
     return { inserted, updated, unchanged };
+  }
+
+  /**
+   * Take the cancelled documents out of the books.
+   *
+   * A bill that Petpooja cancelled is not a bill, and the pull leaves it out.
+   * But a bill that was pulled *before* it was cancelled would still be in the
+   * books as money the restaurant owes — so the cancelled document is matched
+   * against the ledger and the row is removed.
+   *
+   * Only rows that came from Petpooja are touched. A bill typed by hand, or
+   * written by the accountant in the sheet, is a person's record and is never
+   * removed by the sync.
+   *
+   * @param {Array<{vendor_name: string, invoice_number: string, invoice_date: string}>} docs
+   * @param {string} label what the rows are called in the log
+   */
+  async function removeCancelledBills(docs, label = 'bill(s)') {
+    if (!docs || docs.length === 0) return 0;
+    let removed = 0;
+    for (const doc of docs) {
+      // A document with no date cannot be matched to a row, and PostgREST
+      // refuses an equality on a null. There is nothing to remove either way.
+      if (!doc.vendor_name || !doc.invoice_number || !doc.invoice_date) continue;
+
+      const { data: matches, error } = await supabase
+        .from('expenses')
+        .select('id, source, description')
+        .eq('vendor_name', doc.vendor_name)
+        .eq('invoice_number', doc.invoice_number)
+        .eq('invoice_date', doc.invoice_date);
+      if (error) {
+        console.error(`  ❌ Could not look up a cancelled ${label}:`, error.message);
+        continue;
+      }
+
+      // Only a row that came from Petpooja is removed. The older rows are
+      // tagged 'existing' — that is the column's default, so anything written
+      // without a source lands there — and the description is what tells the
+      // Petpooja rows apart from a bill a person typed.
+      const mine = (matches || []).filter(
+        (row) =>
+          row.source === 'petpooja' ||
+          (row.source === 'existing' && String(row.description || '').startsWith('Petpooja'))
+      );
+      if (mine.length === 0) continue;
+
+      const { error: deleteError } = await supabase
+        .from('expenses')
+        .delete()
+        .in('id', mine.map((row) => row.id));
+      if (deleteError) {
+        console.error(`  ❌ Could not remove a cancelled ${label}:`, deleteError.message);
+        continue;
+      }
+      removed += mine.length;
+    }
+    if (removed > 0) {
+      console.log(`  🧹 Took ${removed} cancelled ${label} out of the books`);
+    }
+    return removed;
   }
 
   function findEmployeeByName(name, empList) {
@@ -2738,6 +2808,10 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
           const purchaseResult = parsePurchaseInvoices(purchaseRows, cycle);
           if (purchaseResult.ok && purchaseResult.invoices.length > 0) {
             console.log(`  📊 Found ${purchaseResult.invoices.length} purchase invoices`);
+            if (purchaseResult.cancelled) {
+              // A cancelled document never happened, so it is not money owed.
+              console.log(`  ↩︎ Left out ${purchaseResult.cancelled} cancelled purchase document(s)`);
+            }
   
             // Sync each invoice to expenses table.
             const invoicePayloads = purchaseResult.invoices.map((invoice) => ({
@@ -2761,6 +2835,11 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
             }));
             await syncExpenseRows(invoicePayloads, 'purchase invoice(s)');
 
+            // A bill that was pulled before Petpooja cancelled it is still in
+            // the books as money owed. The cancelled document is what says it
+            // never happened.
+            await removeCancelledBills(purchaseResult.cancelledDocs, 'bill(s)');
+
             successfulReports++;
           } else {
             console.log('  ℹ️ No purchase invoices found for this period');
@@ -2782,10 +2861,18 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
         const purchaseReturnUrl = 'https://inventory.petpooja.com/inventories/purchase_return_list/';
         const returnRows = await fetchCustomReport(purchaseReturnUrl, 'Purchase Returns', cycle);
 
+        // The raw export, when asked for.
+        if (String(process.env.SYNC_DUMP_ROWS || '').toLowerCase() === 'true') {
+          dumpReportRows('purchase-returns', returnRows);
+        }
+
         if (returnRows && returnRows.length > 0) {
           const returnsResult = parsePurchaseReturns(returnRows, cycle);
           if (returnsResult.ok && returnsResult.returns.length > 0) {
             console.log(`  📊 Found ${returnsResult.returns.length} purchase returns (debit notes)`);
+            if (returnsResult.cancelled) {
+              console.log(`  ↩︎ Left out ${returnsResult.cancelled} cancelled debit note(s)`);
+            }
 
             // The `b2b_returns` metric comes from the same report.
             const total = returnsResult.returns.reduce((s, r) => s + Number(r.total_amount || 0), 0);
@@ -2823,6 +2910,16 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
               source: 'petpooja', // this bill is the Petpooja one, not the sheet's
             }));
             await syncExpenseRows(returnPayloads, 'debit note(s)');
+
+            // A cancelled debit note is not a credit either.
+            await removeCancelledBills(
+              returnsResult.cancelledDocs.map((doc) => ({
+                vendor_name: doc.vendor_name,
+                invoice_number: doc.return_number,
+                invoice_date: doc.return_date,
+              })),
+              'debit note(s)'
+            );
 
             successfulReports++;
           } else {

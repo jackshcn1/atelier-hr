@@ -9,6 +9,7 @@
     "sync:petpooja": "node scripts/petpooja-sync.mjs",
     "setup:petpooja": "node scripts/setup-petpooja.mjs",
     "test:finance": "node tests/expense-helpers-verify.mjs",
+    "test:parsers": "node tests/expense-parsers-verify.mjs",
     "test:finance-routes": "node tests/finance-routes-verify.mjs",
     "test:invoice-sheet": "node tests/invoice-sheet-verify.mjs",
     "test:drive": "node tests/google-drive-verify.mjs",
