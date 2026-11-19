@@ -72,7 +72,7 @@ export default function FinanceMonthPicker({
     // One line: how many months, then the month itself with its arrows. The
     // dropdowns are sized to their content (`.field` is full width, which
     // would push each one onto its own line).
-    <div className="flex items-center gap-2 flex-wrap justify-end">
+    <div className="flex items-center gap-2 flex-wrap justify-end sm:shrink-0">
       {onRangeChange && (
         <select
           value={range}

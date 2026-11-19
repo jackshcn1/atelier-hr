@@ -145,8 +145,10 @@ export default function FinanceDashboard() {
     <div className="space-y-6">
       {drilldown && <DrilldownModal title={drilldown.title} items={drilldown.items} onClose={() => setDrilldown(null)} />}
 
+      {/* The title gives way, not the controls: the picker stays on one line
+          at the right, and the title wraps inside its own column. */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-sm text-[#6b635c]">
             {period.label}
             <span className="text-[#8b6f4e]">
@@ -190,7 +192,7 @@ export default function FinanceDashboard() {
               ? `${isProfit ? 'Net Profit' : 'Net Loss'} on record`
               : isProfit
                 ? 'Net Profit'
-                : 'Net Loss'}{' '}
+                : 'Net Loss'}{' — '}
             {spanName}
           </span>
           <span className="text-lg font-serif font-bold">

@@ -112,7 +112,7 @@ export default function PnLPage() {
         </div>
 
         <div className="page-head mb-8 flex flex-wrap items-end justify-between gap-6">
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="page-title font-serif text-4xl lg:text-5xl">P&L Statement</h1>
             <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">
               {period.label} — calendar month
