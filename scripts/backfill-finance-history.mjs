@@ -11,22 +11,31 @@
  * This script asks the hosted sync for one window at a time, so every report
  * is read for the month it belongs to:
  *
- *   sales    ?reports=executive&revenueMonth=YYYY-MM   the calendar month
- *   bills    ?reports=purchase_invoices&from=…&to=…    the vendor bills
- *   returns  ?reports=purchase_returns&from=…&to=…     the debit notes
+ *   bills    ?reports=purchase_invoices&from=…&to=…   the vendor bills
+ *   returns  ?reports=purchase_returns&from=…&to=…    the debit notes
+ *   sales    ?reports=executive&revenueMonth=YYYY-MM  the calendar month
  *
  * Every request is a finance-only run (`finance=1`), so the variable-pay
  * metrics and the pay periods are left exactly as they are — the route
  * refuses a backfill window without that flag.
  *
+ * **A sales pull is checked before it is believed.** The Executive Sales
+ * Summary sometimes answers with the report's own default window instead of
+ * the one that was asked for, and a wrong month is worse than a missing one.
+ * Two things give it away: the figure is identical to another month's, and
+ * the figure is far too small for a month that has that month's purchases.
+ * A pull that fails either check is thrown away — the month is put back the
+ * way it was — and the run carries on.
+ *
  * The secret is read from SYNC_SECRET, or from /tmp/pj_sync_secret. It is
  * never printed.
  *
  * Usage:
- *   node scripts/backfill-finance-history.mjs                     # March–October 2026
+ *   node scripts/backfill-finance-history.mjs --months 2026-04,2026-05
  *   node scripts/backfill-finance-history.mjs --from 2026-03 --to 2026-10
- *   node scripts/backfill-finance-history.mjs --verify            # only print the books
- *   node scripts/backfill-finance-history.mjs --dry-run           # print the plan
+ *   node scripts/backfill-finance-history.mjs --months 2026-10 --skip-sales 2026-10
+ *   node scripts/backfill-finance-history.mjs --verify          # only print the books
+ *   node scripts/backfill-finance-history.mjs --dry-run         # print the plan
  */
 
 import { readFileSync } from 'node:fs';
@@ -38,12 +47,18 @@ const value = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i !== -1 && args[i + 1] ? args[i + 1] : fallback;
 };
+const list = (name) =>
+  value(name, '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 const BASE = (value('base', process.env.ATELIER_SITE_URL || 'https://atelier-hr-inky.vercel.app')).replace(/\/$/, '');
 const FROM = value('from', '2026-03');
 const TO = value('to', '2026-10');
 const DRY = flag('dry-run');
 const VERIFY_ONLY = flag('verify');
+const SKIP_SALES = list('skip-sales');
 
 const LAST_DAY = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -63,9 +78,7 @@ function monthKeys(fromKey, toKey) {
 
 function windowOf(key) {
   const [y, m] = key.split('-').map(Number);
-  const start = `${key}-01`;
-  const end = `${key}-${String(LAST_DAY[m - 1]).padStart(2, '0')}`;
-  return { start, end };
+  return { start: `${key}-01`, end: `${key}-${String(LAST_DAY[m - 1]).padStart(2, '0')}` };
 }
 
 // The secret never leaves this process.
@@ -78,11 +91,21 @@ function readSecret() {
   }
 }
 
+function supabaseClient() {
+  const env = {};
+  for (const line of readFileSync('.env.local', 'utf8').split('\n')) {
+    const m = line.match(/^([A-Z_]+)=(.*)$/);
+    if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
+}
+
 async function callSync(query, { label, keepSession }) {
   const secret = readSecret();
   const url = `${BASE}/api/sync?${query}${keepSession ? '&keepSession=1' : ''}`;
-  const attempts = 3;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     const startedAt = Date.now();
     try {
       const res = await fetch(url, {
@@ -100,10 +123,10 @@ async function callSync(query, { label, keepSession }) {
       }
       console.log(`  ⚠️  ${label} — ${seconds}s — HTTP ${res.status}: ${body?.error || body?.raw || 'unknown'}`);
     } catch (e) {
-      console.log(`  ⚠️  ${label} — ${(e.name === 'TimeoutError' ? 'timed out' : e.message)}`);
+      console.log(`  ⚠️  ${label} — ${e.name === 'TimeoutError' ? 'timed out' : e.message}`);
     }
-    if (attempt < attempts) {
-      console.log(`     … retrying (${attempt + 1}/${attempts})`);
+    if (attempt < 3) {
+      console.log(`     … retrying (${attempt + 1}/3)`);
       await new Promise((r) => setTimeout(r, 30000));
     }
   }
@@ -111,16 +134,7 @@ async function callSync(query, { label, keepSession }) {
 }
 
 /** What the books hold, month by month. */
-async function readBooks() {
-  const env = {};
-  for (const line of readFileSync('.env.local', 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z_]+)=(.*)$/);
-    if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false },
-  });
-
+async function readBooks(supabase) {
   const { data: revenue } = await supabase
     .from('finance_monthly_revenue')
     .select('month, total, is_complete')
@@ -138,8 +152,8 @@ async function readBooks() {
     if (row.invoice_date) months.add(String(row.invoice_date).slice(0, 7));
   }
 
-  console.log('\nMonth     | Sales        | Bills           | Returns (credit) | Recv');
-  console.log('----------|--------------|-----------------|------------------|------');
+  console.log('\nMonth     | Sales          | Bills                | Returns (credit) | Recv');
+  console.log('----------|----------------|----------------------|------------------|------');
   for (const key of [...months].sort()) {
     const sales = (revenue || []).find((r) => r.month === key);
     const rows = (expenses || []).filter((r) => String(r.invoice_date || '').slice(0, 7) === key);
@@ -150,25 +164,90 @@ async function readBooks() {
     const billTotal = bills.reduce((s, r) => s + Number(r.amount || 0), 0);
     const recv = (receivables || []).filter((r) => r.month === key).length;
     console.log(
-      `${key} | ${sales ? `₹${Number(sales.total).toLocaleString('en-IN')}${sales.is_complete ? '' : '*'}` : '— missing'} | ` +
-      `${bills.length} bills ₹${billTotal.toLocaleString('en-IN')}`.padEnd(45) +
-      ` | ₹${credit.toLocaleString('en-IN')}`.padEnd(26) +
+      `${key} | ${(sales ? `₹${Number(sales.total).toLocaleString('en-IN')}${sales.is_complete ? '' : '*'}` : '— missing').padEnd(14)} | ` +
+      `${bills.length} bills ₹${billTotal.toLocaleString('en-IN')}`.padEnd(20) +
+      ` | ₹${credit.toLocaleString('en-IN')}`.padEnd(16) +
       ` | ${recv || '—'}`
     );
   }
   console.log('\n* the month is still running');
 }
 
-const months = monthKeys(FROM, TO);
+/**
+ * Is the sales figure for a month believable?
+ *
+ * The Executive Sales Summary sometimes answers with the report's own default
+ * window rather than the month that was asked for. The tell is a figure that
+ * is identical to another month's, or one that is far too small for a month
+ * that has that month's purchases.
+ */
+async function checkSales(supabase, monthKey, purchases) {
+  const { data: rows } = await supabase
+    .from('finance_monthly_revenue')
+    .select('month, total');
+  const mine = (rows || []).find((r) => r.month === monthKey);
+  if (!mine) return { ok: false, why: 'nothing was written' };
+
+  const total = Number(mine.total || 0);
+  const clash = (rows || []).find(
+    (r) => r.month !== monthKey && Math.abs(Number(r.total || 0) - total) < 0.01,
+  );
+  if (clash) {
+    return { ok: false, why: `the same figure as ${clash.month} — the report did not take the date range` };
+  }
+  if (purchases > 0 && total < purchases * 0.25) {
+    return {
+      ok: false,
+      why: `₹${Math.round(total)} against ₹${Math.round(purchases)} of purchases — too small to be the month`,
+    };
+  }
+  return { ok: true, total };
+}
+
+/** Put a month back the way it was before this run touched it. */
+async function restoreMonth(supabase, monthKey, before) {
+  if (before) {
+    await supabase
+      .from('finance_monthly_revenue')
+      .update({
+        total: before.total,
+        dine_in: before.dine_in,
+        pick_up: before.pick_up,
+        delivery: before.delivery,
+        is_complete: before.is_complete,
+      })
+      .eq('month', monthKey);
+    console.log(`     ↩️ ${monthKey} put back to ₹${Number(before.total).toLocaleString('en-IN')}`);
+  } else {
+    await supabase.from('finance_monthly_revenue').delete().eq('month', monthKey);
+    console.log(`     ↩️ ${monthKey} removed — the figure was not believable`);
+  }
+}
+
+const months = list('months').length ? list('months') : monthKeys(FROM, TO);
+const supabase = supabaseClient();
+
+// What the sales table holds now, so a bad pull can be undone.
+const { data: revenueBefore } = await supabase
+  .from('finance_monthly_revenue')
+  .select('month, total, dine_in, pick_up, delivery, is_complete');
+const beforeByMonth = new Map((revenueBefore || []).map((r) => [r.month, r]));
+
 const plan = [];
 for (const key of months) {
   const { start, end } = windowOf(key);
-  plan.push({ key, kind: 'sales', query: `reports=executive&revenueMonth=${key}&from=${start}&to=${end}&finance=1` });
   plan.push({ key, kind: 'bills', query: `reports=purchase_invoices&from=${start}&to=${end}&finance=1` });
   plan.push({ key, kind: 'returns', query: `reports=purchase_returns&from=${start}&to=${end}&finance=1` });
+  if (!SKIP_SALES.includes(key)) {
+    plan.push({ key, kind: 'sales', query: `reports=executive&revenueMonth=${key}&from=${start}&to=${end}&finance=1` });
+  }
 }
 
-console.log(`Backfill ${FROM} → ${TO}: ${months.length} months, ${plan.length} report pulls.`);
+console.log(
+  `Backfill ${months[0]} → ${months[months.length - 1]}: ${months.length} months, ${plan.length} report pulls.` +
+  `${SKIP_SALES.length ? ` (sales skipped for ${SKIP_SALES.join(', ')})` : ''}`,
+);
+
 if (DRY) {
   for (const step of plan) console.log(`  ${step.key}  ${step.kind.padEnd(8)} ${step.query}`);
   process.exit(0);
@@ -181,9 +260,33 @@ if (!VERIFY_ONLY) {
     const last = i === plan.length - 1;
     console.log(`\n▶ ${step.key} — ${step.kind}`);
     const result = await callSync(step.query, { label: `${step.key} ${step.kind}`, keepSession: !last });
-    if (!result.ok) failures += 1;
+    if (!result.ok) {
+      failures += 1;
+      continue;
+    }
+
+    // A sales figure is only believed once it has been checked.
+    if (step.kind === 'sales') {
+      const { data: bills } = await supabase
+        .from('expenses')
+        .select('amount, debit_note, invoice_date')
+        .gte('invoice_date', `${step.key}-01`)
+        .lte('invoice_date', windowOf(step.key).end);
+      const purchases = (bills || []).reduce(
+        (s, r) => s + Number(r.amount || 0) - Number(r.debit_note || 0),
+        0,
+      );
+      const check = await checkSales(supabase, step.key, purchases);
+      if (check.ok) {
+        console.log(`     ✓ ${step.key} sales ₹${Math.round(check.total).toLocaleString('en-IN')} — believable`);
+      } else {
+        console.log(`     ⚠️  ${step.key} sales not believable: ${check.why}`);
+        await restoreMonth(supabase, step.key, beforeByMonth.get(step.key));
+        failures += 1;
+      }
+    }
   }
-  console.log(`\n${plan.length - failures}/${plan.length} pulls succeeded.`);
+  console.log(`\n${plan.length - failures}/${plan.length} pulls accepted.`);
 }
 
-await readBooks();
+await readBooks(supabase);
