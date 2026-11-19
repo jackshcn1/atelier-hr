@@ -46,7 +46,19 @@ export default function SettingsPage() {
     const said = new URLSearchParams(window.location.search).get('drive');
     if (said === 'connected') setDriveNote('Google Drive is connected.');
     else if (said === 'declined') setDriveNote('The Google sign-in was cancelled. Nothing was changed.');
-    else if (said === 'failed') setDriveNote('The Google sign-in did not go through. Try again.');
+    else if (said === 'failed') {
+      // The callback says what went wrong. Saying it here saves a round trip
+      // through the server log every time a sign-in does not go through.
+      const reason = new URLSearchParams(window.location.search).get('reason');
+      const why = {
+        state: 'The sign-in did not match this browser. Try again.',
+        signin: 'You were signed out while Google was asking. Sign in again, then try again.',
+        'not-configured': 'The Google sign-in is not set up on the server yet.',
+        'no-refresh-token': 'Google did not give the site permission to keep access. Try again.',
+        exchange: 'Google could not hand over access. Try again — and if it keeps failing, say so and we will look at the server log.',
+      };
+      setDriveNote(why[reason] || 'The Google sign-in did not go through. Try again.');
+    }
   }, []);
 
   async function disconnectDrive() {
