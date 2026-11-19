@@ -18,6 +18,7 @@ export default function SettingsPage() {
   // Google Drive — the account that invoices are uploaded as.
   const [drive, setDrive] = useState({ connected: false, email: null, configured: false });
   const [driveNote, setDriveNote] = useState('');
+  const [driveBusy, setDriveBusy] = useState(false);
 
   const [error, setError] = useState('');
 
@@ -47,6 +48,33 @@ export default function SettingsPage() {
     else if (said === 'declined') setDriveNote('The Google sign-in was cancelled. Nothing was changed.');
     else if (said === 'failed') setDriveNote('The Google sign-in did not go through. Try again.');
   }, []);
+
+  async function disconnectDrive() {
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(
+        'Disconnect the connected Google account?\n\nThe site will stop acting as that account. The files already in Drive are not touched.',
+      )
+    ) {
+      return;
+    }
+    setDriveBusy(true);
+    setDriveNote('');
+    try {
+      const res = await fetch('/api/google-drive/disconnect', { method: 'DELETE' });
+      const d = await res.json();
+      if (!d.success) {
+        setDriveNote(d.error || 'The account could not be disconnected.');
+      } else {
+        setDrive({ connected: false, email: null, configured: drive.configured });
+        setDriveNote('Google Drive is disconnected. The site will not act as that account.');
+      }
+    } catch {
+      setDriveNote('The account could not be disconnected.');
+    } finally {
+      setDriveBusy(false);
+    }
+  }
 
   async function savePayroll(e) {
     e.preventDefault();
@@ -127,13 +155,22 @@ export default function SettingsPage() {
             link to it. Google will not let the service account store files, so a
             Google account connects here, once — after that the upload goes in as
             that account. The account that connects is the one that owns the file,
-            so it has to be able to write to the invoice folder.
+            so it has to be able to write to the invoice folder. It can be
+            disconnected again at any time — the files stay in Drive.
           </p>
 
           {drive.connected ? (
             <div className="flex items-center gap-3 flex-wrap">
               <span className="pill-good text-xs">✓ Connected</span>
               <span className="text-sm text-ink-muted">{drive.email || 'the connected Google account'}</span>
+              <button
+                type="button"
+                className="btn-secondary text-xs"
+                onClick={disconnectDrive}
+                disabled={driveBusy}
+              >
+                {driveBusy ? 'Disconnecting…' : 'Disconnect'}
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-3 flex-wrap">
