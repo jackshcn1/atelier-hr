@@ -1,8 +1,9 @@
 import { getSupabase } from '../../../../lib/supabaseServer.js';
-import { financePeriod } from '../../../../lib/financePeriod.js';
+import { financePeriod, lastMonthKeys } from '../../../../lib/financePeriod.js';
 import { monthCosts } from '../../../../lib/financeCosts.js';
 import { monthPosition, monthReadiness } from '../../../../lib/financePosition.js';
 import { cycleEndingIn, salaryForCycle } from '../../../../lib/financeSalary.js';
+import { monthsOnRecord, rangeDashboard } from '../../../../lib/financeRange.js';
 
 // The finance dashboards report on the plain calendar month.
 //
@@ -13,11 +14,25 @@ import { cycleEndingIn, salaryForCycle } from '../../../../lib/financeSalary.js'
 //
 // The costs come from lib/financeCosts.js, which the P&L uses as well, so the
 // two pages can never disagree about a month.
+//
+// `?range=N` widens the window: the month named is the last month of the
+// span, and the last N months are added up. The span is for the months that
+// are worth looking at together — the last three, six or twelve.
 export async function GET(req) {
   try {
     const supabase = getSupabase();
     const params = new URL(req.url).searchParams;
     const period = financePeriod(params.get('month'));
+    const range = Math.min(Math.max(Number(params.get('range')) || 1, 1), 24);
+
+    // More than one month is a different question, and it is answered in
+    // lib/financeRange.js — the same helpers, with the months added up.
+    if (range > 1) {
+      const periods = lastMonthKeys(period.key, range).map((key) => financePeriod(key));
+      const data = await rangeDashboard(supabase, periods);
+      data.availableMonths = await monthsOnRecord(supabase, period.key);
+      return Response.json({ success: true, data });
+    }
 
     // Revenue for the calendar month, split by order type.
     const { data: revenueRow } = await supabase
@@ -83,13 +98,13 @@ export async function GET(req) {
       salaryCycle: salary.cycle,
     });
 
-    // The months that have figures, so the dashboard can offer the ones worth
-    // looking at.
-    const { data: availableMonths } = await supabase
-      .from('finance_monthly_revenue')
-      .select('month, window_end, is_complete')
-      .order('month', { ascending: false })
-      .limit(24);
+    // The months worth offering on the dropdown.
+    //
+    // Not the months with a sales figure — the costs go back a long way
+    // before the sales figures do, and a month with only costs on it is
+    // still a month the owner may want to look at. Every month from the
+    // earliest one with figures to the month on the clock is offered.
+    const availableMonths = await monthsOnRecord(supabase, period.key);
 
     return Response.json({
       success: true,
@@ -104,6 +119,14 @@ export async function GET(req) {
           isComplete: period.isComplete,
           previousKey: period.previousKey,
           nextKey: period.nextKey,
+        },
+        // The span this page reports on. One month is the plain case; a
+        // wider span says how many months were added up.
+        range: {
+          months: 1,
+          from: period.key,
+          to: period.key,
+          label: period.label,
         },
         revenue,
         costs,

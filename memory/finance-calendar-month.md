@@ -119,13 +119,62 @@ net profit       operating profit (no interest, depreciation or tax on the books
 - **Costs & Expenses** (`/finance/costs`) — revenue channels and cost
   breakdown for the calendar month, with a month picker. The "YTD /
   Forecasted" lines and the mock drilldown are gone; the drilldown now shows
-  the real rows behind each total.
+  the real rows behind each total. It can also report on **several months at
+  once** — see below.
 - **P&L** (`/finance/pnl`) — the statement above, for the calendar month.
 - **Cashflow** (`/finance/cashflow`) — the month's transactions and the
   month's inflow, outflow and net. The month picker moves between months.
 
 The month lives in `?month=YYYY-MM`, so a month can be linked and survives a
 refresh. The default is the current month, up to today.
+
+## Several months at once (19 Nov 2026)
+
+The Costs & Expenses page can report on the **last 3, 6 or 12 months**. The
+month named is the **last** month of the span, so the arrows move the whole
+window rather than changing its length. The width of the span lives in
+`?range=N`, next to the month.
+
+`lib/financeRange.js` does the adding up, using the same helpers the single
+month uses (`monthCosts`, `salaryForCycle`, `monthPosition`), so the two cannot
+disagree. Two things are deliberately **not** added up:
+
+- **the money owed by customers** — it is a snapshot of where things stand
+  today, not a monthly flow, so the latest month's figure is the one that is
+  true now. The bills *are* added up, because bills are a flow;
+- **the costs that carry no date** — they belong to no month, so a span counts
+  them once (in its first month) rather than once for every month in it.
+
+**A profit is only a real profit when the sales figures behind it are in.**
+The revenue table only has October and November in it — the nightly sync pulls
+the current month and the one before it — so a six-month view has four months
+with no sales figure. The page says which months are missing and shows the
+profit in **amber, "on record"**, rather than as a confident red loss.
+
+The month dropdown offers **every month from the earliest with figures to the
+month on the clock**, not only the months with a sales figure: the costs go
+back to March 2026, long before the sales figures do, and a month with only
+costs on it is still a month worth looking at.
+
+## A fixed cost with no standing cost of its own used to vanish
+
+The code that works out which invoice belongs to which standing cost never read
+the invoice's **id**, so every invoice looked like it had been claimed — and a
+fixed invoice that matched no standing cost was quietly left out of the month's
+costs. `lib/financeCosts.js` now reads the id, and there is a test for it.
+
+Nothing changed in the books when this was fixed (the only unmatched fixed
+invoice happened to be in a month where nothing matched at all, so it was
+counted either way). It was a landmine, not a loss.
+
+**One real double count is still in the books.** The Triads marketing bill of
+5 Sep 2026 (₹15,000) is booked under the category **"Marketing"**, while the
+standing cost is **"Digital Marketing Retainer"** — the same ₹15,000 a month,
+booked under the right name in May and June. So September counts the marketing
+twice: once as the invoice and once as the standing cost's expected amount.
+The standing-cost list has no supplier column, so the invoice cannot be
+matched to it automatically; the fix is for the bill's category to be
+**"Digital Marketing Retainer"**.
 
 ## The figures are only as complete as the books
 

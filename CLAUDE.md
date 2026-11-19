@@ -49,7 +49,7 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 
 5. **Finance**
    - Finance (`/finance`) — the four finance modules, on the calendar month
-   - Costs & Expenses (`/finance/costs`) — revenue channels and the cost breakdown
+   - Costs & Expenses (`/finance/costs`) — revenue channels and the cost breakdown, for one calendar month or for the last 3, 6 or 12 months (`?range=N`)
    - New Expense (`/finance/costs/new`) — the accountant's entry form: variable / fixed / petty, with the supplier as a type-ahead that can add a new supplier. It writes a row into the accountant's Google Sheet, and the sheet is pulled into the books
    - Bill Entry (`/finance/costs/entry`) — log a bill by hand (the fallback path): the category follows the kind of cost (fixed = the standing costs, closed; variable = the moving costs + Other), the supplier is a type-ahead that can add a new supplier, and the invoice itself can be attached — the file goes into the restaurant's Drive folder and the bill keeps the link
    - Standing Costs (`/finance/costs/fixed`) — the expected monthly costs; the month's invoice replaces the expected amount

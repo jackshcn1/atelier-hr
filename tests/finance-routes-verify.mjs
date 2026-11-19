@@ -59,6 +59,9 @@ const post = (url, body) =>
   });
 const json = async (res) => ({ status: res.status, body: await res.json() });
 
+// The database, for the checks that write a row and take it away again.
+const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 console.log('finance routes');
 
 const dash = await json(await dashboardGET(req('/api/finance/dashboard')));
@@ -70,6 +73,100 @@ await check('the dashboard answers with revenue, costs and the readiness of the 
   if (!Array.isArray(d.readiness) || d.readiness.length < 5) throw new Error('no readiness');
   if (!Array.isArray(d.missing)) throw new Error('no missing list');
   if (!d.receivables || !d.payables) throw new Error('no money owed');
+});
+
+// Looking at several months at once.
+await check('a span of months adds the months up', async () => {
+  const months = ['2026-09', '2026-10', '2026-11'];
+  const span = await json(await dashboardGET(req('/api/finance/dashboard?month=2026-11&range=3')));
+  if (span.status !== 200) throw new Error(`status ${span.status}`);
+  const d = span.body.data;
+
+  if (d.range?.months !== 3) throw new Error(`the span holds ${d.range?.months} months, expected 3`);
+  if (d.range.from !== '2026-09' || d.range.to !== '2026-11') {
+    throw new Error(`the span runs ${d.range.from} → ${d.range.to}`);
+  }
+
+  // Each month on its own, added together, is the span.
+  let revenue = 0;
+  let costs = 0;
+  let salary = 0;
+  for (const month of months) {
+    const one = await json(await dashboardGET(req(`/api/finance/dashboard?month=${month}`)));
+    revenue += one.body.data.revenue.total;
+    costs += one.body.data.costs.total;
+    salary += one.body.data.salary.amount;
+  }
+
+  const near = (a, b, what) => {
+    if (Math.abs(a - b) > 1) throw new Error(`the ${what} is ${a}, expected ${b}`);
+  };
+  near(d.revenue.total, revenue, 'revenue');
+  near(d.costs.total, costs, 'costs');
+  near(d.salary.amount, salary, 'salary');
+  near(d.net_pl, revenue - costs - salary, 'net profit');
+});
+
+await check('the money owed by customers is where things stand now, not a sum', async () => {
+  const span = await json(await dashboardGET(req('/api/finance/dashboard?month=2026-11&range=3')));
+  const latest = await json(await dashboardGET(req('/api/finance/dashboard?month=2026-11')));
+  if (Math.abs(span.body.data.receivables.totals.outstanding - latest.body.data.receivables.totals.outstanding) > 0.01) {
+    throw new Error('the span added the money owed up instead of reporting where things stand');
+  }
+  // The bills, on the other hand, do add up across the span.
+  if (span.body.data.payables.totals.unpaid < latest.body.data.payables.totals.unpaid) {
+    throw new Error('the span lost some of the unpaid bills');
+  }
+});
+
+await check('the months on record are all offered, not only the ones with sales', async () => {
+  const d = dash.body.data;
+  const months = d.availableMonths || [];
+  if (months.length < 3) throw new Error(`only ${months.length} months are offered`);
+  if (!months.includes(d.period.key)) throw new Error('the month on the clock is not offered');
+  // The costs go back a long way before the sales figures do, and a month
+  // with only costs on it is still a month worth looking at.
+  if (!months.includes('2026-04')) throw new Error('April 2026 — bills but no sales figure — is not offered');
+  // The list is in order, newest first.
+  const sorted = [...months].sort().reverse();
+  if (months.join(',') !== sorted.join(',')) throw new Error('the months are not in order');
+});
+
+// A fixed cost that is not on the standing-cost list still counts.
+//
+// It used to be dropped. The code that works out which invoice belongs to
+// which standing cost never read the invoice's id, so every invoice looked
+// like it had been claimed — and a fixed invoice that matched no standing
+// cost was quietly left out of the month's costs.
+await check('a fixed cost with no standing cost of its own is still counted', async () => {
+  const month = '2026-06';
+  const marker = `verify-fixed-${Date.now()}`;
+
+  const before = await json(await dashboardGET(req(`/api/finance/dashboard?month=${month}`)));
+  const { data: inserted, error } = await sb
+    .from('expenses')
+    .insert([{
+      vendor_name: 'Verify Supplier',
+      category: marker,
+      amount: 1234,
+      cost_type: 'fixed',
+      invoice_date: `${month}-05`,
+      payment_status: 'unpaid',
+      source: 'manual',
+    }])
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+
+  try {
+    const after = await json(await dashboardGET(req(`/api/finance/dashboard?month=${month}`)));
+    const difference = after.body.data.costs.fixed - before.body.data.costs.fixed;
+    if (Math.abs(difference - 1234) > 0.01) {
+      throw new Error(`the fixed costs went up by ${difference}, expected 1234`);
+    }
+  } finally {
+    await sb.from('expenses').delete().eq('id', inserted.id);
+  }
 });
 
 const pnl = await json(await pnlGET(req('/api/finance/pnl')));
@@ -329,7 +426,6 @@ if (madeId) {
 // right shape, that the same invoice number is never written twice, and that
 // a bill the sheet wrote is *updated* when the sheet changes — which is how
 // ticking a bill "Paid" in the sheet reaches the books.
-const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const SHEET_BILL = {
   sourceKey: 'id:verify-sheet-bill-1',
   bucket: 'fixed',
