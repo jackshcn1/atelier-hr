@@ -153,20 +153,27 @@ The reading side exists (`lib/googleSheetsService.js` and
 There is already one, set up for the customer-feedback pull:
 
 ```
-variable-pay-feedback-sync@my-project-27246-510206.iam.gserviceaccount.com
+variable-pay-feedback-sync@atelier-hr-drive.iam.gserviceaccount.com
 ```
 
-in the Google Cloud project `my-project-27246-510206`. **Reuse it** — do not
-create a second one.
+in the Google Cloud project `atelier-hr-drive` (number `187302776196`) — a
+project of its own, with nothing sensitive in it. **Reuse it** — do not create a
+second one. The old account in the sensitive company project
+`my-project-27246-510206` is retired: its key was disabled, and the account
+should be deleted.
+
+The service account needs the **"ERP Website Files"** folder in the
+restaurant's Drive shared with it as **Editor** (Viewer is enough to read, but
+the site's expense form writes a row into the sheet). Sharing the folder covers
+both sheets and anything added to it later:
+
+```
+https://drive.google.com/drive/folders/1bNDcGxKqEu5mILcHjqrwLHxnW42Eo2tL
+```
 
 ### Getting the key onto this machine
 
-`scripts/petpooja-config.json` has the service account's address and a
-`GOOGLE_PRIVATE_KEY_PATH` that points at the **office computer**
-(`C:\Users\LENOVO\my-project-27246-510206-edce775e7ba3.json`). So the key is
-not on the Mac, and a new one has to be downloaded.
-
-Download a JSON key from Google Cloud and save it as:
+The key is downloaded from Google Cloud and saved as:
 
 ```
 scripts/google-service-account.json

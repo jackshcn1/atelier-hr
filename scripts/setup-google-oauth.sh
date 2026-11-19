@@ -21,7 +21,7 @@
 # -------------
 #   1. In Google Cloud, create an OAuth client of type **Web application**:
 #
-#        https://console.cloud.google.com/apis/credentials?project=my-project-27246-510206
+#        https://console.cloud.google.com/apis/credentials?project=atelier-hr-drive
 #        -> Create credentials -> OAuth client ID -> Application type: Web application
 #        -> Authorised redirect URIs:
 #             https://atelier-hr-inky.vercel.app/api/google-drive/callback
@@ -50,7 +50,7 @@ if [ ! -f "$CLIENT_FILE" ]; then
   echo "✗ No OAuth client file at $CLIENT_FILE"
   echo ""
   echo "  Create the client and download its JSON file:"
-  echo "    https://console.cloud.google.com/apis/credentials?project=my-project-27246-510206"
+  echo "    https://console.cloud.google.com/apis/credentials?project=atelier-hr-drive"
   echo "    -> Create credentials -> OAuth client ID -> Application type: Web application"
   echo "  Then save it as scripts/google-oauth-client.json"
   exit 1

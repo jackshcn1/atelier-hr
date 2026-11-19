@@ -5,7 +5,11 @@
 # The nightly pull reads the accountant's sheet, and the site's expense form
 # writes rows into it. Both need the service account:
 #
-#   variable-pay-feedback-sync@my-project-27246-510206.iam.gserviceaccount.com
+#   variable-pay-feedback-sync@atelier-hr-drive.iam.gserviceaccount.com
+#
+# It lives in the Cloud project `atelier-hr-drive` — a project of its own, with
+# nothing sensitive in it. The Sheets it reads are the accountant's, in the
+# restaurant's Drive; the service account only needs access to those.
 #
 # Two things go onto the Vercel production environment:
 #
@@ -21,7 +25,7 @@
 #   1. Download a new key from Google Cloud:
 #
 #        https://console.cloud.google.com/iam-admin/serviceaccounts
-#        -> project "my-project-27246-510206"
+#        -> project "atelier-hr-drive"
 #        -> service account "variable-pay-feedback-sync"
 #        -> Keys tab -> Add key -> Create new key -> JSON
 #
@@ -31,15 +35,15 @@
 #
 #      (that path is gitignored, so it will never be committed)
 #
-#   2. Share both sheets with the service account as an **Editor**:
+#   2. Share the **"ERP Website Files"** folder in the restaurant's Drive with
+#      the service account as an **Editor**:
 #
 #        (Viewer is enough to read, but the site's expense form writes a row
-#         into the sheet, so it needs to be able to write)
+#         into the sheet, so it needs to be able to write. Sharing the folder
+#         covers both sheets, and anything added to it later.)
 #
-#        the accountant's expense sheet
-#          https://docs.google.com/spreadsheets/d/1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig
-#        the customer feedback sheet
-#          https://docs.google.com/spreadsheets/d/1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU
+#        the folder's web address:
+#        https://drive.google.com/drive/folders/1bNDcGxKqEu5mILcHjqrwLHxnW42Eo2tL
 #
 #   3. Run this script from the project folder:
 #
@@ -55,7 +59,7 @@ if [ ! -f "$KEY_FILE" ]; then
   echo ""
   echo "  Download one from Google Cloud and save it there:"
   echo "    https://console.cloud.google.com/iam-admin/serviceaccounts"
-  echo "    -> project \"my-project-27246-510206\""
+  echo "    -> project \"atelier-hr-drive\""
   echo "    -> \"variable-pay-feedback-sync\" -> Keys -> Add key -> JSON"
   exit 1
 fi

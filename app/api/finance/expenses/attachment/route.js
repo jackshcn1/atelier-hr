@@ -19,7 +19,7 @@ import { INVOICE_FOLDER_ID } from '../../../../../lib/googleDrive.js';
 // plainly when they are not:
 //
 //   1. the **Drive API** has to be switched on in the Google Cloud project
-//      `my-project-27246-510206` (the Sheets API alone cannot store files);
+//      `atelier-hr-drive` (the Sheets API alone cannot store files);
 //   2. the restaurant's Google account has to be connected, in Settings.
 
 const ALLOWED = {
@@ -124,7 +124,7 @@ export async function POST(request) {
           success: false,
           error: apiOff
             ? 'The Drive API is not switched on for the project. Turn it on at ' +
-              'https://console.cloud.google.com/apis/library/drive.googleapis.com?project=my-project-27246-510206 ' +
+              'https://console.cloud.google.com/apis/library/drive.googleapis.com?project=atelier-hr-drive ' +
               'and try again.'
             : 'Google refused the upload (403). The connected account may not have access to the ' +
               'invoice folder — check that the folder is shared with ' +
