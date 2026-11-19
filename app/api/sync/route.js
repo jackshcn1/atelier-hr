@@ -22,6 +22,14 @@
  *   finance=1    writes the finance figures only. WITHOUT it the run also
  *                writes the variable-pay metrics, which are paused.
  *
+ * A backfill — filling in months that are long gone — asks for the history
+ * explicitly:
+ *   ?from=YYYY-MM-DD&to=YYYY-MM-DD   the window the purchase and
+ *                purchase-return reports are read for.
+ *   ?revenueMonth=YYYY-MM   one calendar month of sales.
+ * Both are only allowed together with finance=1: a window change moves the
+ * pay cycle, and the pay cycle belongs to payroll.
+ *
  * A bare request — no group, no sheet — runs EVERY group in ONE function
  * invocation. That is longer than a serverless function is allowed to run, so
  * it ends in FUNCTION_INVOCATION_TIMEOUT at the 300s mark, and it writes the
@@ -42,6 +50,7 @@ import { runPetpoojaSync, REPORT_GROUPS, REPORT_NAMES } from '../../../scripts/p
 import { closeFinishedCycles } from '../../../scripts/close-variable-pay-cycles.mjs';
 import { fetchGoogleSheetsData, googleSheetsConfigured } from '../../../lib/googleSheetsService.js';
 import { parseInvoiceSheet, writeInvoiceSheet } from '../../../lib/invoiceSheet.js';
+import { parseBackfillRequest } from '../../../lib/syncBackfill.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -250,6 +259,34 @@ async function handle(req) {
     if (financeOnly) {
       process.env.SYNC_FINANCE_ONLY = '1';
       push('💼 Finance-only run — the variable-pay figures are left alone.');
+    }
+
+    // A backfill asks for a window of history.
+    //
+    // The nightly run pulls the month that is running and the pay cycle that
+    // is running; the months before them are never looked at. A backfill
+    // names the window it wants, so the purchase and purchase-return reports
+    // can be read for a month that is long gone, and the sales report can be
+    // pulled for one calendar month by name.
+    //
+    // The rules are in lib/syncBackfill.js — a window change moves the pay
+    // cycle, and the pay cycle belongs to payroll, so a backfill is only
+    // ever allowed on a finance-only run.
+    const backfill = parseBackfillRequest(params, { financeOnly });
+    if (!backfill.ok) {
+      return NextResponse.json(
+        { ok: false, error: backfill.error, expected: backfill.expected },
+        { status: backfill.status || 400 },
+      );
+    }
+    if (backfill.backfill) {
+      process.env.SYNC_START_DATE = backfill.from;
+      process.env.SYNC_END_DATE = backfill.to;
+      if (backfill.revenueMonth) process.env.SYNC_REVENUE_MONTH = backfill.revenueMonth;
+      push(
+        `🕰️ Backfill window: ${backfill.from} → ${backfill.to}` +
+        `${backfill.revenueMonth ? ` (sales for ${backfill.revenueMonth})` : ''}.`,
+      );
     }
 
     // Chromium flags.

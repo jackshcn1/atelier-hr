@@ -23,7 +23,7 @@ import { parseCustomerFeedback } from '../lib/feedbackParsers.js';
 import { fetchGoogleSheetsData } from '../lib/googleSheetsService.js';
 import { sendFailureEmail } from '../lib/notificationService.js';
 import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParsers.js';
-import { cleanVendorName } from '../lib/expenseHelpers.js';
+import { cleanVendorName, mergePetpoojaBill } from '../lib/expenseHelpers.js';
 import { monthKeyOf, previousMonthKey, petpoojaMonthWindow } from '../lib/financePeriod.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
@@ -1248,7 +1248,7 @@ export async function runPetpoojaSync(options = {}) {
     for (let i = 0; i < invoiceNumbers.length; i += batchSize) {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note, source')
+        .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note, source, category, cost_type, entry_type, status, description, created_by, approved_by')
         .in('invoice_number', invoiceNumbers.slice(i, i + batchSize));
       if (error) throw error;
       found.push(...(data || []));
@@ -1280,7 +1280,7 @@ export async function runPetpoojaSync(options = {}) {
       unnamedVendors.length > 0
         ? supabase
             .from('expenses')
-            .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note, source')
+            .select('id, vendor_name, invoice_number, amount, invoice_date, payment_status, debit_note, source, category, cost_type, entry_type, status, description, created_by, approved_by')
             .in('vendor_name', unnamedVendors)
         : Promise.resolve({ data: [] }),
     ]);
@@ -1325,7 +1325,15 @@ export async function runPetpoojaSync(options = {}) {
       // Petpooja bill is the record — even when only the supplier's spelling
       // differs.
       const fromSheet = found.source === 'sheet';
-      if (changed || fromSheet) toUpdate.push({ id: found.id, row });
+      if (changed || fromSheet) {
+        // Petpooja is the record of the **facts** of a bill — how much, when it
+        // is dated, whether it is paid. It knows nothing of how the bill is
+        // **classified**, and the pull must not wipe a classification a person
+        // or the accountant made: the category is what matches a bill to its
+        // standing cost (rent, pest control, power), so losing it would both
+        // change the books and break that match.
+        toUpdate.push({ id: found.id, row: mergePetpoojaBill(found, row) });
+      }
     }
 
     let inserted = 0;
@@ -2129,24 +2137,41 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
     //
     // The month that has just ended is pulled as well, until a pull has
     // covered its last day — that is what makes a completed month final.
+    //
+    // A backfill asks for one month by name (`SYNC_REVENUE_MONTH`), because
+    // the months before the running one are not otherwise reachable: the
+    // nightly run only ever looks at the month that is running and the one
+    // before it. The named month is pulled on its own — nothing else is.
     async function syncCalendarMonthRevenue() {
       const currentKey = monthKeyOf();
+      const backfillKey = String(process.env.SYNC_REVENUE_MONTH || '').trim();
       const targets = [];
 
-      const currentWindow = petpoojaMonthWindow(currentKey);
-      if (currentWindow) targets.push(currentWindow);
+      if (backfillKey) {
+        const backfillWindow = petpoojaMonthWindow(backfillKey);
+        if (!backfillWindow) {
+          console.error(`  ⚠️ "${backfillKey}" is not a month I can pull.`);
+        } else {
+          targets.push(backfillWindow);
+          console.log(`  📅 Backfill: the calendar month ${backfillKey} only.`);
+        }
+      } else {
+        const currentWindow = petpoojaMonthWindow(currentKey);
+        if (currentWindow) targets.push(currentWindow);
 
-      const previousKey = previousMonthKey(currentKey);
-      const previousWindow = petpoojaMonthWindow(previousKey);
-      if (previousWindow) {
-        const { data: existing } = await supabase
-          .from('finance_monthly_revenue')
-          .select('is_complete')
-          .eq('month', previousKey)
-          .maybeSingle();
-        if (existing?.is_complete !== true) targets.push(previousWindow);
+        const previousKey = previousMonthKey(currentKey);
+        const previousWindow = petpoojaMonthWindow(previousKey);
+        if (previousWindow) {
+          const { data: existing } = await supabase
+            .from('finance_monthly_revenue')
+            .select('is_complete')
+            .eq('month', previousKey)
+            .maybeSingle();
+          if (existing?.is_complete !== true) targets.push(previousWindow);
+        }
       }
 
+      let pulled = 0;
       for (const window of targets) {
         const isComplete = window.through >= window.end;
         const queryCycle = { start: window.start, end: window.end, queryEnd: window.through };
@@ -2193,11 +2218,13 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
             `(dine-in ${parsed.data.dine_in}, pick-up ${parsed.data.pick_up}, delivery ${parsed.data.delivery}) ` +
             `covering ${window.start} → ${window.through}${isComplete ? ' — complete' : ' — month so far'}`
           );
+          pulled += 1;
         } catch (e) {
           // A failed calendar-month pull must never fail the pay-cycle sync.
           console.error(`  ⚠️ Could not sync the calendar-month revenue for ${window.key}: ${e.message}`);
         }
       }
+      return { pulled, asked: targets.length };
     }
 
     let successfulReports = 0;
@@ -2359,28 +2386,43 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
     
     if (reportEnabled('executive')) {
       try {
-        console.log("📥 Fetching Executive Sales Summary...");
-        // The Executive Sales Report spreads its sections over 17 sheets;
-        // the Order Type table is the one we need.
-        const execRows = await fetchCustomReport("https://billing.petpooja.com/reports/executive_sales_summary/all", "Executive Sales Summary", cycle, 'order type');
-        const execResult = parseExecutiveOrderTypes(execRows);
-        if (execResult.ok) {
-          console.log("  📊 Executive Sales breakdown:", JSON.stringify(execResult.data));
-          await saveMetric("rev_dine_in", execResult.data.dine_in, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
-          await saveMetric("rev_delivery", execResult.data.delivery, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
-          await saveMetric("rev_pick_up", execResult.data.pick_up, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
-          successfulReports++;
+        // A backfill asks for one calendar month of sales. The pay-cycle
+        // revenue breakdown is not wanted then — and it is not written in a
+        // finance-only run anyway — so the report is pulled once, for the
+        // month that was named.
+        const backfillKey = String(process.env.SYNC_REVENUE_MONTH || '').trim();
+        if (backfillKey) {
+          console.log(`📥 Fetching the Executive Sales Summary for ${backfillKey}...`);
+          const backfill = await syncCalendarMonthRevenue();
+          if (backfill?.pulled > 0) successfulReports++;
+          else {
+            failedReports++;
+            console.error(`⚠️ The Executive Sales Summary for ${backfillKey} could not be read.`);
+          }
         } else {
-          // Never fail silently: the report downloaded but its shape was not
-          // understood, so the revenue breakdown metrics were not written.
-          console.error(`⚠️ Could not parse Executive Sales Summary: ${execResult.error || 'unknown reason'}`);
-          dumpReportRows('executive-sales', execRows);
-          failedReports++;
-        }
+          console.log("📥 Fetching Executive Sales Summary...");
+          // The Executive Sales Report spreads its sections over 17 sheets;
+          // the Order Type table is the one we need.
+          const execRows = await fetchCustomReport("https://billing.petpooja.com/reports/executive_sales_summary/all", "Executive Sales Summary", cycle, 'order type');
+          const execResult = parseExecutiveOrderTypes(execRows);
+          if (execResult.ok) {
+            console.log("  📊 Executive Sales breakdown:", JSON.stringify(execResult.data));
+            await saveMetric("rev_dine_in", execResult.data.dine_in, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+            await saveMetric("rev_delivery", execResult.data.delivery, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+            await saveMetric("rev_pick_up", execResult.data.pick_up, "petpooja", "Executive Sales Summary", { scheme_name: "revenue_breakdown" });
+            successfulReports++;
+          } else {
+            // Never fail silently: the report downloaded but its shape was not
+            // understood, so the revenue breakdown metrics were not written.
+            console.error(`⚠️ Could not parse Executive Sales Summary: ${execResult.error || 'unknown reason'}`);
+            dumpReportRows('executive-sales', execRows);
+            failedReports++;
+          }
 
-        // The same report, pulled again for the plain calendar month, so the
-        // finance dashboards have a month to report on.
-        await syncCalendarMonthRevenue();
+          // The same report, pulled again for the plain calendar month, so the
+          // finance dashboards have a month to report on.
+          await syncCalendarMonthRevenue();
+        }
       } catch (e) {
         failedReports++;
         console.error("⚠️ Could not sync Executive Sales Summary:", e.message);

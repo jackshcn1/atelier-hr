@@ -17,6 +17,7 @@ import {
   cleanExpense,
   cleanExpensePatch,
   cleanVendorName,
+  mergePetpoojaBill,
   normalizePaymentStatus,
 } from '../lib/expenseHelpers.js';
 
@@ -129,6 +130,59 @@ check('the supplier name loses its tag and its extra spaces', () => {
   );
   assert.equal(cleanVendorName('  Wholegrains   - The Baker\'s Hub  '), "Wholegrains - The Baker's Hub");
   assert.equal(cleanVendorName(null), '');
+});
+
+check('a pull keeps the category a person set on a bill', () => {
+  // Petpooja knows the facts of a bill, not how it is classified. A bill the
+  // accountant filed as "Digital Marketing Retainer" must stay filed that way,
+  // because that is what matches it to its standing cost.
+  const merged = mergePetpoojaBill(
+    {
+      category: 'Digital Marketing Retainer',
+      cost_type: 'fixed',
+      entry_type: 'actual',
+      status: 'approved',
+      description: 'From the accountant invoice sheet',
+      amount: 15000,
+    },
+    {
+      category: 'Vendor',
+      cost_type: 'variable',
+      entry_type: 'actual',
+      status: 'approved',
+      description: 'Petpooja purchase bill',
+      amount: 15000,
+      invoice_number: '0369',
+    }
+  );
+  assert.equal(merged.category, 'Digital Marketing Retainer');
+  assert.equal(merged.cost_type, 'fixed');
+  assert.equal(merged.description, 'From the accountant invoice sheet');
+  // The facts still come from Petpooja.
+  assert.equal(merged.invoice_number, '0369');
+  assert.equal(merged.amount, 15000);
+});
+
+check('a bill with no category yet takes the one the pull brings', () => {
+  const merged = mergePetpoojaBill(
+    { category: null, cost_type: null, description: '' },
+    { category: 'Vendor', cost_type: 'variable', description: 'Petpooja purchase bill' }
+  );
+  assert.equal(merged.category, 'Vendor');
+  assert.equal(merged.cost_type, 'variable');
+  assert.equal(merged.description, 'Petpooja purchase bill');
+});
+
+check('a pull that changed nothing else keeps everything', () => {
+  const merged = mergePetpoojaBill(
+    { category: 'Outlet Rent', cost_type: 'fixed', created_by: 'rishab', approved_by: 'rishab' },
+    { category: 'Vendor', cost_type: 'variable', amount: 90000, created_by: null, approved_by: null }
+  );
+  assert.equal(merged.amount, 90000);
+  assert.equal(merged.category, 'Outlet Rent');
+  assert.equal(merged.cost_type, 'fixed');
+  assert.equal(merged.created_by, 'rishab');
+  assert.equal(merged.approved_by, 'rishab');
 });
 
 console.log(`\n${passed} check(s) passed`);
