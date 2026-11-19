@@ -8,6 +8,7 @@
 - [Database Access & Migration State](database-access-and-migration-state.md) — exec_sql RPCs, backup command, migration ledger reconciliation (2026-11-14)
 - [Petpooja Hosted Sync](petpooja-hosted-sync.md) — why the sync runs on Vercel (Petpooja blocks datacenter IPs), the four report groups, hosting rules and constraints
 - [The Thousand-Row Rule](finance-thousand-row-rule.md) — the database stops a plain read at 1,000 rows and says nothing; a read that means "every row" has to page for it
+- [Cancelled Petpooja Documents](petpooja-cancelled-documents.md) — a cancelled document is not a bill; Petpooja keeps them with an "Unpaid" column and they came in as money owed
 - [Finance Salary & Standing Costs](finance-salary-and-standing-costs.md) — salary forecast frozen at the 1st after the cycle ends, replaced by the real payroll; standing costs as a checklist the invoice replaces
 - [Maintenance Module Status](maintenance-module-status.md) — architecture, access/link details, and mandatory workflow rules (browser verify, GATES.md ledger, plain-English steps) — local-only, contains credentials
 - [Maintenance Module Framework](maintenance-module-framework.md) — locked: derived-status + rejected revert + completed picker + save guard + POC picker (filter/search/add-with-dup-guard) + migrations
