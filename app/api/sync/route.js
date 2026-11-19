@@ -14,6 +14,19 @@
  * secret. Two accepted forms:
  *   GET  with  Authorization: Bearer <SYNC_SECRET>   (Vercel Cron sends this)
  *   POST with  x-sync-secret: <SYNC_SECRET>           (GitHub Actions / manual)
+ *
+ * How it has to be called:
+ *   ?group=<n>   one report group. This is how the nightly workflow calls it —
+ *                one request per group, each with its own serverless run.
+ *   ?sheet=1     the accountant's invoice sheet on its own (no browser).
+ *   finance=1    writes the finance figures only. WITHOUT it the run also
+ *                writes the variable-pay metrics, which are paused.
+ *
+ * A bare request — no group, no sheet — runs EVERY group in ONE function
+ * invocation. That is longer than a serverless function is allowed to run, so
+ * it ends in FUNCTION_INVOCATION_TIMEOUT at the 300s mark, and it writes the
+ * variable-pay metrics on the way, which are meant to stay frozen. Never call
+ * it that way, not even to "see if it works".
  */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
