@@ -4,45 +4,64 @@ description: "How the Petpooja daily sync is hosted (Vercel), why it cannot run 
 metadata:
   node_type: memory
   type: project
-  modified: 2026-11-19T09:00:00.000Z
+  modified: 2026-11-19T12:00:00.000Z
 ---
 
 # Petpooja Hosted Sync (replaces the local-computer job)
 
-## The sync only ever pulls the current window — there is no backfill
+## The nightly run pulls the current window; a backfill fills the history
 
-Checked against the live books on 19 Nov 2026, the data before October 2026
-is simply not there:
+The nightly sync pulls the month that is running and the pay cycle that is
+running. The months before them are never looked at, so on 19 Nov 2026 the
+books held sales for October and November only, and the vendor bills for
+March–June that had come from the accountant's sheet — July, August and the
+first half of October were missing altogether.
 
-| What | In the books |
-|---|---|
-| Sales (`finance_monthly_revenue`) | 2026-10 and 2026-11 only — March to September missing |
-| Purchases (`expenses`) | March–June only from the accountant's sheet (19 rows); July and August empty; September has one bill; October and November are full |
-| Purchase returns (`debit_note > 0`) | October and November only |
-| Receivables (`finance_receivables`) | November only |
+**A backfill names the window it wants** (`lib/syncBackfill.js`):
 
-The reasons are in the code, not in the data:
+    ?from=YYYY-MM-DD&to=YYYY-MM-DD   the purchase and purchase-return reports
+    ?revenueMonth=YYYY-MM             one calendar month of sales
 
-- **Sales** — `syncCalendarMonthRevenue()` pulls the Executive Sales Summary
-  for the **current calendar month and the one before it**. A month cannot be
-  asked for by name, so a sales backfill needs a small change first.
-- **Purchases and returns** — both are pulled with `cycle`, the **current pay
-  cycle** (20th–19th). `getActivePayrollCycle()` already honours
-  `SYNC_START_DATE` and `SYNC_END_DATE`, so a backfill is a loop over month
-  windows with no code change.
-- `finance=1` makes a run finance-only: it writes no payroll and no
-  variable-pay figures, so a backfill cannot disturb the frozen metrics.
+Both are refused unless the run is finance-only (`finance=1`), because a
+window change moves the pay cycle and the pay cycle belongs to payroll.
+`scripts/backfill-finance-history.mjs` drives the pulls month by month and
+prints what the books hold afterwards.
 
-**Re-pulling a month is safe**: a bill is matched by (supplier, invoice
-number), and a bill that came from the accountant's sheet is also matched by
-its invoice number alone, so the Petpooja version updates that row instead of
-writing a second one.
+**The history is now filled** (19 Nov 2026): March–October have sales,
+bills and returns. December 2025 – February 2026 are still missing — the
+reports were never pulled for them.
+
+### The Executive Sales Summary does not always take the date range
+
+It sometimes answers with the report's own default window instead of the
+month that was asked for, and the tell is a figure that is **identical to
+another month's** (two months came back with the very same ₹21,317.32).
+
+So:
+
+- a figure that repeats another month's is **not written** —
+  `repeatsAnotherMonth()` in `lib/financePeriod.js`;
+- the pull is **tried again** first — a report that did not take the range
+  usually takes it the second time;
+- the backfill runner checks the same way and puts the month back the way it
+  was if the figure is not believable.
+
+**A wrong month is worse than a missing one.** A month with no figure is
+shown as missing, which is honest; a month with the wrong figure is not.
+
+### A pull must not wipe how a bill is classified
+
+Petpooja is the record of a bill's **facts** — how much, when it is dated,
+whether it is paid. It knows nothing of the **category**, and the category is
+what matches a bill to its standing cost (rent, pest control, power).
+`mergePetpoojaBill()` in `lib/expenseHelpers.js` carries the classification
+over; the accountant's "Digital Marketing Retainer" stays a fixed cost
+instead of turning into a variable "Vendor" bill.
 
 **How to apply:** the nightly job keeps the last month current — it does not
-fill history. If someone asks for an older month, say what is missing and
-backfill it deliberately (back up the database first, one window per request,
-because of the 300 s serverless cap) rather than assuming the books are
-complete.
+fill history. If someone asks for an older month, check what is on record
+first, and backfill it deliberately (back up the database first, one window
+per request, because of the 300 s serverless cap).
 
 ## The constraint that shapes everything
 
