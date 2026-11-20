@@ -39,10 +39,11 @@ process.env.GOOGLE_OAUTH_REDIRECT_URI =
   'https://atelier-hr-inky.vercel.app/api/google-drive/callback';
 
 const { POST: attachmentPOST } = await import('../app/api/finance/expenses/attachment/route.js');
-const { POST: expensesPOST } = await import('../app/api/finance/expenses/route.js');
+const { POST: sheetPOST } = await import('../app/api/finance/expenses/sheet/route.js');
 const { GET: invoiceGET } = await import('../app/api/finance/expenses/invoice/[id]/route.js');
 const { INVOICE_FOLDER_ID } = await import('../lib/googleDrive.js');
 const { driveConnection, userDriveClient } = await import('../lib/googleUserDrive.js');
+const { fetchGoogleSheetsData, googleSheetsClient } = await import('../lib/googleSheetsService.js');
 const { createClient } = await import('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -71,6 +72,7 @@ const fileName = `atelier-upload-check-${stamp}.pdf`;
 
 let fileId = null;
 let billId = null;
+let entryId = null;
 let failed = null;
 
 try {
@@ -117,27 +119,29 @@ try {
   }
   console.log('   ok  in the invoice folder, owned by the connected account');
 
-  // 3. The bill.
+  // 3. The bill — through the sheet, the way the site enters it.
   console.log('3. saving a bill that carries the invoice link…');
-  const bill = await expensesPOST(
-    new Request('https://atelier.test/api/finance/expenses', {
+  const bill = await sheetPOST(
+    new Request('https://atelier.test/api/finance/expenses/sheet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        vendor_name: 'Atelier Upload Check',
-        category: 'Atelier Upload Check',
+        type: 'variable',
+        costType: 'Atelier Upload Check',
+        vendor: 'Atelier Upload Check',
         amount: 1,
-        invoice_date: new Date().toISOString().slice(0, 10),
-        invoice_number: `CHECK-${stamp}`,
-        cost_type: 'variable',
-        payment_status: 'unpaid',
-        invoice_attachment: uploadBody.data.link,
+        invoiceDate: new Date().toISOString().slice(0, 10),
+        invoiceNo: `CHECK-${stamp}`,
+        description: 'The invoice path check',
+        attachment: uploadBody.data.link,
       }),
     }),
   );
   const billBody = await bill.json();
   if (!billBody.success) throw new Error(billBody.error);
-  billId = billBody.data.id;
+  billId = billBody.data.bill?.id;
+  entryId = billBody.data.entryId;
+  if (!billId) throw new Error('the bill was not written to the books');
   console.log(`   ok  ${billId}`);
 
   // 4. The invoice, served back.
@@ -165,6 +169,28 @@ try {
   console.log(`\n✗ The invoice path failed — ${error.message}`);
   process.exitCode = 1;
 } finally {
+  if (entryId) {
+    // The row goes out of the accountant's sheet again, so the sheet is left
+    // as it was.
+    const SHEET_ID = '1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig';
+    const SHEET_TAB = 'Form Responses 1';
+    const client = googleSheetsClient();
+    const sheet = await client.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties' });
+    const tab = (sheet.data.sheets || []).map((s) => s.properties).find((p) => p.title === SHEET_TAB);
+    const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: 'A:AZ' });
+    const at = rows.findIndex((row) => (row || []).includes(entryId));
+    if (at !== -1) {
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: {
+          requests: [
+            { deleteDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: at, endIndex: at + 1 } } },
+          ],
+        },
+      });
+    }
+    console.log('   cleanup: the row is removed from the sheet');
+  }
   if (billId) {
     await supabase.from('expenses').delete().eq('id', billId);
     console.log('   cleanup: the test bill is removed');

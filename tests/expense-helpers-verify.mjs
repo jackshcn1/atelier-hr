@@ -14,6 +14,7 @@
 
 import assert from 'node:assert/strict';
 import {
+  cleanAttachment,
   cleanExpense,
   cleanExpensePatch,
   cleanVendorName,
@@ -121,6 +122,17 @@ check('a patch does not reset the amount or the approval status', () => {
   assert.equal('amount' in row, false);
   assert.equal('cost_type' in row, false);
   assert.equal(row.status, 'approved');
+});
+
+check('the link to the invoice is only ever a link', () => {
+  assert.equal(
+    cleanAttachment('https://drive.google.com/file/d/abc/view'),
+    'https://drive.google.com/file/d/abc/view',
+  );
+  assert.equal(cleanAttachment('javascript:alert(1)'), null);
+  assert.equal(cleanAttachment('http://drive.google.com/file/d/abc/view'), null);
+  assert.equal(cleanAttachment(''), null);
+  assert.equal(cleanAttachment(null), null);
 });
 
 check('the supplier name loses its tag and its extra spaces', () => {

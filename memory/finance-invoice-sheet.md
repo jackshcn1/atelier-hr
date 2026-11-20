@@ -61,15 +61,16 @@ uploaded through the site uses — so **See the invoice** works on the bills pag
 for a bill that came in through the Form. The bank reference stays the invoice
 number, so the two are never mixed up.
 
-### The three columns this system adds
+### The four columns this system adds
 
 | | Column | What it holds |
 |---|---|---|
 | T | Supplier | who the bill was paid to. **The Form has no supplier question for the variable and fixed blocks**, so this column is how the accountant says who it was — including for the entries that are already there. Until they do, the cost type stands in. Seven of the nineteen rows already name their supplier — Airtel, Sequire Pest Control and Triads, the three the books could prove. |
 | U | Entry ID | the row's own identity, written by the site's form. A Form row has none, so the Timestamp stands in. |
 | V | Invoice Number | the invoice number, when there is one. |
+| W | Description | a line of what the bill was for. Written by the site's form; a Form row has none and falls back to "From the accountant invoice sheet". |
 
-`scripts/setup-invoice-sheet.mjs` adds these three columns to the tab.
+`scripts/setup-invoice-sheet.mjs` adds these columns to the tab.
 
 **The columns are found by NAME, not by position.** The Form may add a
 question, the accountant may add a column, and the columns may be moved. The
@@ -78,6 +79,12 @@ normalised first: lower case, and anything that is not a letter or a digit
 becomes an underscore. `Amount (Variable Cost)` and `Amount (Fixed Cost)` are
 different columns with the same word in them, and the reader tells them apart
 by the block they name.
+
+**Because the columns are found by name, the whole tab is read** (`A:AZ`) and
+not a fixed range. A range that stopped one column short would lose that
+column **quietly** — and a column that is lost is a bill that is lost. The
+`INVOICE_SHEET_RANGE` variable that used to set that range has been removed
+from the code and from the server.
 
 **The reader accepts the forms a Form produces.** A date may be
 `yyyy-mm-dd`, `April 24, 2026`, or `5/1/2026` — and the Form's own date
@@ -200,22 +207,49 @@ key never appears in a command line or in the shell history.
 |---|---|---|
 | `INVOICE_SHEET_SPREADSHEET_ID` | `GOOGLE_SHEETS_SPREADSHEET_ID` | which spreadsheet |
 | `INVOICE_SHEET_NAME` | `Invoices` | which tab |
-| `INVOICE_SHEET_RANGE` | `A:K` | which columns |
 
 The customer-feedback sheet uses the `GOOGLE_SHEETS_*` names, so the invoice
 sheet has its own — one service account can open both.
 
-### The site's own entry form
+### The site's own bill form
 
-`/finance/invoice-entry/expense` — one page for all three kinds of cost, with the
-**supplier as a type-ahead** over the supplier list: type, and the suppliers
-that match come up; a name that is not on the list can be added there and
-then, and it is on the list for next time.
+`/finance/invoice-entry` — **one form** for every bill. It was two forms
+("Log a Bill by Hand" and "New Expense"), and **neither had ever been used**:
+of the 2,422 bills in the books, 19 came in through the accountant's Google
+Form and **0** through the site's own forms. One form is now the whole of it.
+
+- **variable or fixed**; fixed picks the standing cost from the closed list,
+  variable takes what the sheet already uses (typed, with suggestions)
+- the **supplier is a type-ahead** over the supplier list: type, and the
+  suppliers that match come up; a name that is not on the list can be added
+  there and then, and it is on the list for next time
+- the amount, the invoice date, the invoice number, the paid-on date
+- **the invoice itself** can be attached — the link goes into the sheet's own
+  attachment column for that block (G for variable, L for fixed) and the pull
+  carries it into the books, so *See the invoice* works on the bills page
+- a **description**, in the sheet's Description column
 
 Submitting writes a row into the sheet and then pulls it into the books — the
 same pull the nightly run does, so there is one way into the books. The row is
 placed by **heading**, so a question added to the Form cannot shift it into
 the wrong column.
+
+**The same bill cannot be entered twice.** The sheet is read *before* the row
+is written, and a bill already there is refused with a message that names it.
+The bill is identified the way the books identify one: the **supplier and the
+invoice number**; when there is no invoice number, the **supplier, the amount
+and the date**. This matters because the sheet has two ways in — the
+accountant's Form and this form — and a bill entered in both would be counted
+twice.
+
+**There is no way to write a bill straight into the books.** The old
+`POST /api/finance/expenses` created bills (`source = 'manual'`) and is
+**retired**: it answers `405` and says that bills are entered on the Invoice
+Entry page. The endpoint still reads bills, and can still mark one paid.
+
+**Petty cash is not entered here.** It is a float with a balance of its own, so
+it lives on its own page — `/finance/invoice-entry/petty` — and writes
+straight to the petty ledger.
 
 ### Reading and writing the sheet from here
 

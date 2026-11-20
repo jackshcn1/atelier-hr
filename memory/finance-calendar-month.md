@@ -193,10 +193,9 @@ in the books yet. See [[finance-salary-and-standing-costs]].
 | Page | What it answers |
 |---|---|
 | `/finance` | the six finance modules |
-| `/finance/invoice-entry` | the one page a biller needs — the three ways of entering what the restaurant buys, and nothing else |
-| `/finance/invoice-entry/bill` | log a bill by hand (straight into the books, with the invoice attached) |
-| `/finance/invoice-entry/expense` | the accountant's entry form, through the Google Sheet |
-| `/finance/invoice-entry/petty` | the petty cash ledger |
+| `/finance/invoice-entry` | the one page a biller needs — **one form for every bill**, with the invoice attachable, and nothing else |
+| `/finance/invoice-entry/petty` | the petty cash ledger — a float with a balance, so it is entered on its own page |
+| `/finance/invoice-entry/bill`, `/finance/invoice-entry/expense` | old paths — they redirect to the one form |
 | `/finance/costs` | revenue channels and the cost breakdown against the month's forecast |
 | `/finance/bills` | what the restaurant owes its suppliers, bill by bill, grouped by supplier |
 | `/finance/vendors` | the supplier list, with what is owed to each |
