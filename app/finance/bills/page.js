@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { normalizePaymentStatus } from '../../../lib/expenseHelpers.js';
 import { monthLabel } from '../../../lib/financePeriod.js';
+import { billsInPeriod, periodNote } from '../../../lib/financeBills.js';
 
 // The link to the invoice itself. Only a Drive link is followed — anything
 // else is not a link we put there.
@@ -21,6 +22,9 @@ export default function BillsPage() {
   const [totals, setTotals] = useState(null);
   const [filter, setFilter] = useState('unpaid');
   const [month, setMonth] = useState('all');
+  // A custom period: the bills dated from one day to another.
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [openVendor, setOpenVendor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -75,15 +79,19 @@ export default function BillsPage() {
     return [...keys].sort().reverse();
   }, [bills]);
 
-  // The bills of the chosen month. A bill with no date belongs to no month,
-  // so it shows in "All months" only.
+  // The bills in the chosen period.
+  //
+  // A month is the window Petpooja reports on. A custom period is any span
+  // of days — for a quarter, for a financial year, for one supplier's
+  // statement. A bill with no date belongs to no period, so it shows in
+  // "All months" only.
   const scoped = useMemo(
-    () =>
-      month === 'all'
-        ? bills
-        : bills.filter((bill) => String(bill.invoice_date || '').slice(0, 7) === month),
-    [bills, month]
+    () => billsInPeriod(bills, { month, from, to }),
+    [bills, month, from, to]
   );
+
+  // What the period filter is saying, in words.
+  const periodNoteText = useMemo(() => periodNote({ month, from, to }), [month, from, to]);
 
   // The bills, grouped by supplier.
   //
@@ -147,8 +155,8 @@ export default function BillsPage() {
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
       <div className="max-w-shell mx-auto px-6 py-16 lg:py-24">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/finance/costs" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
-            ← Back to Costs &amp; Expenses
+          <Link href="/finance" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
+            ← Back to Finance
           </Link>
           <span className="text-[#8b6f4e] text-sm">Finance / Bills</span>
         </div>
@@ -186,6 +194,15 @@ export default function BillsPage() {
           </div>
         </div>
 
+        {/* The totals are of the bills in the period — so when a period is
+            chosen, it says so rather than letting the figures be read as
+            what the restaurant owes in total. */}
+        {month !== 'all' && (
+          <p className="text-xs text-[#6b635c] -mt-6 mb-8">
+            These totals are of the bills in the period chosen below.
+          </p>
+        )}
+
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           {FILTERS.map((option) => (
             <button
@@ -200,14 +217,18 @@ export default function BillsPage() {
               {option.label}
             </button>
           ))}
-          <Link href="/finance/costs/entry" className="btn-primary text-sm px-4 py-2 ml-auto">
-            + Log a bill
+          {/*
+              Entering a bill has its own page, so a biller never has to open
+              this one. The link points there rather than at a form.
+          */}
+          <Link href="/finance/invoice-entry" className="text-xs text-[#8b6f4e] hover:underline ml-auto">
+            To enter a new bill → Invoice Entry
           </Link>
         </div>
 
         <div className="flex items-center gap-3 mb-8 flex-wrap">
           <label htmlFor="bills-month" className="text-sm text-[#6b635c]">
-            Month
+            Period
           </label>
           <select
             id="bills-month"
@@ -219,12 +240,47 @@ export default function BillsPage() {
             {months.map((key) => (
               <option key={key} value={key}>{monthLabel(key)}</option>
             ))}
+            <option value="custom">Custom period…</option>
           </select>
-          <p className="text-xs text-[#6b635c]">
-            {month === 'all'
-              ? 'Every bill on record, whatever its date.'
-              : `Only the bills dated ${monthLabel(month)} — the same window Petpooja reports on.`}
-          </p>
+
+          {/* A custom period — any span of days. */}
+          {month === 'custom' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <label htmlFor="bills-from" className="text-sm text-[#6b635c]">
+                From
+              </label>
+              <input
+                id="bills-from"
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="field w-auto text-sm py-1.5 px-2.5"
+              />
+              <label htmlFor="bills-to" className="text-sm text-[#6b635c]">
+                To
+              </label>
+              <input
+                id="bills-to"
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="field w-auto text-sm py-1.5 px-2.5"
+              />
+              {(from || to) && (
+                <button
+                  onClick={() => {
+                    setFrom('');
+                    setTo('');
+                  }}
+                  className="text-xs text-[#8b6f4e] hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
+          <p className="text-xs text-[#6b635c]">{periodNoteText}</p>
         </div>
 
         {message && <p className="mb-4 text-sm text-[#6b635c]">{message}</p>}

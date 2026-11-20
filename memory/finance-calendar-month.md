@@ -188,23 +188,33 @@ used** until its invoice arrives.
 This is not a bug in the reporting; it is the cost of the invoices not being
 in the books yet. See [[finance-salary-and-standing-costs]].
 
-## The pages that exist now (17 Nov 2026)
+## The pages that exist now (20 Nov 2026)
 
 | Page | What it answers |
 |---|---|
-| `/finance` | the four finance modules |
-| `/finance/costs` | revenue channels and the cost breakdown for the month |
-| `/finance/costs/entry` | log a bill by hand |
+| `/finance` | the six finance modules |
+| `/finance/invoice-entry` | the one page a biller needs — the three ways of entering what the restaurant buys, and nothing else |
+| `/finance/invoice-entry/bill` | log a bill by hand (straight into the books, with the invoice attached) |
+| `/finance/invoice-entry/expense` | the accountant's entry form, through the Google Sheet |
+| `/finance/invoice-entry/petty` | the petty cash ledger |
+| `/finance/costs` | revenue channels and the cost breakdown against the month's forecast |
 | `/finance/bills` | what the restaurant owes its suppliers, bill by bill, grouped by supplier |
 | `/finance/vendors` | the supplier list, with what is owed to each |
 | `/finance/costs/fixed` | the standing monthly costs |
-| `/finance/costs/petty` | the petty cash ledger |
 | `/finance/cashflow` | the month's cash movements **and** the money owed by customers |
 | `/finance/pnl` | the statement |
 
 **Bills** and **Suppliers** are the mirror image of the receivables: the bills
 page is money owed *to* suppliers, the cashflow page is money owed *by*
 customers.
+
+**Entry has its own area.** The three entry forms live under
+`/finance/invoice-entry`, not under Costs & Expenses, so that a biller can be
+given that one page and nothing else. The old paths (`/finance/costs/entry`,
+`/finance/costs/new`, `/finance/costs/petty`) redirect there.
+
+**Bills and Suppliers are not on Costs & Expenses** — one place for each, and
+the Finance overview is it.
 
 ## The bill data speaks one language
 

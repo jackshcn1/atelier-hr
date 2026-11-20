@@ -5,9 +5,15 @@ import Link from 'next/link';
 export default function FinanceOverviewPage() {
   const financeModules = [
     {
+      title: 'Invoice Entry',
+      subtitle: 'Bills & Expenses',
+      description: 'Enter a bill or an expense. The one page a biller needs — nothing else in Finance is shown on it.',
+      href: '/finance/invoice-entry',
+    },
+    {
       title: 'Costs & Expenses',
       subtitle: 'Cost Tracking',
-      description: 'Monitor operational expenses, vendor bills, and departmental budgets.',
+      description: 'How the month is going against what it was forecast to be.',
       href: '/finance/costs',
     },
     {

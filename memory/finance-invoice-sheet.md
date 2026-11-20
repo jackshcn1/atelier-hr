@@ -207,7 +207,7 @@ sheet has its own — one service account can open both.
 
 ### The site's own entry form
 
-`/finance/costs/new` — one page for all three kinds of cost, with the
+`/finance/invoice-entry/expense` — one page for all three kinds of cost, with the
 **supplier as a type-ahead** over the supplier list: type, and the suppliers
 that match come up; a name that is not on the list can be added there and
 then, and it is on the list for next time.

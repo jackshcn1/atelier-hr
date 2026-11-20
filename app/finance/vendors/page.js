@@ -109,8 +109,8 @@ export default function VendorsPage() {
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
       <div className="max-w-shell mx-auto px-6 py-16 lg:py-24">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/finance/costs" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
-            ← Back to Costs &amp; Expenses
+          <Link href="/finance" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
+            ← Back to Finance
           </Link>
           <span className="text-[#8b6f4e] text-sm">Finance / Suppliers</span>
         </div>
