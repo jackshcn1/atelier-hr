@@ -48,13 +48,15 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
    - Company Policies (`/documents?category=policy`)
 
 5. **Finance**
-   - Finance (`/finance`) — the four finance modules, on the calendar month
-   - Costs & Expenses (`/finance/costs`) — revenue channels and the cost breakdown, for one calendar month or for the last 3, 6 or 12 months (`?range=N`)
-   - New Expense (`/finance/costs/new`) — the accountant's entry form: variable / fixed / petty, with the supplier as a type-ahead that can add a new supplier. It writes a row into the accountant's Google Sheet, and the sheet is pulled into the books
-   - Bill Entry (`/finance/costs/entry`) — log a bill by hand (the fallback path): the category follows the kind of cost (fixed = the standing costs, closed; variable = the moving costs + Other), the supplier is a type-ahead that can add a new supplier, and the invoice itself can be attached — the file goes into the restaurant's Drive folder and the bill keeps the link
+   - Finance (`/finance`) — the six finance modules, on the calendar month
+   - **Invoice Entry (`/finance/invoice-entry`) — the one page a biller needs.** It shows nothing else in Finance: no costs, no forecast, no profit. It holds the three ways of entering what the restaurant buys, and says in plain English which to use:
+     - Bill Entry (`/finance/invoice-entry/bill`) — log a bill by hand (the fallback path): the category follows the kind of cost (fixed = the standing costs, closed; variable = the moving costs + Other), the supplier is a type-ahead that can add a new supplier, and the invoice itself can be attached — the file goes into the restaurant's Drive folder and the bill keeps the link. It goes **straight into the books**.
+     - New Expense (`/finance/invoice-entry/expense`) — the accountant's entry form: variable / fixed / petty, with the supplier as a type-ahead that can add a new supplier. It writes a row into the accountant's Google Sheet, and the sheet is pulled into the books — so the sheet is the record and there is one way into the books. It cannot carry an invoice attachment.
+     - Petty Cash (`/finance/invoice-entry/petty`) — Cash entry (money in) or Expense (money out)
+     - The old paths (`/finance/costs/entry`, `/finance/costs/new`, `/finance/costs/petty`) redirect here.
+   - Costs & Expenses (`/finance/costs`) — revenue channels and the cost breakdown against the month's forecast, for one calendar month or for the last 3, 6 or 12 months (`?range=N`). **Bills and Suppliers are not here** — they live in the Finance overview, one place for each.
    - Standing Costs (`/finance/costs/fixed`) — the expected monthly costs; the month's invoice replaces the expected amount
-   - Petty Cash (`/finance/costs/petty`) — Cash entry (money in) or Expense (money out)
-   - Bills (`/finance/bills`) — what the restaurant owes its suppliers, bill by bill
+   - Bills (`/finance/bills`) — what the restaurant owes its suppliers, bill by bill. Filtered by a **month** (the window Petpooja reports on) or by a **custom period** — any span of days (`lib/financeBills.js`)
    - Suppliers (`/finance/vendors`) — the supplier list, with what is owed to each
    - Cashflow (`/finance/cashflow`) — the month's cash movements and the money owed by customers
    - P&L (`/finance/pnl`) — the statement for the calendar month

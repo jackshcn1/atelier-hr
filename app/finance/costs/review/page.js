@@ -76,8 +76,8 @@ export default function ExpenseReviewDashboard() {
       <div className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
         <div className="max-w-shell mx-auto px-6 py-16 lg:py-24">
           <div className="flex items-center gap-3 mb-6">
-            <Link href="/finance/costs/entry" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
-              ← Back to Entry
+            <Link href="/finance/invoice-entry/bill" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
+              ← Back to Invoice Entry
             </Link>
             <span className="text-[#8b6f4e] text-sm">Finance / Costs & Expenses / Review</span>
           </div>
@@ -118,8 +118,8 @@ export default function ExpenseReviewDashboard() {
     <div className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
       <div className="max-w-shell mx-auto px-6 py-16 lg:py-24">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/finance/costs/entry" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
-            ← Back to Entry
+          <Link href="/finance/invoice-entry/bill" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
+            ← Back to Invoice Entry
           </Link>
           <span className="text-[#8b6f4e] text-sm">Finance / Costs & Expenses / Review</span>
         </div>

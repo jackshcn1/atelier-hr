@@ -16,29 +16,19 @@ export default function CostsExpensesPage() {
 
         <div className="page-head mb-12 flex justify-between items-center">
           <div>
-            <h1 className="page-title font-serif text-4xl lg:text-5xl">Costs & Expenses</h1>
+            <h1 className="page-title font-serif text-4xl lg:text-5xl">Costs &amp; Expenses</h1>
             <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">
-              Manage operational costs, vendor bills, and budget tracking
+              How the month is going against what it was forecast to be
             </p>
           </div>
+          {/*
+              Bills and Suppliers live in the Finance overview, not here —
+              one place for each. The entry forms live in Invoice Entry, so
+              that a biller never has to open this page at all.
+          */}
           <div className="flex gap-3 flex-wrap">
-            <Link href="/finance/costs/new" className="btn-primary text-sm px-4 py-2">
-              + New Expense
-            </Link>
-            <Link href="/finance/costs/entry" className="btn-secondary text-sm px-4 py-2">
-              Log a Bill by Hand
-            </Link>
-            <Link href="/finance/bills" className="btn-secondary text-sm px-4 py-2">
-              Bills
-            </Link>
-            <Link href="/finance/vendors" className="btn-secondary text-sm px-4 py-2">
-              Suppliers
-            </Link>
             <Link href="/finance/costs/fixed" className="btn-secondary text-sm px-4 py-2">
-              Fixed Costs
-            </Link>
-            <Link href="/finance/costs/petty" className="btn-secondary text-sm px-4 py-2">
-              Petty Expenses
+              Standing Costs
             </Link>
           </div>
         </div>

@@ -17,7 +17,8 @@
     "test:refresh": "node tests/purchase-refresh-verify.mjs",
     "backfill:finance": "node scripts/backfill-finance-history.mjs",
     "verify:invoice": "node scripts/verify-invoice-upload.mjs",
-    "test:forecast": "node tests/finance-forecast-verify.mjs"
+    "test:forecast": "node tests/finance-forecast-verify.mjs",
+    "test:bills": "node tests/finance-bills-verify.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
