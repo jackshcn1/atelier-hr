@@ -158,12 +158,11 @@ async function main() {
     console.log(`\nCleared a stray heading: ${stray.join(', ')}`);
   }
 
-  // The importer needs a range wide enough for every column.
-  const end = columnLetter(Math.max(lastUsed, 22));
+  // There is no column range to set on the server any more: the columns are
+  // found by their heading, so the whole tab is read.
   console.log(`\nSet these on the server:`);
   console.log(`  INVOICE_SHEET_SPREADSHEET_ID=${SPREADSHEET_ID}`);
   console.log(`  INVOICE_SHEET_NAME="${SHEET_NAME}"`);
-  console.log(`  INVOICE_SHEET_RANGE=A:${end}`);
 }
 
 main().catch((error) => {
