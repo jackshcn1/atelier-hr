@@ -76,16 +76,25 @@ jobs:
 
           # A manual run may target a single group.
           #
-          # The daily run pulls only the four finance groups:
+          # The daily run pulls the four finance groups and the Customer
+          # section's own groups:
           #   5 = Due Payment  (money owed by customers)
           #   6 = Executive    (the revenue split)
           #   9 = Purchase invoices (vendor bills)
           #  10 = Purchase returns  (debit notes)
+          #  11 = Customer orders (the last 90 days)
+          #  12 = Customer reviews (Zomato and Swiggy)
+          #
+          # Group 13 is the Customer section's older history — the 285 days
+          # before the last 90. It does not change with the day, so it is
+          # pulled once a week rather than every night. The day of the week
+          # is taken from the runner's clock (UTC), and 0 is Sunday.
           #
           # The other groups feed variable pay, which is paused.
           #
           # Asking for the variable pay back (the `variable_pay` switch) runs
-          # all ten groups, because variable pay needs its own reports.
+          # all the variable-pay groups as well, because variable pay needs
+          # its own reports.
           #
           # NOTE: do not name this variable GROUPS — `GROUPS` is a Bash
           # built-in array holding the current user's group ids, so assigning
@@ -94,9 +103,11 @@ jobs:
           if [ -n "$ONLY_GROUP" ]; then
             SYNC_GROUPS="$ONLY_GROUP"
           elif [ "$VARIABLE_PAY" = "true" ]; then
-            SYNC_GROUPS="1 2 3 4 5 6 7 8 9 10"
+            SYNC_GROUPS="1 2 3 4 5 6 7 8 9 10 11 12"
+          elif [ "$(date -u +%w)" = "0" ]; then
+            SYNC_GROUPS="5 6 9 10 11 12 13"
           else
-            SYNC_GROUPS="5 6 9 10"
+            SYNC_GROUPS="5 6 9 10 11 12"
           fi
 
           # `finance=1` tells the server this is a finance run: it pulls the
@@ -128,6 +139,11 @@ jobs:
             echo ""
             echo "=== Report group $G ==="
             URL="$SYNC_URL?group=$G"
+            # `lastGroup` tells the server which group is the last of this run.
+            # The work that happens once per run rather than once per group
+            # belongs there, and "the last group" is not always the highest
+            # group number — the nightly run stops short of group 13.
+            URL="$URL&lastGroup=$LAST_GROUP"
             [ -n "$MODE_FLAG" ] && URL="$URL&$MODE_FLAG"
             [ -n "$PERIOD" ] && URL="$URL&$PERIOD"
 
@@ -239,6 +255,45 @@ jobs:
             exit 1
           fi
 
+      # The customer feedback form.
+      #
+      # The Customer Feedback Form is a Google Sheet, so it needs no browser
+      # and no login — it is its own request, and it takes about a second.
+      #
+      # It is asked for once, after the Petpooja groups, so the responses land
+      # in the same night's books. A sheet that is not set up yet answers
+      # "skipped" and does not fail the run.
+      - name: Pull the customer feedback sheet
+        env:
+          SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
+          SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
+        run: |
+          set -u
+          if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
+            echo "::error::VERCEL_SYNC_URL and VERCEL_SYNC_SECRET must be configured as repository secrets."
+            exit 1
+          fi
+
+          FEEDBACK_STATUS=$(curl -sS -o "response-feedback.json" -w '%{http_code}' -X POST "$SYNC_URL?sheet=feedback" \
+            -H "x-sync-secret: $SYNC_SECRET" \
+            -H 'Content-Type: application/json' \
+            --max-time 120) || FEEDBACK_STATUS="000"
+
+          echo "HTTP $FEEDBACK_STATUS"
+          tail -c 4000 "response-feedback.json" || true
+          echo ""
+
+          # A sheet that is not set up yet answers "skipped" — that is not a
+          # failure, and the run must not fail over it.
+          if [ "$FEEDBACK_STATUS" != "200" ]; then
+            echo "::error::The customer feedback sheet pull failed with HTTP $FEEDBACK_STATUS"
+            exit 1
+          fi
+          if ! grep -q '"ok":true' "response-feedback.json"; then
+            echo "::error::The customer feedback sheet pull did not report ok:true"
+            exit 1
+          fi
+
       - name: Publish run summary
         if: always()
         run: |
@@ -246,7 +301,7 @@ jobs:
             echo "### Petpooja daily sync"
             echo
             echo "- Finished: $(date -u '+%Y-%m-%d %H:%M UTC')"
-            for f in response-group-*.json response-sheet.json; do
+            for f in response-group-*.json response-sheet.json response-feedback.json; do
               [ -e "$f" ] || continue
               echo ""
               echo "#### ${f%.json}"

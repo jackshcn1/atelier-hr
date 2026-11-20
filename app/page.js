@@ -41,6 +41,13 @@ export default function Home() {
       href: '/finance',
       accent: '#4a6b82',
     },
+    {
+      title: 'Customers',
+      subtitle: 'Value, Reviews & Feedback',
+      description: 'Who our customers are, what they are worth, what they say, and what they want improved',
+      href: '/customers',
+      accent: '#8a5a3c',
+    },
   ];
 
   return (

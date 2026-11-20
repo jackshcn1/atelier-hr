@@ -26,7 +26,15 @@ import { parsePurchaseInvoices, parsePurchaseReturns } from '../lib/expenseParse
 import { cleanVendorName, mergePetpoojaBill } from '../lib/expenseHelpers.js';
 import { applyRefreshMisses, describeRefresh } from '../lib/purchaseRefresh.js';
 import { readAllRows } from '../lib/supabaseServer.js';
-import { monthKeyOf, previousMonthKey, petpoojaMonthWindow, repeatsAnotherMonth } from '../lib/financePeriod.js';
+import { monthKeyOf, previousMonthKey, petpoojaMonthWindow, repeatsAnotherMonth, todayInIST } from '../lib/financePeriod.js';
+import {
+  fetchOrdersWindow,
+  fetchRatings,
+  syncOrders,
+  syncReviews,
+  parseRatingsExport,
+  customerWindowFor,
+} from '../lib/customerSync.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,6 +92,21 @@ export const REPORT_GROUPS = {
   8: ['inventory'],
   9: ['purchase_invoices'],
   10: ['purchase_returns'],
+  // The Customer section.
+  //
+  // Three groups, and none of them touches the payroll:
+  //
+  //   customer_orders          the last 90 days of orders -> customer_orders
+  //   customer_ratings         the platform reviews     -> customer_reviews
+  //   customer_orders_history  the 285 days before that -> customer_orders
+  //
+  // The orders are taken in two pieces because Petpooja's export is capped
+  // at ten thousand rows and a pull is slower than the rest of the sync put
+  // together. The recent part is pulled every night; the older part is
+  // pulled once a week, because it does not change with the day.
+  11: ['customer_orders'],
+  12: ['customer_ratings'],
+  13: ['customer_orders_history'],
 };
 
 // The login gets one time budget for every attempt it makes. A serverless
@@ -564,15 +587,25 @@ function killOrphanBrowsers(browserPid) {
 //   purchase_invoices   vendor bills -> expenses
 //   purchase_returns    debit notes   -> expenses
 //
-// The rest of the reports feed variable pay only, and are not pulled at all.
-export const FINANCE_REPORTS = ['due_payment', 'executive', 'purchase_invoices', 'purchase_returns'];
+// The reports that feed the **variable-pay** metrics.
+//
+// These are the ones a finance-only run leaves alone, because variable pay
+// is paused and a run that pulled them would move figures that are meant to
+// stay frozen.
+//
+// The finance reports (groups 5, 6, 9 and 10) and the Customer section's own
+// reports are not in this list. They write to their own tables and to
+// nothing else, so they are safe to pull — and they are pulled by the same
+// nightly run, so the Customer section is never days behind the rest of the
+// books.
+const VARIABLE_PAY_REPORTS = ['captain', 'pax', 'item', 'gstn', 'kot', 'inventory'];
 
 // Is this run finance-only?
 //
 // Finance-only means two things: the variable-pay reports are not pulled, and
 // nothing is written to the variable-pay metric rows. What is left is the
 // finance data — the revenue split, the vendor bills and the money owed by
-// customers.
+// customers — and the Customer section's own data.
 export function isFinanceOnly() {
   const value = String(process.env.SYNC_FINANCE_ONLY ?? '').toLowerCase();
   return value === '1' || value === 'true';
@@ -584,7 +617,7 @@ function reportEnabled(name) {
     return explicit.split(',').map((s) => s.trim()).filter(Boolean).includes(name);
   }
   // Finance-only: the reports that feed variable pay are not pulled.
-  if (isFinanceOnly() && !FINANCE_REPORTS.includes(name)) return false;
+  if (isFinanceOnly() && VARIABLE_PAY_REPORTS.includes(name)) return false;
   const group = process.env.SYNC_GROUP;
   if (group) {
     const list = REPORT_GROUPS[Number(group)] || [];
@@ -608,7 +641,11 @@ function feedbackEnabled() {
   if (isFinanceOnly()) return false;
   const group = process.env.SYNC_GROUP;
   if (!group) return true;
-  const lastGroup = Math.max(...Object.keys(REPORT_GROUPS).map(Number));
+  // The last group of THIS run, which the scheduler names. It is not simply
+  // the highest group number: the nightly run does not include group 13, so
+  // its last group is 12, and the once-per-run work belongs there.
+  const lastGroup = Number(process.env.SYNC_LAST_GROUP)
+    || Math.max(...Object.keys(REPORT_GROUPS).map(Number));
   return Number(group) === lastGroup;
 }
 
@@ -3019,6 +3056,98 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
       } catch (re) {
         failedReports++;
         console.error('⚠️ Could not sync Purchase Returns:', re.message);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // The Customer section.
+    //
+    // Three reports, and none of them touches the payroll:
+    //
+    //   customer_orders          the last 90 days -> customer_orders, customers
+    //   customer_ratings         the platform reviews -> customer_reviews
+    //   customer_orders_history  the 285 days before that -> customer_orders
+    //
+    // The window is a rolling one, so a customer's total spend is their spend
+    // over all the time the books cover. The customer rows are worked out
+    // from every order on record, not only from this window's.
+
+    // The last day the books are up to. Both order reports measure their
+    // window back from it.
+    const customerTo = process.env.SYNC_CUSTOMER_TO || todayInIST();
+
+    // The two order reports, in the order they should be pulled.
+    for (const orderReport of ['customer_orders', 'customer_orders_history']) {
+      if (!reportEnabled(orderReport)) continue;
+
+      // An explicit window (a backfill) overrides the report's own.
+      const window = process.env.SYNC_CUSTOMER_FROM
+        ? { from: process.env.SYNC_CUSTOMER_FROM, to: customerTo }
+        : customerWindowFor(orderReport, customerTo);
+
+      try {
+        console.log(`\n📥 Fetching the All Orders export (${window.from} → ${window.to})...`);
+
+        // The pull is a calendar month at a time, because Petpooja's export
+        // holds only ten thousand rows and drops the rest without a word.
+        const fetched = await fetchOrdersWindow(page, context, window, (chunk, count) => {
+          console.log(`  📅 ${chunk.from} → ${chunk.to}: ${count} order(s).`);
+        });
+        if (!fetched.ok) throw new Error(fetched.error);
+        if (fetched.orders.length === 0) throw new Error('The orders export had no order rows.');
+
+        const written = await syncOrders(supabase, fetched.orders);
+        console.log(`  📊 ${written.orders} order(s) read, ${written.customers} customer(s) on the books.`);
+        console.log(`  📊 ${written.gap.orders} order(s) carry no contact number — ₹${Math.round(written.gap.amount)} of order value.`);
+        successfulReports++;
+      } catch (co) {
+        failedReports++;
+        console.error('⚠️ Could not sync the customer orders:', co.message);
+      }
+    }
+
+    if (reportEnabled('customer_ratings')) {
+      try {
+        const ratingsWindow = customerWindowFor('customer_orders', customerTo);
+        console.log(`\n📥 Fetching the platform reviews (${ratingsWindow.from} → ${ratingsWindow.to})...`);
+        const fetched = await fetchRatings(context, ratingsWindow);
+        if (!fetched.ok) throw new Error(fetched.error);
+
+        // The reviews are read back through the same parser that reads the
+        // ratings export, so there is one place that knows what a review is.
+        //
+        // The heading is a row of its own. Putting the headings and the
+        // values in the SAME row reads the word "Rating" where the score
+        // should be, and every review is then thrown away for having no
+        // rating — which is exactly what happened the first time.
+        const parsed = parseRatingsExport([
+          [
+            'Provider', 'Client Order Id', 'Client Restaurant Id', 'Rating',
+            'Created Date', 'Identifier', 'Feedback',
+          ],
+          ...fetched.reviews.map((review) => [
+            review.platform,
+            review.client_order_id,
+            '',
+            review.rating,
+            review.review_date,
+            'Atelier',
+            review.comment,
+          ]),
+        ]);
+        if (!parsed.ok) throw new Error(parsed.error);
+        if (parsed.reviews.length !== fetched.reviews.length) {
+          throw new Error(
+            `Only ${parsed.reviews.length} of ${fetched.reviews.length} review(s) could be read.`,
+          );
+        }
+
+        const written = await syncReviews(supabase, parsed.reviews);
+        console.log(`  📊 ${written.reviews} review(s) read — ${written.linked} matched to an order, ${written.unlinked} without one.`);
+        successfulReports++;
+      } catch (cr) {
+        failedReports++;
+        console.error('⚠️ Could not sync the customer reviews:', cr.message);
       }
     }
 

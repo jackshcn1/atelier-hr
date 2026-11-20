@@ -110,4 +110,27 @@ Resolution, in order:
   uses `on conflict do nothing`, so `Chair` is skipped rather than aborting the
   migration.
 
+### The new-user trigger could not find its tables (fixed 20 Nov 2026)
+
+`public.handle_new_user()` runs AFTER INSERT on `auth.users` and creates the
+profile row for a new sign-up. It is `SECURITY DEFINER` and it had **no
+`search_path` of its own**, so it inherited the caller's — and GoTrue inserts
+into `auth.users` with an **empty** one. The trigger looked for an
+unqualified `employees` and an unqualified `profiles` and Postgres said:
+
+    ERROR: relation "employees" does not exist
+
+The whole INSERT failed, so **creating a user failed** — every time, for
+everybody. The app's own "Add user" drawer (`POST /api/admin/create-user`,
+which calls `auth.admin.createUser`) answered with a 500, and a new sign-up
+answered "Database error saving new user".
+
+**The lesson is the same one the `exec_sql` RPC has:** a function that runs
+with an empty `search_path` must name every table in full. A `SECURITY
+DEFINER` function with no `search_path` of its own inherits whatever the
+caller had, and the caller is not always the one you expect.
+
+Fixed by `supabase/migrations/20261120170000_fix_new_user_trigger.sql`: the
+tables are named in full and the function is given `set search_path = ''`.
+
 Related: [[tech-stack-atelier]], [[workflow-preferences]], [[project-atelier-hr]]
