@@ -242,9 +242,9 @@ hiding it.
 does not change with the day. Together they cover about a year.
 
 **The writes are upserts**, never replacements: an order keeps its order
-number, a review keeps its platform + order id + date, a feedback response
-keeps its bill number + date. So the history only ever has to be pulled
-once, and a re-pull updates the same rows.
+number **and the day it was placed**, a review keeps its platform + order id +
+date, a feedback response keeps its bill number + date. So the history only
+ever has to be pulled once, and a re-pull updates the same rows.
 
 **The roll-up is worked out from the whole orders table**, not from the
 window that was just pulled — so a customer's total spend is their spend over
@@ -267,3 +267,17 @@ reviews, feedback — are read whole and worked out in JavaScript.
 
 Every query is a constant string. Nothing a visitor sends is ever put into
 SQL text.
+
+## What the books hold (20 Nov 2026)
+
+| | |
+|---|---|
+| Orders | **27,719**, from 1 Mar to 20 Nov 2026, worth **₹1,63,01,815** |
+| Customers | **512**, worth **₹14,15,978** between them (8.7% of the order value) |
+| The gap | **26,899 orders worth ₹1,48,85,837** carry no contact number |
+| Reviews | **420** — 280 Zomato (4.08 ★), 140 Swiggy (3.92 ★) |
+| Feedback | 1 response so far — the form's bill number does not match an order yet |
+
+The gap is the number worth closing at the counter: it is 91.3% of the order
+value, and it exists because the number is not asked for at the till.
+
