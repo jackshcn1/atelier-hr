@@ -415,25 +415,53 @@ await check('the supplier list counts every bill, not the first thousand', async
   if (checked === 0) throw new Error('no supplier could be checked');
 });
 
-// A bill typed by hand, then removed again — the whole round trip.
-const created = await json(await expensesPOST(post('/api/finance/expenses', {
-  category: 'Rent',
-  cost_type: 'variable',
-  amount: 123.45,
-  vendor_name: 'Ambrosia - The Classic Bakehouse',
-  invoice_number: 'ROUTE-CHECK-1',
-  invoice_date: '2026-11-17',
-  payment_status: 'unpaid',
-})));
+// A bill cannot be written straight into the books.
+//
+// The sheet is the record: a bill is written into the accountant's sheet and
+// pulled in from there, which is checked further down. This endpoint only
+// reads bills, so a bill put straight into the books is turned away —
+// otherwise the same bill could be counted twice.
+await check('a bill cannot be written straight into the books', async () => {
+  const res = await expensesPOST(
+    post('/api/finance/expenses', {
+      category: 'Rent',
+      cost_type: 'variable',
+      amount: 123.45,
+      vendor_name: 'Ambrosia - The Classic Bakehouse',
+      invoice_number: 'ROUTE-CHECK-1',
+      invoice_date: '2026-11-17',
+      payment_status: 'unpaid',
+    }),
+  );
+  if (res.status !== 405) throw new Error(`it was answered with ${res.status}, expected 405`);
+  const body = await res.json();
+  if (body.success) throw new Error('the bill was accepted');
 
-let testBillId = null;
-await check('a bill typed by hand is accepted', () => {
-  if (created.status !== 200) throw new Error(`status ${created.status}: ${JSON.stringify(created.body).slice(0, 200)}`);
-  if (created.body.data.amount !== 123.45) throw new Error('wrong amount');
-  if (created.body.data.cost_type !== 'variable') throw new Error('wrong cost type');
-  if (created.body.data.payment_status !== 'unpaid') throw new Error('wrong payment status');
-  testBillId = created.body.data.id;
+  const { data } = await sb.from('expenses').select('id').eq('invoice_number', 'ROUTE-CHECK-1');
+  if (data && data.length > 0) throw new Error('the bill was written into the books anyway');
 });
+
+// A bill that is in the books turns up in the supplier totals.
+const { data: madeBill, error: madeBillError } = await sb
+  .from('expenses')
+  .insert({
+    category: 'Rent',
+    cost_type: 'variable',
+    entry_type: 'actual',
+    status: 'approved',
+    debit_note: 0,
+    amount: 123.45,
+    vendor_name: 'Ambrosia - The Classic Bakehouse',
+    invoice_number: 'ROUTE-CHECK-1',
+    invoice_date: '2026-11-17',
+    payment_status: 'unpaid',
+    source: 'manual',
+  })
+  .select()
+  .single();
+if (madeBillError) throw madeBillError;
+
+const testBillId = madeBill.id;
 
 await check('the bill shows up in the supplier totals', async () => {
   const after = await json(await vendorsGET(req('/api/finance/vendors')));
@@ -808,24 +836,29 @@ await check('the invoice of a bill is fetched through the connected account', as
   const isConnected = (connected || []).some((row) => row.refresh_token);
 
   const link = 'https://drive.google.com/file/d/test-file-id/view';
-  const res = await expensesPOST(
-    post('/api/finance/expenses', {
+  const { data: bill, error } = await sb
+    .from('expenses')
+    .insert({
       category: 'Other',
       cost_type: 'variable',
+      entry_type: 'actual',
+      status: 'approved',
+      debit_note: 0,
       amount: 323,
       vendor_name: 'Invoice Check',
       invoice_date: '2026-11-17',
       payment_status: 'unpaid',
       invoice_attachment: link,
-    }),
-  );
-  const created = await json(res);
-  if (!created.body.success) throw new Error(JSON.stringify(created.body).slice(0, 200));
+      source: 'manual',
+    })
+    .select()
+    .single();
+  if (error) throw error;
 
   try {
     const invoice = await invoiceGET(
-      new Request(`https://atelier.test/api/finance/expenses/invoice/${created.body.data.id}`),
-      { params: { id: created.body.data.id } },
+      new Request(`https://atelier.test/api/finance/expenses/invoice/${bill.id}`),
+      { params: { id: bill.id } },
     );
 
     if (isConnected) {
@@ -838,109 +871,66 @@ await check('the invoice of a bill is fetched through the connected account', as
       if (!/not connected/i.test(body.error)) throw new Error(`the answer does not say why: ${body.error}`);
     }
   } finally {
-    await sb.from('expenses').delete().eq('id', created.body.data.id);
+    await sb.from('expenses').delete().eq('id', bill.id);
   }
 });
 
-await check('a bill keeps the link to its invoice', async () => {
-  const link = 'https://drive.google.com/file/d/test-file-id/view';
-  const res = await expensesPOST(
-    post('/api/finance/expenses', {
-      category: 'Other',
-      cost_type: 'variable',
-      amount: 321,
-      vendor_name: 'Attachment Check',
-      invoice_date: '2026-11-17',
-      payment_status: 'unpaid',
-      invoice_attachment: link,
-    }),
-  );
-  const result = await json(res);
-  if (!result.body.success) throw new Error(JSON.stringify(result.body).slice(0, 200));
-
-  try {
-    const { data } = await sb
-      .from('expenses')
-      .select('invoice_attachment')
-      .eq('id', result.body.data.id);
-    if (!data || data.length !== 1) throw new Error('the bill is not in the ledger');
-    if (data[0].invoice_attachment !== link) throw new Error(`the link is ${data[0].invoice_attachment}`);
-  } finally {
-    await sb.from('expenses').delete().eq('id', result.body.data.id);
-  }
-});
-
-await check('a link that is not a link is not stored', async () => {
-  const res = await expensesPOST(
-    post('/api/finance/expenses', {
-      category: 'Other',
-      cost_type: 'variable',
-      amount: 322,
-      vendor_name: 'Attachment Check',
-      invoice_date: '2026-11-17',
-      payment_status: 'unpaid',
-      invoice_attachment: 'javascript:alert(1)',
-    }),
-  );
-  const result = await json(res);
-  if (!result.body.success) throw new Error(JSON.stringify(result.body).slice(0, 200));
-
-  try {
-    const { data } = await sb
-      .from('expenses')
-      .select('invoice_attachment')
-      .eq('id', result.body.data.id);
-    if (data[0].invoice_attachment) throw new Error(`it stored ${data[0].invoice_attachment}`);
-  } finally {
-    await sb.from('expenses').delete().eq('id', result.body.data.id);
-  }
-});
-
-// The site's own expense form.
+// The site's own bill form.
 //
 // The sheet is the record: the form writes a row into it, and the sheet is
-// then pulled into the books. This checks that whole path, and that the row
-// is removed again afterwards so the sheet is left as it was.
+// then pulled into the books. This checks that whole path — the invoice
+// attached to the bill, the description, and the rule that the same bill
+// cannot be entered twice — and that the rows are taken out again afterwards
+// so the sheet is left as it was.
 const { POST: sheetPOST } = await import('../app/api/finance/expenses/sheet/route.js');
 const { fetchGoogleSheetsData, googleSheetsClient } = await import('../lib/googleSheetsService.js');
 
 const SHEET_ID = '1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig';
 const SHEET_TAB = 'Form Responses 1';
+const SHEET_RANGE = 'A:AZ';
 
-let sheetEntryId = null;
+const sheetEntryIds = [];
 
-await check('an entry from the site form goes into the sheet and the books', async () => {
-  const res = await sheetPOST(
+/** Write a row into the sheet through the site's own form. */
+function postToSheet(body) {
+  return sheetPOST(
     new Request('https://atelier.test/api/finance/expenses/sheet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'fixed',
-        costType: 'Outlet Rent',
-        vendor: 'Site Form Check',
-        amount: 1234.56,
-        invoiceDate: '2026-11-17',
-        paidOn: '2026-11-18',
-        description: 'Written by the site form test',
-      }),
+      body: JSON.stringify(body),
     }),
   );
+}
+
+await check('an entry from the site form goes into the sheet and the books', async () => {
+  const res = await postToSheet({
+    type: 'fixed',
+    costType: 'Outlet Rent',
+    vendor: 'Site Form Check',
+    amount: 1234.56,
+    invoiceDate: '2026-11-17',
+    paidOn: '2026-11-18',
+    invoiceNo: 'SITE-FORM-CHECK-1',
+    description: 'Written by the site form test',
+    attachment: 'https://drive.google.com/file/d/site-form-check/view',
+  });
   const body = await res.json();
   if (!body.success) throw new Error(body.error);
 
-  sheetEntryId = body.data.entryId;
-  if (!sheetEntryId) throw new Error('the entry was not given an id');
+  const entryId = body.data.entryId;
+  if (!entryId) throw new Error('the entry was not given an id');
+  sheetEntryIds.push(entryId);
 
   // It is in the sheet.
-  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: 'A:V' });
-  const inSheet = rows.some((row) => (row || []).includes(sheetEntryId));
+  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: SHEET_RANGE });
+  const inSheet = rows.some((row) => (row || []).includes(entryId));
   if (!inSheet) throw new Error('the row is not in the sheet');
 
   // And in the books.
   const { data } = await sb
     .from('expenses')
-    .select('vendor_name, category, amount, invoice_date, payment_status, cost_type')
-    .eq('source_key', `id:${sheetEntryId.toLowerCase()}`);
+    .select('vendor_name, category, amount, invoice_date, payment_status, cost_type, invoice_attachment, description')
+    .eq('source_key', `id:${entryId.toLowerCase()}`);
   if (!data || data.length !== 1) throw new Error(`the bill is not in the books (${data?.length} found)`);
 
   const row = data[0];
@@ -950,34 +940,84 @@ await check('an entry from the site form goes into the sheet and the books', asy
   if (Number(row.amount) !== 1234.56) throw new Error(`the amount is ${row.amount}`);
   if (row.invoice_date !== '2026-11-17') throw new Error(`the date is ${row.invoice_date}`);
   if (row.payment_status !== 'paid') throw new Error(`the payment state is ${row.payment_status}`);
+  if (row.invoice_attachment !== 'https://drive.google.com/file/d/site-form-check/view') {
+    throw new Error(`the invoice link is ${row.invoice_attachment}`);
+  }
+  if (row.description !== 'Written by the site form test') throw new Error(`the description is ${row.description}`);
 });
 
-await check('the row the site form wrote is taken out of the sheet again', async () => {
-  if (!sheetEntryId) throw new Error('nothing was written');
+await check('the same bill cannot be entered twice', async () => {
+  const res = await postToSheet({
+    type: 'fixed',
+    costType: 'Outlet Rent',
+    vendor: 'Site Form Check',
+    amount: 1234.56,
+    invoiceDate: '2026-11-17',
+    invoiceNo: 'SITE-FORM-CHECK-1',
+    description: 'The same bill again',
+  });
+  if (res.status !== 409) throw new Error(`it was answered with ${res.status}, expected 409`);
+  const body = await res.json();
+  if (body.success) throw new Error('the bill was accepted');
+  if (!/already in the sheet/i.test(body.error)) throw new Error(`the answer does not say why: ${body.error}`);
+
+  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: SHEET_RANGE });
+  const count = rows.filter((row) => (row || []).includes('SITE-FORM-CHECK-1')).length;
+  if (count !== 1) throw new Error(`the sheet holds ${count} rows for it`);
+});
+
+await check('a link that is not a link is not stored', async () => {
+  const res = await postToSheet({
+    type: 'variable',
+    costType: 'Gas',
+    vendor: 'Link Check',
+    amount: 322,
+    invoiceDate: '2026-11-17',
+    invoiceNo: 'SITE-FORM-CHECK-2',
+    attachment: 'javascript:alert(1)',
+  });
+  const body = await res.json();
+  if (!body.success) throw new Error(body.error);
+  sheetEntryIds.push(body.data.entryId);
+
+  const { data } = await sb
+    .from('expenses')
+    .select('invoice_attachment')
+    .eq('source_key', `id:${body.data.entryId.toLowerCase()}`);
+  if (!data || data.length !== 1) throw new Error('the bill is not in the books');
+  if (data[0].invoice_attachment) throw new Error(`it stored ${data[0].invoice_attachment}`);
+});
+
+await check('the rows the site form wrote are taken out of the sheet again', async () => {
+  if (sheetEntryIds.length === 0) throw new Error('nothing was written');
 
   const client = googleSheetsClient();
   const sheet = await client.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties' });
   const tab = (sheet.data.sheets || []).map((s) => s.properties).find((p) => p.title === SHEET_TAB);
 
-  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: 'A:V' });
-  const at = rows.findIndex((row) => (row || []).includes(sheetEntryId));
-  if (at === -1) throw new Error('the row is not in the sheet any more');
+  for (const entryId of sheetEntryIds) {
+    const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: SHEET_RANGE });
+    const at = rows.findIndex((row) => (row || []).includes(entryId));
+    if (at === -1) throw new Error('the row is not in the sheet any more');
 
-  await client.spreadsheets.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: {
-      requests: [
-        { deleteDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: at, endIndex: at + 1 } } },
-      ],
-    },
-  });
+    await client.spreadsheets.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      requestBody: {
+        requests: [
+          { deleteDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: at, endIndex: at + 1 } } },
+        ],
+      },
+    });
 
-  const after = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: 'A:V' });
-  if (after.some((row) => (row || []).includes(sheetEntryId))) {
-    throw new Error('the row is still in the sheet');
+    await sb.from('expenses').delete().eq('source_key', `id:${entryId.toLowerCase()}`);
   }
 
-  await sb.from('expenses').delete().eq('source_key', `id:${sheetEntryId.toLowerCase()}`);
+  const after = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: SHEET_RANGE });
+  for (const entryId of sheetEntryIds) {
+    if (after.some((row) => (row || []).includes(entryId))) {
+      throw new Error('a row is still in the sheet');
+    }
+  }
 });
 
 console.log(`\n${passed} check(s) passed`);

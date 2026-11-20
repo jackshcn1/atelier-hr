@@ -540,7 +540,6 @@ export async function POST(req) {
  *   GOOGLE_PRIVATE_KEY_PATH        its key (a file on a local machine)
  *   INVOICE_SHEET_SPREADSHEET_ID   the sheet — or GOOGLE_SHEETS_SPREADSHEET_ID
  *   INVOICE_SHEET_NAME             the tab — default 'Invoices'
- *   INVOICE_SHEET_RANGE            the columns — default 'A:K'
  */
 async function pullInvoiceSheet(push, started) {
   // Not configured is not a failure. The nightly run has to keep working
@@ -560,7 +559,10 @@ async function pullInvoiceSheet(push, started) {
   const spreadsheetId =
     process.env.INVOICE_SHEET_SPREADSHEET_ID || process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   const sheetName = process.env.INVOICE_SHEET_NAME || 'Invoices';
-  const range = process.env.INVOICE_SHEET_RANGE || 'A:K';
+  // The whole tab, not a slice of it. The columns are found **by heading**, so
+  // a range that stopped one column short would lose that column quietly —
+  // and a column that is lost is a bill that is lost.
+  const range = 'A:AZ';
 
   if (!spreadsheetId) {
     push('📄 The invoice sheet has no spreadsheet id — nothing was pulled.');

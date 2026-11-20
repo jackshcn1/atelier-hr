@@ -108,6 +108,7 @@ const HEADINGS = [
   'Supplier',
   'Entry ID',
   'Invoice Number',
+  'Description',
 ];
 
 // The real rows, as they were on the sheet.
@@ -229,6 +230,20 @@ check('the supplier is the column the accountant fills in', () => {
     ['11/18/2026 10:32:02', 'a@b.com', 'Variable Cost', 'Gas', '6400', '5/23/2026', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Indrapastha Gas', '', ''],
   ]);
   assert(parsed.entries[0].vendor === 'Indrapastha Gas', `the supplier is ${parsed.entries[0].vendor}`);
+});
+
+check('the description of the row is kept', () => {
+  const parsed = parseInvoiceSheet([
+    HEADINGS,
+    ['11/18/2026 10:32:02', 'a@b.com', 'Variable Cost', 'Gas', '6400', '5/23/2026', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Indrapastha Gas', 'AT-1', 'GAS-991', 'Gas for the kitchen'],
+  ]);
+  assert(parsed.entries[0].description === 'Gas for the kitchen', `the description is ${parsed.entries[0].description}`);
+});
+
+check('a row with no description still says something', () => {
+  const parsed = parseInvoiceSheet(sheet);
+  const gas = parsed.entries.find((e) => e.costTypeName === 'Gas');
+  assert(gas.description === 'From the accountant invoice sheet', `the description is ${gas.description}`);
 });
 
 check('without a supplier the cost type stands in, so the bill is not nameless', () => {

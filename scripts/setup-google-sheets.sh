@@ -104,12 +104,14 @@ for target in production development; do
 done
 
 # Which sheet to read, and which tab of it.
+#
+# The columns are not set here on purpose: they are found **by heading**, so
+# the whole tab is read. A range that stopped one column short would lose
+# that column quietly.
 printf '%s' "${INVOICE_SHEET_SPREADSHEET_ID:-1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig}" \
   | vercel env add INVOICE_SHEET_SPREADSHEET_ID production --force --yes
 printf '%s' "${INVOICE_SHEET_NAME:-Form Responses 1}" \
   | vercel env add INVOICE_SHEET_NAME production --force --yes
-printf '%s' "${INVOICE_SHEET_RANGE:-A:V}" \
-  | vercel env add INVOICE_SHEET_RANGE production --force --yes
 
 rm -f /tmp/.atelier-google-key.pem
 

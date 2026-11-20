@@ -27,7 +27,7 @@ for (const line of readFileSync(new URL('../.env.local', import.meta.url), 'utf8
 const spreadsheetId =
   process.env.INVOICE_SHEET_SPREADSHEET_ID || '1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig';
 const sheetName = process.env.INVOICE_SHEET_NAME || 'Form Responses 1';
-const range = process.env.INVOICE_SHEET_RANGE || 'A:V';
+const range = 'A:AZ';
 
 async function main() {
   console.log(`Reading ${spreadsheetId} / ${sheetName} (${range})...`);

@@ -102,8 +102,9 @@ Because a fixed line on the sheet replaces the expected amount rather than
 adding to it, the outlet rent appears **once** — as the invoice, not as the
 invoice plus the standing-cost expectation.
 
-The manual expense entry form (`/finance/invoice-entry/bill`) stays as the fallback
-path and produces identical rows, de-duplicated by invoice number.
+The site's bill form (`/finance/invoice-entry`) is the way a bill is entered: it
+writes into the accountant's sheet and the sheet is pulled into the books, so
+the standing cost is ticked off by the same rule as a bill typed in the Form.
 
 ## The figures as they stand (17 Nov 2026)
 

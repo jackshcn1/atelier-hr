@@ -1,6 +1,6 @@
 import { getSupabase, readAllRows } from '../../../../lib/supabaseServer.js';
 import { financePeriod } from '../../../../lib/financePeriod.js';
-import { cleanExpense, cleanExpensePatch, normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js';
+import { cleanExpensePatch, normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js';
 
 // The expenses are the bills — what the restaurant has bought and what it
 // still owes for it.
@@ -18,8 +18,9 @@ import { cleanExpense, cleanExpensePatch, normalizePaymentStatus, PAID } from '.
 //   /api/finance/expenses?month=2026-11
 //       only the bills of one calendar month
 //
-// The write side goes through cleanExpense(), so a field the table does not
-// have can never break the insert again.
+// The write side goes through cleanExpensePatch(), so a field the table does
+// not have can never break the update, and a request that says "mark this
+// bill paid" does not quietly reset anything else.
 export async function GET(request) {
   try {
     const supabase = getSupabase();
@@ -182,28 +183,24 @@ function billTotals(rows) {
   };
 }
 
+/**
+ * There is no way to write a bill straight into the books.
+ *
+ * A bill is written into the accountant's sheet and pulled in from there —
+ * `POST /api/finance/expenses/sheet` — so the sheet is the record and there
+ * is one way into the books. This endpoint reads the bills and can mark one
+ * paid; it cannot create one.
+ */
 export async function POST(request) {
-  try {
-    const supabase = getSupabase();
-    const body = await request.json();
-    const row = cleanExpense(body);
-    // A bill typed in by a person is not the sheet's, so the sheet leaves it
-    // alone — the two are counted once, and the bill in the ledger is the
-    // record.
-    row.source = 'manual';
-
-    if (!row.amount) {
-      return Response.json({ success: false, error: 'An amount is needed.' }, { status: 400 });
-    }
-
-    const { data, error } = await supabase.from('expenses').insert([row]).select();
-
-    if (error) throw error;
-
-    return Response.json({ success: true, data: data[0] });
-  } catch (error) {
-    return Response.json({ success: false, error: error.message }, { status: 500 });
-  }
+  return Response.json(
+    {
+      success: false,
+      error:
+        'Bills are entered on the Invoice Entry page, which writes them into the ' +
+        'accountant’s sheet. This endpoint only reads bills.',
+    },
+    { status: 405 },
+  );
 }
 
 export async function PATCH(request) {
