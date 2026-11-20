@@ -61,7 +61,7 @@ uploaded through the site uses — so **See the invoice** works on the bills pag
 for a bill that came in through the Form. The bank reference stays the invoice
 number, so the two are never mixed up.
 
-### The four columns this system adds
+### The six columns this system adds
 
 | | Column | What it holds |
 |---|---|---|
@@ -69,8 +69,19 @@ number, so the two are never mixed up.
 | U | Entry ID | the row's own identity, written by the site's form. A Form row has none, so the Timestamp stands in. |
 | V | Invoice Number | the invoice number, when there is one. |
 | W | Description | a line of what the bill was for. Written by the site's form; a Form row has none and falls back to "From the accountant invoice sheet". |
+| X | Payment Mode | how it was paid — UPI, cash, a transfer. Written by the site's form. |
+| Y | Bank Reference | the bank's own reference for the payment — the UTR. Written by the site's form. |
 
 `scripts/setup-invoice-sheet.mjs` adds these columns to the tab.
+
+**The payment facts are what a bill paid before it was entered needed.** A
+bill transferred on the 18th and typed in on the 20th used to carry no trace
+of the payment beyond the date. The mode and the UTR travel through the sheet
+into `expenses.payment_mode` and `expenses.bank_reference`, and the Bills page
+says *"Paid by UPI · UTR-44921"*. When there is no UTR, the **invoice number
+stands in** for it, so the column is never empty and the two are never mixed
+up. A **petty** entry carries neither — cash out of a drawer has no bank
+reference.
 
 **The columns are found by NAME, not by position.** The Form may add a
 question, the accountant may add a column, and the columns may be moved. The
@@ -224,6 +235,8 @@ Form and **0** through the site's own forms. One form is now the whole of it.
   suppliers that match come up; a name that is not on the list can be added
   there and then, and it is on the list for next time
 - the amount, the invoice date, the invoice number, the paid-on date
+- **how it was paid** and **the bank's reference for it** — the two facts a
+  bill that was paid before it was entered needed
 - **the invoice itself** can be attached — the link goes into the sheet's own
   attachment column for that block (G for variable, L for fixed) and the pull
   carries it into the books, so *See the invoice* works on the bills page

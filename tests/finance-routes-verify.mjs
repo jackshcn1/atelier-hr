@@ -913,6 +913,8 @@ await check('an entry from the site form goes into the sheet and the books', asy
     invoiceNo: 'SITE-FORM-CHECK-1',
     description: 'Written by the site form test',
     attachment: 'https://drive.google.com/file/d/site-form-check/view',
+    paymentMode: 'UPI',
+    bankReference: 'UTR-SITE-CHECK-1',
   });
   const body = await res.json();
   if (!body.success) throw new Error(body.error);
@@ -929,7 +931,7 @@ await check('an entry from the site form goes into the sheet and the books', asy
   // And in the books.
   const { data } = await sb
     .from('expenses')
-    .select('vendor_name, category, amount, invoice_date, payment_status, cost_type, invoice_attachment, description')
+    .select('vendor_name, category, amount, invoice_date, payment_status, cost_type, invoice_attachment, description, payment_mode, bank_reference')
     .eq('source_key', `id:${entryId.toLowerCase()}`);
   if (!data || data.length !== 1) throw new Error(`the bill is not in the books (${data?.length} found)`);
 
@@ -944,6 +946,8 @@ await check('an entry from the site form goes into the sheet and the books', asy
     throw new Error(`the invoice link is ${row.invoice_attachment}`);
   }
   if (row.description !== 'Written by the site form test') throw new Error(`the description is ${row.description}`);
+  if (row.payment_mode !== 'UPI') throw new Error(`the payment mode is ${row.payment_mode}`);
+  if (row.bank_reference !== 'UTR-SITE-CHECK-1') throw new Error(`the bank reference is ${row.bank_reference}`);
 });
 
 await check('the same bill cannot be entered twice', async () => {

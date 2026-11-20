@@ -109,6 +109,8 @@ const HEADINGS = [
   'Entry ID',
   'Invoice Number',
   'Description',
+  'Payment Mode',
+  'Bank Reference',
 ];
 
 // The real rows, as they were on the sheet.
@@ -244,6 +246,23 @@ check('a row with no description still says something', () => {
   const parsed = parseInvoiceSheet(sheet);
   const gas = parsed.entries.find((e) => e.costTypeName === 'Gas');
   assert(gas.description === 'From the accountant invoice sheet', `the description is ${gas.description}`);
+});
+
+check('how the bill was paid is read, and the bank reference with it', () => {
+  const parsed = parseInvoiceSheet([
+    HEADINGS,
+    ['11/18/2026 10:32:02', 'a@b.com', 'Variable Cost', 'Gas', '6400', '5/23/2026', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Indrapastha Gas', 'AT-1', 'GAS-991', 'Gas for the kitchen', 'UPI', 'UTR-44921'],
+  ]);
+  const entry = parsed.entries[0];
+  assert(entry.paymentMethod === 'UPI', `the payment mode is ${entry.paymentMethod}`);
+  assert(entry.bankReference === 'UTR-44921', `the bank reference is ${entry.bankReference}`);
+});
+
+check('a row that says nothing about the payment has neither', () => {
+  const parsed = parseInvoiceSheet(sheet);
+  const gas = parsed.entries.find((e) => e.costTypeName === 'Gas');
+  assert(gas.paymentMethod === '', `the payment mode is ${gas.paymentMethod}`);
+  assert(gas.bankReference === '', `the bank reference is ${gas.bankReference}`);
 });
 
 check('without a supplier the cost type stands in, so the bill is not nameless', () => {

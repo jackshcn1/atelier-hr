@@ -357,6 +357,17 @@ export default function BillsPage() {
                                   {bill.description && (
                                     <span className="block text-xs text-[#6b635c]">{bill.description}</span>
                                   )}
+                                  {/* How it was paid, and the bank's reference for it —
+                                      the two facts that tell a payment apart from
+                                      another payment of the same amount. */}
+                                  {(bill.payment_mode || bill.bank_reference) && (
+                                    <span className="block text-xs text-[#6b635c]">
+                                      {bill.payment_mode ? `Paid by ${bill.payment_mode}` : 'Paid'}
+                                      {bill.bank_reference && bill.bank_reference !== bill.invoice_number
+                                        ? ` · ${bill.bank_reference}`
+                                        : ''}
+                                    </span>
+                                  )}
                                   {bill.invoice_attachment && isDriveLink(bill.invoice_attachment) && (
                                     <>
                                       {/* The site serves the file, so it opens for

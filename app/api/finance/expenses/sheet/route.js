@@ -75,6 +75,10 @@ function entryId() {
         : 'Invoice Upload (if available) (Fixed Cost)']: body.attachment || '',
       // What the bill was for, in a line of its own.
       Description: body.description || '',
+      // How it was paid, and the bank's reference for it. A bill that was
+      // paid before it was entered keeps both.
+      'Payment Mode': body.paymentMode || '',
+      'Bank Reference': body.bankReference || '',
     };
   }
 
@@ -209,6 +213,9 @@ export async function POST(request) {
       paidOn,
       invoiceNo: String(body.invoiceNo || '').trim(),
       description: String(body.description || '').trim(),
+      // How the bill was paid, and the bank's reference for it.
+      paymentMode: String(body.paymentMode || '').trim(),
+      bankReference: String(body.bankReference || '').trim(),
       // The link to the invoice itself. It is only ever a link, and only ever
       // an https one — anything else is dropped rather than written down.
       attachment: cleanAttachment(body.attachment) || '',

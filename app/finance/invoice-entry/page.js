@@ -31,6 +31,10 @@ const VARIABLE_CATEGORIES = [
   'Other',
 ];
 
+// How a bill can be paid. Typing is allowed as well — the list is what is
+// used most, not a closed set.
+const PAYMENT_MODES = ['UPI', 'NEFT', 'RTGS', 'Cash', 'Credit Card', 'Cheque'];
+
 const BLANK = {
   type: 'variable',
   costType: '',
@@ -39,6 +43,8 @@ const BLANK = {
   invoiceDate: '',
   invoiceNo: '',
   paidOn: '',
+  paymentMode: '',
+  bankReference: '',
   description: '',
 };
 
@@ -322,7 +328,51 @@ export default function InvoiceEntryPage() {
                     onChange={(e) => set('paidOn', e.target.value)}
                     className={inputClass}
                   />
-                  <p className="text-xs text-[#6b635c] mt-1.5">Leave it empty if it has not been paid.</p>
+                  <p className="text-xs text-[#6b635c] mt-1.5">
+                    Leave it empty if it has not been paid. If it was paid before it was
+                    entered, put the date the money went out here.
+                  </p>
+                </div>
+              </div>
+
+              {/* ---- how it was paid ----------------------------------------- */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="field">
+                  <label className="field-label block text-sm font-medium mb-2">Paid by</label>
+                  <input
+                    type="text"
+                    name="paymentMode"
+                    list="payment-modes"
+                    value={form.paymentMode}
+                    onChange={(e) => set('paymentMode', e.target.value)}
+                    placeholder="UPI"
+                    className={inputClass}
+                  />
+                  <datalist id="payment-modes">
+                    {PAYMENT_MODES.map((mode) => (
+                      <option key={mode} value={mode} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-[#6b635c] mt-1.5">
+                    How it was paid — UPI, cash, a bank transfer. Pick one of the usual
+                    ones or type your own.
+                  </p>
+                </div>
+
+                <div className="field">
+                  <label className="field-label block text-sm font-medium mb-2">Bank reference (UTR)</label>
+                  <input
+                    type="text"
+                    name="bankReference"
+                    value={form.bankReference}
+                    onChange={(e) => set('bankReference', e.target.value)}
+                    placeholder="UTR / reference number"
+                    className={inputClass}
+                  />
+                  <p className="text-xs text-[#6b635c] mt-1.5">
+                    The number the bank gave the payment. It is what tells this payment
+                    apart from the other payments of the same amount.
+                  </p>
                 </div>
               </div>
 
