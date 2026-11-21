@@ -36,6 +36,7 @@ const indexes = new Set((await sql(`select indexname as i from pg_indexes where 
 const policies = new Set((await sql(`select policyname as p from pg_policies where schemaname='public'`)).map((r) => r.p));
 const triggers = new Set((await sql(`select trigger_name as t from information_schema.triggers where trigger_schema='public'`)).map((r) => r.t));
 const functions = new Set((await sql(`select proname as f from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'`)).map((r) => r.f));
+const constraints = new Set((await sql(`select conname as c from pg_constraint c join pg_namespace n on n.oid=c.connamespace where n.nspname='public'`)).map((r) => r.c));
 const rlsEnabled = new Set((await sql(`select c.relname as t from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relrowsecurity`)).map((r) => r.t));
 const ledger = new Set((await sql(`select version as v from supabase_migrations.schema_migrations`)).map((r) => r.v));
 
@@ -64,9 +65,33 @@ for (const version of uniq) {
     checks.push({ kind: 'table', name: t, exists: tables.has(t) });
   }
   // ALTER TABLE x ADD [COLUMN] [IF NOT EXISTS] col
+  //
+  // `ADD CONSTRAINT name` is a **constraint**, not a column — and the two are
+  // read from different places in the catalogue. Reading a constraint as a
+  // column made a migration that was applied report itself as PARTIAL, with
+  // a "missing column" that never existed. The constraint is looked up on its
+  // own, and the column pattern no longer matches it.
   for (const m of sqlText.matchAll(/alter\s+table\s+(?:if\s+exists\s+)?([a-zA-Z_][\w.]*)\s+add\s+(?:column\s+)?(?:if\s+not\s+exists\s+)?([a-zA-Z_]\w*)/gi)) {
     const t = clean(m[1]); const c = clean(m[2]);
+    if (/^constraint$/i.test(c)) continue;
     checks.push({ kind: 'column', name: `${t}.${c}`, exists: columns.has(`${t}.${c}`) });
+  }
+  // ALTER TABLE x ADD CONSTRAINT name
+  const addedConstraints = new Set();
+  for (const m of sqlText.matchAll(/alter\s+table\s+(?:if\s+exists\s+)?([a-zA-Z_][\w.]*)\s+add\s+constraint\s+([a-zA-Z_]\w*)/gi)) {
+    const c = clean(m[2]);
+    addedConstraints.add(c);
+    checks.push({ kind: 'constraint', name: c, exists: constraints.has(c) });
+  }
+  // ALTER TABLE x DROP CONSTRAINT name — the constraint must be gone.
+  //
+  // A constraint that is dropped and then added back in the same file is a
+  // **replacement**, not a removal: the name is taken by the new one, so the
+  // drop is checked as the add that follows it.
+  for (const m of sqlText.matchAll(/alter\s+table\s+(?:if\s+exists\s+)?([a-zA-Z_][\w.]*)\s+drop\s+constraint\s+(?:if\s+exists\s+)?([a-zA-Z_]\w*)/gi)) {
+    const c = clean(m[2]);
+    if (addedConstraints.has(c)) continue;
+    checks.push({ kind: 'dropped constraint', name: c, exists: !constraints.has(c) });
   }
   // CREATE INDEX name ON table
   for (const m of sqlText.matchAll(/create\s+(?:unique\s+)?index\s+(?:if\s+not\s+exists\s+)?([a-zA-Z_]\w*)\s+on\s+([a-zA-Z_][\w.]*)/gi)) {

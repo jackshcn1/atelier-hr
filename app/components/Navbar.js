@@ -96,6 +96,9 @@ function isLinkActive(pathname, href) {
   if (pathOnly === '/tasks') return pathname === '/tasks';
   if (pathOnly === '/checklists') return pathname === '/checklists';
   if (pathOnly === '/documents') return pathname === '/documents';
+  // The Customer section has two pages of its own, so "Overview" must not
+  // stay lit while the list is open.
+  if (pathOnly === '/customers') return pathname === '/customers';
   return pathname === pathOnly || pathname?.startsWith(`${pathOnly}/`);
 }
 
@@ -194,6 +197,7 @@ export default function Navbar() {
   const currentModule = pathname.startsWith('/operations') ? 'operations' :
                         pathname.startsWith('/sales') ? 'sales' :
                         pathname.startsWith('/marketing') ? 'marketing' :
+                        pathname.startsWith('/customers') ? 'customers' :
                         pathname.startsWith('/finance') ? 'finance' : 'hrms';
 
   // Define module-specific navigations
@@ -243,6 +247,14 @@ export default function Navbar() {
       ],
       employee: [
         { label: 'Finance', links: [{ href: '/finance', label: 'Overview' }] },
+      ]
+    },
+    customers: {
+      admin: [
+        { label: 'Customers', links: [{ href: '/customers', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }] },
+      ],
+      employee: [
+        { label: 'Customers', links: [{ href: '/customers', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }] },
       ]
     }
   };
