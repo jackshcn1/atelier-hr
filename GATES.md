@@ -114,5 +114,8 @@ CHECK: `select to_char(review_date, 'YYYY-MM'), platform, count(*) from customer
 EXPECT: one row per month per platform, and each month's number must equal
 what Petpooja's own count endpoint says for that month. The history starts at
 **March 2026** — every month before it answers zero — and runs to the last day
-the books are up to. A month that comes up short is **failed, not written**,
-because a window that crosses a calendar month comes back short silently.
+the books are up to. A walk must stay inside one calendar month and must not
+reach today, because a window that crosses a month boundary comes back short
+silently, and one that reaches today comes back with the same review served
+twice. A month that comes up short is walked a day at a time; a walk that is
+still short is **failed, not written**.

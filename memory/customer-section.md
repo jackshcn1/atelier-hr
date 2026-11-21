@@ -200,7 +200,7 @@ the only thing that says whether a pull was complete, exactly as
 
 Each window was walked **three times** and compared with the count endpoint.
 
-**The rule is not "a month". The rule is: never cross a calendar month.**
+**The rule is not "a month". The rule is: never cross a calendar month, and never reach today.**
 
 | Window | Zomato count | Walks | Verdict |
 |---|---|---|---|
@@ -210,12 +210,12 @@ Each window was walked **three times** and compared with the count endpoint.
 | 1 month (April) | 117 | 117/117/117 | complete |
 | 1 month (May) | 131 | 131/131/131 | complete |
 | 1 month (August) | 157 | 157/157/157 | complete |
+| 1–20 November | 57 | **57 rows, 57 distinct** | complete |
+| 1–21 November (today) | 58 | **58 rows, 45 distinct** | **short** — thirteen rows are the same review twice |
 | 22 Aug → 4 Sep | 61 | 50/41/51 | **short** — crosses a month |
 | 25 Sep → 4 Oct | 34 | 34/20/24 | **short** — crosses a month |
 | 20 Oct → 2 Nov | 38 | 20/38/36 | **short** — crosses a month |
-| 1 Nov → 21 Nov | 58 | 41/38/47 | **short** — the month is still open |
 | 90 days | 281 | 203/210/189 | **short** |
-| 2 months | 248 | 196/188/186 | **short** |
 | 3 months | 366 | 252/258/238 | **short** |
 | 6 months | 690 | 468/529/498 | **short** |
 
@@ -224,24 +224,27 @@ month of the same size is complete (1–14 Sep = 36/36/36, 1–21 Oct = 66/66/66
 And splitting a boundary-crossing span into two inside-month halves recovers
 it **exactly**: 22 Aug → 4 Sep is 61, and 22–31 Aug (45) + 1–4 Sep (16) is 61.
 
-**A whole month that is over is walked in one go.** Every month from March 2026
-to October 2026 was walked three times and came back complete and identical,
-both platforms — and the set of rows is the same set the day-at-a-time walk
-returns.
+**A window that reaches today is short.** 1–21 November returns 58 rows but
+only 45 distinct reviews — the same review served on two pages, because the
+set under the endpoint is still moving while it is being paged. 1–20 November
+returns 57 rows and 57 distinct reviews. So **the pull ends yesterday**, and a
+day's reviews land the next morning.
 
-**Anything else is walked a day at a time.** The part of a month at either end
-of a window, and the month still being written, are both cut this way: a day
-is one page of rows, so the shifting order cannot bite, and every day measured
-walked completely.
+**A closed month is walked in one go.** Every month from March 2026 was walked
+three times and came back complete and identical, both platforms — and the
+set of rows is the same set a day-at-a-time walk returns.
 
-So `ratingChunks()` cuts a window into calendar months and then chooses:
-**a whole month that is over → one walk; anything else → a day at a time.**
-Each walk's rows are counted and compared against the count endpoint before
-they are written, and a walk that comes up short is **failed**, not written.
+So `ratingChunks()` cuts a window into calendar months and each month is
+walked in one go. If a month comes up short, it is walked **a day at a time**
+instead — a day is one page, so the shifting order cannot bite — and only if
+that is short too is the pull failed. Every walk's rows are counted and
+compared against the count endpoint before they are written.
 
-The page dump shows why a long walk fails — the endpoint's own ordering is
-scrambled within it: page 7 of the 90-day walk ran *backwards*
-(2026-11-13 → 2026-08-25) and page 15 repeated page 1 exactly.
+**What this bought:** the history pull went from **nine minutes** (day at a
+time, every day of every month) to **two minutes twenty** (a month at a time),
+with every month's number equal to Petpooja's own count. The nightly pull is
+two minutes. Both fit inside the 300 seconds a serverless function is given —
+the day-at-a-time version did not.
 
 ### The reviews only go back to March 2026 — but Petpooja says so
 
@@ -375,13 +378,17 @@ hiding it.
 | Group | What | Window | When |
 |---|---|---|---|
 | 11 `customer_orders` | the orders | the last **90 days**, a month at a time | every night |
-| 12 `customer_ratings` | the platform reviews | the last **90 days** | every night |
+| 12 `customer_ratings` | the platform reviews | the last **90 days, ending yesterday** | every night |
 | 13 `customer_orders_history` | the orders | the **285 days before** that | once a week |
 | 14 `customer_ratings_history` | the platform reviews | **1 Mar 2026** → the day before the recent window | once a week |
 
 11 and 12 run every night; 13 and 14 run once a week, because the older history
 does not change with the day. Together they cover about a year of orders and
 **every review Petpooja holds**.
+
+**The reviews' window ends the day before the books are up to.** A range that
+reaches today cannot be walked cleanly (see the measurement above), so a day's
+reviews land the next morning — the same promise the orders make.
 
 **The writes are upserts**, never replacements: an order keeps its order
 number **and the day it was placed**, a review keeps its platform + order id +

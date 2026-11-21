@@ -40,7 +40,7 @@ import {
   dayChunks,
   ratingChunks,
   ratingsHistoryWindow,
-  isWholeCalendarMonth,
+  ratingsWindowFor,
   reviewLinkStatement,
 } from '../lib/customerSync.js';
 
@@ -712,58 +712,44 @@ await check('the two order reports cover the year between them', () => {
 });
 
 await check('the older reviews reach back to the first day Petpooja holds one', () => {
-  const recent = customerWindowFor('customer_orders', '2026-11-20');
-  const history = ratingsHistoryWindow('2026-11-20');
+  const recent = ratingsWindowFor('2026-11-21');
+  const history = ratingsHistoryWindow('2026-11-21');
   // March 2026 is where the reviews start: the count endpoint answers zero
   // for every day before it.
   assert.equal(history.from, '2026-03-01');
   // It ends the day before the recent window begins, so no review is pulled
   // twice and none is missed between the two.
-  assert.equal(history.to, '2026-08-21');
+  assert.equal(history.to, '2026-08-22');
   assert.equal(history.to < recent.from, true);
   assert.equal(history.to !== recent.from, true);
+});
+
+await check('the review window ends the day before today', () => {
+  // Measured on 21 Nov 2026: a range that reaches today comes back with the
+  // same review served twice (58 rows, 45 distinct), while a range that ends
+  // yesterday is complete (57 rows, 57 distinct).
+  const window = ratingsWindowFor('2026-11-21');
+  assert.equal(window.to, '2026-11-20');
+  assert.equal(window.from, '2026-08-23');
+  assert.equal(window.to < '2026-11-21', true);
 });
 
 await check('a review walk never crosses a calendar month', () => {
   // The endpoint's page order shifts between calls, so a window that crosses
   // a month boundary comes back short — and it comes back short silently.
   // Measured: a window counting 61 reviews returned 50, 41 and 51 of them.
-  const chunks = ratingChunks('2026-08-23', '2026-11-21', '2026-11-21');
+  const chunks = ratingChunks('2026-08-23', '2026-11-20');
   assert.equal(chunks.length, 4);
   for (const chunk of chunks) {
-    const from = chunk.from.slice(0, 7);
-    const to = chunk.to.slice(0, 7);
-    assert.equal(from, to);
+    assert.equal(chunk.from.slice(0, 7), chunk.to.slice(0, 7));
   }
 });
 
-await check('a whole month that is over is walked in one go', () => {
-  const chunks = ratingChunks('2026-03-01', '2026-11-21', '2026-11-21');
-  // March to October are whole months that are over.
-  const whole = chunks.filter((chunk) => chunk.mode === 'month');
-  assert.equal(whole.length, 8);
-  assert.deepEqual(whole[0], { from: '2026-03-01', to: '2026-03-31', mode: 'month' });
-  assert.deepEqual(whole[7], { from: '2026-10-01', to: '2026-10-31', mode: 'month' });
-  // November is the month being written now, so it is walked a day at a time.
-  assert.deepEqual(chunks[8], { from: '2026-11-01', to: '2026-11-21', mode: 'days' });
-});
-
-await check('a part of a month is walked a day at a time', () => {
-  // The first and the last month of a window are cut short, and a cut-short
-  // month is not walked in one go — the day-at-a-time walk is the one
-  // measured complete everywhere.
-  const chunks = ratingChunks('2026-08-23', '2026-11-21', '2026-11-21');
-  assert.deepEqual(chunks[0], { from: '2026-08-23', to: '2026-08-31', mode: 'days' });
-  assert.deepEqual(chunks[3], { from: '2026-11-01', to: '2026-11-21', mode: 'days' });
-});
-
-await check('a month is only whole when it runs from its first day to its last', () => {
-  assert.equal(isWholeCalendarMonth('2026-03-01', '2026-03-31'), true);
-  assert.equal(isWholeCalendarMonth('2026-03-01', '2026-03-30'), false);
-  assert.equal(isWholeCalendarMonth('2026-03-02', '2026-03-31'), false);
-  // February in a leap year, and in a common one.
-  assert.equal(isWholeCalendarMonth('2028-02-01', '2028-02-29'), true);
-  assert.equal(isWholeCalendarMonth('2026-02-01', '2026-02-28'), true);
+await check('a review window is cut into calendar months', () => {
+  const chunks = ratingChunks('2026-03-01', '2026-08-22');
+  assert.equal(chunks.length, 6);
+  assert.deepEqual(chunks[0], { from: '2026-03-01', to: '2026-03-31' });
+  assert.deepEqual(chunks[5], { from: '2026-08-01', to: '2026-08-22' });
 });
 
 await check('the link is written as a list of tuples', () => {

@@ -35,6 +35,7 @@ import {
   parseRatingsExport,
   customerWindowFor,
   ratingsHistoryWindow,
+  ratingsWindowFor,
 } from '../lib/customerSync.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
@@ -3125,7 +3126,7 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
       if (!reportEnabled(ratingsReport)) continue;
 
       const ratingsWindow = ratingsReport === 'customer_ratings'
-        ? customerWindowFor('customer_orders', customerTo)
+        ? ratingsWindowFor(customerTo)
         : ratingsHistoryWindow(customerTo);
 
       // Nothing older than the first day Petpooja holds.
