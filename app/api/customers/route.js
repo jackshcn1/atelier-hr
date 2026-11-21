@@ -55,6 +55,8 @@ export async function GET(request) {
 
     if (view === 'detail') return await detail(supabase, params.get('phone'));
     if (view === 'list') return await list(supabase, params);
+    if (view === 'reviews') return await reviewsView(supabase, params);
+    if (view === 'feedback') return await feedbackView(supabase);
     return await overview(supabase);
   } catch (error) {
     return NextResponse.json(
@@ -62,6 +64,168 @@ export async function GET(request) {
       { status: 500 },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Two pictures, worked out once and used in more than one place
+// ---------------------------------------------------------------------------
+
+/**
+ * What the reviews say, in numbers.
+ *
+ * Shared by the overview and the Reviews page, so both say the same thing.
+ *
+ * @param {Array<object>} reviews
+ * @returns {{avgRating: number|null, platforms: Array<object>, ratingTrend: Array<object>}}
+ */
+function buildReviewPicture(reviews) {
+  const rows = reviews || [];
+  const byPlatform = {};
+  for (const review of rows) {
+    const key = review.platform || 'unknown';
+    if (!byPlatform[key]) {
+      byPlatform[key] = { platform: key, count: 0, total: 0, linked: 0, latest: null, comments: [] };
+    }
+    const line = byPlatform[key];
+    line.count += 1;
+    line.total += Number(review.rating || 0);
+    if (review.is_linked) line.linked += 1;
+    if (!line.latest || (review.review_date && review.review_date > line.latest)) {
+      line.latest = review.review_date;
+    }
+    if (review.comment) {
+      line.comments.push({
+        date: review.review_date,
+        rating: Number(review.rating || 0),
+        comment: review.comment,
+      });
+    }
+  }
+
+  const platforms = Object.values(byPlatform)
+    .map((line) => ({
+      platform: line.platform,
+      count: line.count,
+      avgRating: line.count ? Math.round((line.total / line.count) * 100) / 100 : null,
+      linked: line.linked,
+      unlinked: line.count - line.linked,
+      latest: line.latest,
+      comments: line.comments.slice(-8).reverse(),
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const scored = rows.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n) && n > 0);
+  const avgRating = scored.length
+    ? Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100) / 100
+    : null;
+
+  // The rating each month, so a fall is visible as a fall.
+  const ratingByMonth = {};
+  for (const review of rows) {
+    if (!review.review_date) continue;
+    const key = review.review_date.slice(0, 7);
+    if (!ratingByMonth[key]) ratingByMonth[key] = { month: key, total: 0, count: 0 };
+    ratingByMonth[key].total += Number(review.rating || 0);
+    ratingByMonth[key].count += 1;
+  }
+  const ratingTrend = Object.values(ratingByMonth)
+    .map((line) => ({
+      month: line.month,
+      count: line.count,
+      avgRating: Math.round((line.total / line.count) * 100) / 100,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  return { avgRating, platforms, ratingTrend };
+}
+
+/**
+ * What the feedback form says, in numbers.
+ *
+ * Shared by the overview and the Feedback page, so both say the same thing.
+ *
+ * @param {Array<object>} feedback
+ * @returns {{questionAverages: Array<object>, topTags: Array<object>, wouldVisit: Array<object>,
+ *            waiters: Array<object>, linked: number, recent: Array<object>}}
+ */
+function buildFeedbackPicture(feedback) {
+  const rows = feedback || [];
+
+  const questionAverages = FEEDBACK_QUESTIONS.map((question) => {
+    const values = rows
+      .map((row) => Number(row[question.field]))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const average = values.length
+      ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100
+      : null;
+    return { field: question.field, heading: question.heading, count: values.length, average };
+  });
+
+  const tagCount = new Map();
+  for (const row of rows) {
+    for (const tag of row.improvement_tags || []) {
+      const key = String(tag).trim();
+      if (!key) continue;
+      tagCount.set(key, (tagCount.get(key) || 0) + 1);
+    }
+  }
+  const topTags = [...tagCount.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+    .slice(0, 12);
+
+  // The form's "Would you visit Atelier again?" is answered on the same scale
+  // as the rating questions — "Very Good", not "Yes" — so the answers are
+  // counted as they were written rather than forced into a yes and a no.
+  const wouldVisit = {};
+  for (const row of rows) {
+    const answer = String(row.would_visit_again || '').trim();
+    const key = answer || '(not answered)';
+    wouldVisit[key] = (wouldVisit[key] || 0) + 1;
+  }
+  const wouldVisitList = Object.entries(wouldVisit)
+    .map(([answer, count]) => ({ answer, count }))
+    .sort((a, b) => b.count - a.count || a.answer.localeCompare(b.answer));
+
+  const waiterRows = new Map();
+  for (const row of rows) {
+    const waiter = String(row.waiter || '').trim();
+    if (!waiter) continue;
+    if (!waiterRows.has(waiter)) waiterRows.set(waiter, { waiter, total: 0, count: 0, responses: 0 });
+    const line = waiterRows.get(waiter);
+    const overall = Number(row.overall);
+    if (Number.isFinite(overall) && overall > 0) {
+      line.total += overall;
+      line.count += 1;
+    }
+    line.responses += 1;
+  }
+  const waiters = [...waiterRows.values()]
+    .map((line) => ({
+      waiter: line.waiter,
+      responses: line.responses,
+      rated: line.count,
+      avgOverall: line.count ? Math.round((line.total / line.count) * 100) / 100 : null,
+    }))
+    .sort((a, b) => (b.avgOverall || 0) - (a.avgOverall || 0) || b.responses - a.responses);
+
+  const linked = rows.filter((row) => row.is_linked).length;
+
+  const recent = [...rows]
+    .sort((a, b) => String(b.response_date || '').localeCompare(String(a.response_date || '')))
+    .slice(0, 12)
+    .map((row) => ({
+      bill_number: row.bill_number,
+      response_date: row.response_date,
+      waiter: row.waiter,
+      overall: row.overall,
+      comment: row.comment,
+      improvement_tags: row.improvement_tags || [],
+      would_visit_again: row.would_visit_again,
+      is_linked: row.is_linked,
+    }));
+
+  return { questionAverages, topTags, wouldVisit: wouldVisitList, waiters, linked, recent };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,122 +314,10 @@ async function overview(supabase) {
   }));
 
   // ---- The reviews -------------------------------------------------------
-  const reviewByPlatform = {};
-  for (const review of reviews) {
-    const key = review.platform || 'unknown';
-    if (!reviewByPlatform[key]) {
-      reviewByPlatform[key] = { platform: key, count: 0, total: 0, linked: 0, latest: null, comments: [] };
-    }
-    const line = reviewByPlatform[key];
-    line.count += 1;
-    line.total += Number(review.rating || 0);
-    if (review.is_linked) line.linked += 1;
-    if (!line.latest || (review.review_date && review.review_date > line.latest)) {
-      line.latest = review.review_date;
-    }
-    if (review.comment) line.comments.push({ date: review.review_date, rating: Number(review.rating || 0), comment: review.comment });
-  }
-  const platforms = Object.values(reviewByPlatform).map((line) => ({
-    platform: line.platform,
-    count: line.count,
-    avgRating: line.count ? Math.round((line.total / line.count) * 100) / 100 : null,
-    linked: line.linked,
-    unlinked: line.count - line.linked,
-    latest: line.latest,
-    comments: line.comments.slice(-8).reverse(),
-  })).sort((a, b) => b.count - a.count);
-
-  const scored = reviews.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n) && n > 0);
-  const avgRating = scored.length
-    ? Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100) / 100
-    : null;
-
-  // The rating each month, so a fall is visible as a fall.
-  const ratingByMonth = {};
-  for (const review of reviews) {
-    if (!review.review_date) continue;
-    const key = review.review_date.slice(0, 7);
-    if (!ratingByMonth[key]) ratingByMonth[key] = { month: key, total: 0, count: 0 };
-    ratingByMonth[key].total += Number(review.rating || 0);
-    ratingByMonth[key].count += 1;
-  }
-  const ratingTrend = Object.values(ratingByMonth)
-    .map((line) => ({ month: line.month, count: line.count, avgRating: Math.round((line.total / line.count) * 100) / 100 }))
-    .sort((a, b) => a.month.localeCompare(b.month));
+  const reviewPicture = buildReviewPicture(reviews);
 
   // ---- The feedback form -------------------------------------------------
-  const questionAverages = FEEDBACK_QUESTIONS.map((question) => {
-    const values = feedback
-      .map((row) => Number(row[question.field]))
-      .filter((n) => Number.isFinite(n) && n > 0);
-    const average = values.length
-      ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100
-      : null;
-    return { field: question.field, heading: question.heading, count: values.length, average };
-  });
-
-  const tagCount = new Map();
-  for (const row of feedback) {
-    for (const tag of row.improvement_tags || []) {
-      const key = String(tag).trim();
-      if (!key) continue;
-      tagCount.set(key, (tagCount.get(key) || 0) + 1);
-    }
-  }
-  const topTags = [...tagCount.entries()]
-    .map(([tag, count]) => ({ tag, count }))
-    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
-    .slice(0, 12);
-
-  // The form's "Would you visit Atelier again?" is answered on the same scale
-  // as the rating questions — "Very Good", not "Yes" — so the answers are
-  // counted as they were written rather than forced into a yes and a no.
-  const wouldVisit = {};
-  for (const row of feedback) {
-    const answer = String(row.would_visit_again || '').trim();
-    const key = answer || '(not answered)';
-    wouldVisit[key] = (wouldVisit[key] || 0) + 1;
-  }
-  const wouldVisitList = Object.entries(wouldVisit)
-    .map(([answer, count]) => ({ answer, count }))
-    .sort((a, b) => b.count - a.count || a.answer.localeCompare(b.answer));
-
-  const waiterRows = new Map();
-  for (const row of feedback) {
-    const waiter = String(row.waiter || '').trim();
-    if (!waiter) continue;
-    if (!waiterRows.has(waiter)) waiterRows.set(waiter, { waiter, total: 0, count: 0, responses: 0 });
-    const line = waiterRows.get(waiter);
-    const overall = Number(row.overall);
-    if (Number.isFinite(overall) && overall > 0) {
-      line.total += overall;
-      line.count += 1;
-    }
-    line.responses += 1;
-  }
-  const waiters = [...waiterRows.values()]
-    .map((line) => ({
-      waiter: line.waiter,
-      responses: line.responses,
-      rated: line.count,
-      avgOverall: line.count ? Math.round((line.total / line.count) * 100) / 100 : null,
-    }))
-    .sort((a, b) => (b.avgOverall || 0) - (a.avgOverall || 0) || b.responses - a.responses);
-
-  const feedbackLinked = feedback.filter((row) => row.is_linked).length;
-  const recentFeedback = [...feedback]
-    .sort((a, b) => String(b.response_date || '').localeCompare(String(a.response_date || '')))
-    .slice(0, 12)
-    .map((row) => ({
-      bill_number: row.bill_number,
-      response_date: row.response_date,
-      waiter: row.waiter,
-      overall: row.overall,
-      comment: row.comment,
-      improvement_tags: row.improvement_tags || [],
-      would_visit_again: row.would_visit_again,
-      is_linked: row.is_linked,
-    }));
+  const feedbackPicture = buildFeedbackPicture(feedback);
 
   // ---- The channels ------------------------------------------------------
   const channelTotals = await selectRows(supabase, `
@@ -340,7 +392,9 @@ async function overview(supabase) {
       trend,
       reviews: {
         count: reviews.length,
-        avgRating,
+        avgRating: reviewPicture.avgRating,
+        platforms: reviewPicture.platforms,
+        ratingTrend: reviewPicture.ratingTrend,
         linked: reviews.filter((r) => r.is_linked).length,
         unlinked: reviews.filter((r) => !r.is_linked).length,
         // A review that reached a *person*. A platform order usually carries no
@@ -348,18 +402,16 @@ async function overview(supabase) {
         // Petpooja — so most reviews are counted, averaged and shown, but
         // cannot be attached to a customer. The page says so.
         reachedCustomer: reviews.filter((r) => r.phone).length,
-        platforms,
-        ratingTrend,
       },
       feedback: {
         responses: feedback.length,
-        linked: feedbackLinked,
-        unlinked: feedback.length - feedbackLinked,
-        questionAverages,
-        wouldVisit: wouldVisitList,
-        topTags,
-        waiters,
-        recent: recentFeedback,
+        linked: feedbackPicture.linked,
+        unlinked: feedback.length - feedbackPicture.linked,
+        questionAverages: feedbackPicture.questionAverages,
+        wouldVisit: feedbackPicture.wouldVisit,
+        topTags: feedbackPicture.topTags,
+        waiters: feedbackPicture.waiters,
+        recent: feedbackPicture.recent,
       },
       topCustomers: [...customers]
         .sort((a, b) => Number(b.total_spend || 0) - Number(a.total_spend || 0))
@@ -444,6 +496,102 @@ async function list(supabase, params) {
       feedback_count: customer.feedback_count || 0,
     })),
     total: rows.length,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The reviews, one by one
+// ---------------------------------------------------------------------------
+
+/**
+ * Every review, newest first.
+ *
+ * The platform filter is applied here rather than in the browser so the count
+ * on each platform chip always shows what is really there.
+ */
+async function reviewsView(supabase, params) {
+  const platform = params.get('platform') || '';
+
+  const reviews = await readAllRows((from, to) =>
+    supabase.from('customer_reviews').select('*').order('id').range(from, to),
+  );
+
+  const picture = buildReviewPicture(reviews);
+
+  const rows = [...reviews]
+    .filter((review) => !platform || (review.platform || '') === platform)
+    .sort((a, b) => String(b.review_date || '').localeCompare(String(a.review_date || '')))
+    .map((review) => ({
+      platform: review.platform,
+      rating: Number(review.rating || 0),
+      comment: review.comment,
+      review_date: review.review_date,
+      order_no: review.order_no,
+      is_linked: !!review.is_linked,
+      phone: review.phone || null,
+      maskedPhone: review.phone ? maskPhone(review.phone) : null,
+    }));
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      count: reviews.length,
+      avgRating: picture.avgRating,
+      platforms: picture.platforms,
+      ratingTrend: picture.ratingTrend,
+      linked: reviews.filter((r) => r.is_linked).length,
+      reachedCustomer: reviews.filter((r) => r.phone).length,
+      withComment: reviews.filter((r) => r.comment).length,
+      filter: platform,
+      rows,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The feedback form, response by response
+// ---------------------------------------------------------------------------
+
+/** Every response from the feedback form, newest first. */
+async function feedbackView(supabase) {
+  const feedback = await readAllRows((from, to) =>
+    supabase.from('customer_feedback').select('*').order('id').range(from, to),
+  );
+
+  const picture = buildFeedbackPicture(feedback);
+
+  const rows = [...feedback]
+    .sort((a, b) => String(b.response_date || '').localeCompare(String(a.response_date || '')))
+    .map((row) => ({
+      bill_number: row.bill_number,
+      response_date: row.response_date,
+      waiter: row.waiter,
+      overall: row.overall,
+      food_quality: row.food_quality,
+      taste: row.taste,
+      service: row.service,
+      hospitality: row.hospitality,
+      waiting_time: row.waiting_time,
+      would_visit_again: row.would_visit_again,
+      improvement_tags: row.improvement_tags || [],
+      comment: row.comment,
+      is_linked: !!row.is_linked,
+      phone: row.phone || null,
+      maskedPhone: row.phone ? maskPhone(row.phone) : null,
+    }));
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      responses: feedback.length,
+      linked: picture.linked,
+      unlinked: feedback.length - picture.linked,
+      questionAverages: picture.questionAverages,
+      topTags: picture.topTags,
+      wouldVisit: picture.wouldVisit,
+      waiters: picture.waiters,
+      rows,
+    },
   });
 }
 

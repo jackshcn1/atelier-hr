@@ -80,7 +80,7 @@ export default function CustomerDetailPage() {
           <Link href="/customers/list" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
             ← All customers
           </Link>
-          <span className="text-ink-muted text-sm">Module / Customers</span>
+          <span className="text-ink-muted text-sm">Customers / All Customers</span>
         </div>
 
         <div className="page-head">
@@ -91,9 +91,11 @@ export default function CustomerDetailPage() {
               {c.address ? ` · ${c.address}` : ''}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/customers" className="btn-secondary">Overview</Link>
+          <div className="flex gap-2 flex-wrap">
+            <Link href="/customers/overview" className="btn-secondary">Overview</Link>
             <Link href="/customers/list" className="btn-secondary">All customers</Link>
+            <Link href="/customers/reviews" className="btn-secondary">Reviews</Link>
+            <Link href="/customers/feedback" className="btn-secondary">Feedback</Link>
           </div>
         </div>
 

@@ -1,10 +1,10 @@
 ---
 name: customer-section
-description: "The Customer section — who a customer is (a real contact number), where the order value, reviews and feedback come from, and the two Petpooja export traps that break it."
+description: "The Customer section — who a customer is (a real contact number), the pages the module is made of, where the order value, reviews and feedback come from, and the two Petpooja export traps that break it."
 metadata:
   node_type: memory
   type: project
-  modified: 2026-11-20T14:20:00.000Z
+  modified: 2026-11-21T06:30:00.000Z
 ---
 
 # The Customer section
@@ -14,6 +14,38 @@ phone is the unique code** — there are no name-based customers and no
 address-based ones, so one person is never counted twice.
 
 That one rule decides every number on the page.
+
+## The module and its pages
+
+The Customer section is a **module like Finance and Operations**, so it opens
+the way they do: a landing page of cards, each one a job.
+
+| Page | What it is |
+|---|---|
+| `/customers` | the **landing page** — four cards, like `/finance` and `/operations` |
+| `/customers/overview` | the dashboard — value, the gap, month by month, top and at-risk customers |
+| `/customers/list` | every customer, searchable and sortable (numbers shown masked) |
+| `/customers/[phone]` | one customer: their orders, their reviews, their feedback |
+| `/customers/reviews` | every review, by platform, with the rating month by month |
+| `/customers/feedback` | every feedback form response, question by question |
+
+**The landing page holds no data of its own** — it is four links. Everything
+is read through `/api/customers`, which dispatches on `view`: `overview`,
+`list`, `detail`, `reviews`, `feedback`.
+
+The reviews and the feedback are worked out once, in `buildReviewPicture()` and
+`buildFeedbackPicture()`, and used by both the overview and their own pages —
+so the two can never disagree with each other.
+
+**The nav has four entries**, and `isLinkActive()` needs two special cases:
+`/customers` lights only on the landing page (it is a module landing, not an
+overview), and `/customers/list` also lights on a customer's own page
+(`/customers/7034308981`).
+
+**The card grid adapts to the number of cards**, as the house already does —
+Sales uses two columns for its two modules, Finance three for its six. Four
+Customers modules use `md:grid-cols-2`: four across was tried and the card
+subtitles wrapped at a 1280px viewport.
 
 ## The rule, and why it is a rule
 

@@ -96,9 +96,13 @@ function isLinkActive(pathname, href) {
   if (pathOnly === '/tasks') return pathname === '/tasks';
   if (pathOnly === '/checklists') return pathname === '/checklists';
   if (pathOnly === '/documents') return pathname === '/documents';
-  // The Customer section has two pages of its own, so "Overview" must not
-  // stay lit while the list is open.
+  // The Customer section is a module with a landing page of its own, so the
+  // landing must not stay lit while one of its sub-pages is open.
   if (pathOnly === '/customers') return pathname === '/customers';
+  // "All Customers" also stands for one customer's own page.
+  if (pathOnly === '/customers/list') {
+    return pathname === '/customers/list' || /^\/customers\/\d{10}$/.test(pathname || '');
+  }
   return pathname === pathOnly || pathname?.startsWith(`${pathOnly}/`);
 }
 
@@ -251,10 +255,10 @@ export default function Navbar() {
     },
     customers: {
       admin: [
-        { label: 'Customers', links: [{ href: '/customers', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }] },
+        { label: 'Customers', links: [{ href: '/customers/overview', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }, { href: '/customers/reviews', label: 'Reviews' }, { href: '/customers/feedback', label: 'Feedback' }] },
       ],
       employee: [
-        { label: 'Customers', links: [{ href: '/customers', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }] },
+        { label: 'Customers', links: [{ href: '/customers/overview', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }, { href: '/customers/reviews', label: 'Reviews' }, { href: '/customers/feedback', label: 'Feedback' }] },
       ]
     }
   };
