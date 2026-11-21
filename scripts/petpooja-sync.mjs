@@ -34,6 +34,7 @@ import {
   syncReviews,
   parseRatingsExport,
   customerWindowFor,
+  ratingsHistoryWindow,
 } from '../lib/customerSync.js';
 import { RUN_TMP_DIR as BROWSER_TMP_DIR } from '../lib/browserTempDir.js';
 
@@ -94,19 +95,27 @@ export const REPORT_GROUPS = {
   10: ['purchase_returns'],
   // The Customer section.
   //
-  // Three groups, and none of them touches the payroll:
+  // Four groups, and none of them touches the payroll:
   //
   //   customer_orders          the last 90 days of orders -> customer_orders
   //   customer_ratings         the platform reviews     -> customer_reviews
   //   customer_orders_history  the 285 days before that -> customer_orders
+  //   customer_ratings_history the reviews before that  -> customer_reviews
   //
   // The orders are taken in two pieces because Petpooja's export is capped
   // at ten thousand rows and a pull is slower than the rest of the sync put
   // together. The recent part is pulled every night; the older part is
   // pulled once a week, because it does not change with the day.
+  //
+  // The reviews are taken in two pieces for the same reason, and the older
+  // half reaches all the way back to March 2026 — the first day Petpooja
+  // holds a review for. The site's own average is then the average of every
+  // review the restaurant has ever been given, and not of the last ninety
+  // days.
   11: ['customer_orders'],
   12: ['customer_ratings'],
   13: ['customer_orders_history'],
+  14: ['customer_ratings_history'],
 };
 
 // The login gets one time budget for every attempt it makes. A serverless
@@ -3106,9 +3115,26 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
       }
     }
 
-    if (reportEnabled('customer_ratings')) {
+    // The platform reviews, in two pieces: the last ninety days every night,
+    // and everything before them once a week.
+    //
+    // The older half reaches back to March 2026 — the first day Petpooja
+    // holds a review for — so the site's own average is the average of every
+    // review the restaurant has been given, not of the last ninety days.
+    for (const ratingsReport of ['customer_ratings', 'customer_ratings_history']) {
+      if (!reportEnabled(ratingsReport)) continue;
+
+      const ratingsWindow = ratingsReport === 'customer_ratings'
+        ? customerWindowFor('customer_orders', customerTo)
+        : ratingsHistoryWindow(customerTo);
+
+      // Nothing older than the first day Petpooja holds.
+      if (ratingsWindow.from > ratingsWindow.to) {
+        console.log(`  ⏭ ${ratingsReport}: nothing to pull before ${ratingsWindow.from}.`);
+        continue;
+      }
+
       try {
-        const ratingsWindow = customerWindowFor('customer_orders', customerTo);
         console.log(`\n📥 Fetching the platform reviews (${ratingsWindow.from} → ${ratingsWindow.to})...`);
         const fetched = await fetchRatings(context, ratingsWindow);
         if (!fetched.ok) throw new Error(fetched.error);
@@ -3143,7 +3169,7 @@ async function fetchCustomReport(url, reportName, queryCycle = cycle, sheetMatch
         }
 
         const written = await syncReviews(supabase, parsed.reviews);
-        console.log(`  📊 ${written.reviews} review(s) read — ${written.linked} matched to an order, ${written.unlinked} without one.`);
+        console.log(`  📊 ${written.reviews} review(s) read — ${written.linked} of the reviews on the books matched to an order, ${written.unlinked} without one.`);
         successfulReports++;
       } catch (cr) {
         failedReports++;

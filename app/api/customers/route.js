@@ -30,8 +30,9 @@
 
 import { NextResponse } from 'next/server';
 import { getSupabase, readAllRows, selectRows } from '../../../lib/supabaseServer.js';
-import { maskPhone, FEEDBACK_QUESTIONS } from '../../../lib/customerParsers.js';
+import { maskPhone, FEEDBACK_QUESTIONS, LISTINGS, listingBucket } from '../../../lib/customerParsers.js';
 import { monthKeyOf, todayInIST } from '../../../lib/financePeriod.js';
+import { listingLabel } from '../../../lib/customerFormat.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,15 @@ const CHANNELS = [
   { key: 'pick_up', label: 'Pick Up' },
   { key: 'delivery', label: 'Delivery' },
 ];
+
+/**
+ * Where a listing sits in the app's own order — Zomato, then Swiggy Atelier,
+ * then Swiggy Ambrosia — so a list of listings always reads the same way.
+ */
+function listingOrder(key) {
+  const index = LISTINGS.findIndex((listing) => listing.key === key);
+  return index === -1 ? LISTINGS.length : index;
+}
 
 /** A customer who used to come often and has stopped is worth a call back. */
 const AT_RISK_MIN_ORDERS = 3;
@@ -75,18 +85,36 @@ export async function GET(request) {
  *
  * Shared by the overview and the Reviews page, so both say the same thing.
  *
+ * **Reviews are counted per LISTING, not per marketplace.** Swiggy carries
+ * two of our outlets — "Atelier by Ambrosia" and "Ambrosia" — and they are
+ * two different pages with two different ratings. Averaging them together
+ * is what made the number on the site disagree with the number on the
+ * platform.
+ *
  * @param {Array<object>} reviews
- * @returns {{avgRating: number|null, platforms: Array<object>, ratingTrend: Array<object>}}
+ * @param {object} official the rating each listing publishes, by listing key
+ * @returns {{avgRating: number|null, listings: Array<object>, ratingTrend: Array<object>}}
  */
-function buildReviewPicture(reviews) {
+function buildReviewPicture(reviews, official = {}) {
   const rows = reviews || [];
-  const byPlatform = {};
+  const byListing = {};
+
+  // Every listing gets a line, even one with no reviews behind it yet — a
+  // listing that has no reviews on the books is still a page people can
+  // review us on, and the page should say so rather than leave it out.
+  for (const key of Object.keys(official)) {
+    byListing[key] = newLine(key);
+  }
+
   for (const review of rows) {
-    const key = review.platform || 'unknown';
-    if (!byPlatform[key]) {
-      byPlatform[key] = { platform: key, count: 0, total: 0, linked: 0, latest: null, comments: [] };
-    }
-    const line = byPlatform[key];
+    // A review that could not be matched to an order does not say which page
+    // it came from, and a Swiggy order with no brand on it names only the
+    // marketplace. Both go into **one** bucket — the one that is not a page
+    // of ours — rather than a bucket each.
+    const key = listingBucket(review.listing);
+    if (!byListing[key]) byListing[key] = newLine(key);
+
+    const line = byListing[key];
     line.count += 1;
     line.total += Number(review.rating || 0);
     if (review.is_linked) line.linked += 1;
@@ -100,19 +128,40 @@ function buildReviewPicture(reviews) {
         comment: review.comment,
       });
     }
+    // The rating month by month, for this listing alone.
+    if (review.review_date) {
+      const month = review.review_date.slice(0, 7);
+      if (!line.byMonth[month]) line.byMonth[month] = { month, total: 0, count: 0 };
+      line.byMonth[month].total += Number(review.rating || 0);
+      line.byMonth[month].count += 1;
+    }
   }
 
-  const platforms = Object.values(byPlatform)
+  const listings = Object.values(byListing)
     .map((line) => ({
-      platform: line.platform,
+      listing: line.listing,
+      label: listingLabel(line.listing),
       count: line.count,
       avgRating: line.count ? Math.round((line.total / line.count) * 100) / 100 : null,
       linked: line.linked,
       unlinked: line.count - line.linked,
       latest: line.latest,
       comments: line.comments.slice(-8).reverse(),
+      // The rating the platform itself publishes, where it has been read.
+      official: official[line.listing] || null,
+      // Each listing's own month-by-month rating, so the three can be read
+      // against each other and not only against the whole.
+      trend: Object.values(line.byMonth)
+        .map((bucket) => ({
+          month: bucket.month,
+          count: bucket.count,
+          avgRating: Math.round((bucket.total / bucket.count) * 100) / 100,
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month)),
     }))
-    .sort((a, b) => b.count - a.count);
+    // The three listings in the order they are listed in the app, so the page
+    // does not reshuffle itself as the number of reviews changes.
+    .sort((a, b) => listingOrder(a.listing) - listingOrder(b.listing) || b.count - a.count);
 
   const scored = rows.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n) && n > 0);
   const avgRating = scored.length
@@ -136,7 +185,12 @@ function buildReviewPicture(reviews) {
     }))
     .sort((a, b) => a.month.localeCompare(b.month));
 
-  return { avgRating, platforms, ratingTrend };
+  return { avgRating, listings, ratingTrend };
+}
+
+/** A blank line for one listing. */
+function newLine(listing) {
+  return { listing, count: 0, total: 0, linked: 0, latest: null, comments: [], byMonth: {} };
 }
 
 /**
@@ -228,6 +282,38 @@ function buildFeedbackPicture(feedback) {
   return { questionAverages, topTags, wouldVisit: wouldVisitList, waiters, linked, recent };
 }
 
+/**
+ * The rating each listing publishes on its own platform.
+ *
+ * This is the number the platform shows, read from the platform's own page.
+ * It is **not** the same number as the average the site works out: the site
+ * averages the reviews Petpooja holds, and Petpooja holds them only from
+ * March 2026, while the platforms have been rated for years.
+ *
+ * @param {object} supabase
+ * @returns {Promise<object>} by listing key
+ */
+async function readOfficialRatings(supabase) {
+  const rows = await selectRows(supabase, `
+    select listing, name, platform, rating, rating_count, rating_count_text, source_url, fetched_at
+    from public.platform_listings`);
+
+  const byListing = {};
+  for (const row of rows) {
+    byListing[row.listing] = {
+      listing: row.listing,
+      name: row.name,
+      platform: row.platform,
+      rating: row.rating === null ? null : Number(row.rating),
+      count: row.rating_count === null ? null : Number(row.rating_count),
+      countText: row.rating_count_text || '',
+      url: row.source_url || '',
+      fetchedAt: row.fetched_at,
+    };
+  }
+  return byListing;
+}
+
 // ---------------------------------------------------------------------------
 // The whole picture
 // ---------------------------------------------------------------------------
@@ -291,10 +377,18 @@ async function overview(supabase) {
     .filter((entry) => entry.daysSince >= AT_RISK_DAYS)
     .sort((a, b) => Number(b.customer.total_spend || 0) - Number(a.customer.total_spend || 0));
 
-  const byPlatform = {};
+  // Which listing these customers order on. Swiggy carries two of ours, so
+  // the marketplace alone would merge them.
+  const byListing = {};
   for (const c of customers) {
-    const key = c.platform || 'counter';
-    byPlatform[key] = (byPlatform[key] || 0) + 1;
+    const counts = c.listings && typeof c.listings === 'object' ? c.listings : {};
+    const keys = Object.keys(counts).filter((key) => Number(counts[key]) > 0);
+    if (keys.length === 0) {
+      byListing.counter = (byListing.counter || 0) + 1;
+      continue;
+    }
+    const best = keys.sort((a, b) => Number(counts[b]) - Number(counts[a]))[0];
+    byListing[best] = (byListing[best] || 0) + 1;
   }
 
   // ---- The month-by-month trend ----------------------------------------
@@ -314,7 +408,7 @@ async function overview(supabase) {
   }));
 
   // ---- The reviews -------------------------------------------------------
-  const reviewPicture = buildReviewPicture(reviews);
+  const reviewPicture = buildReviewPicture(reviews, await readOfficialRatings(supabase));
 
   // ---- The feedback form -------------------------------------------------
   const feedbackPicture = buildFeedbackPicture(feedback);
@@ -373,7 +467,7 @@ async function overview(supabase) {
           ? Math.round((repeatCustomers.length / customers.length) * 1000) / 10
           : 0,
         newThisMonth: newThisMonth.length,
-        byPlatform,
+        byListing,
       },
       orders: {
         count: Number(orderTotals.orders || 0),
@@ -393,7 +487,7 @@ async function overview(supabase) {
       reviews: {
         count: reviews.length,
         avgRating: reviewPicture.avgRating,
-        platforms: reviewPicture.platforms,
+        listings: reviewPicture.listings,
         ratingTrend: reviewPicture.ratingTrend,
         linked: reviews.filter((r) => r.is_linked).length,
         unlinked: reviews.filter((r) => !r.is_linked).length,
@@ -453,7 +547,7 @@ async function overview(supabase) {
 async function list(supabase, params) {
   const search = (params.get('search') || '').trim().toLowerCase();
   const sort = params.get('sort') || 'spend';
-  const platform = params.get('platform') || '';
+  const listing = params.get('listing') || '';
   const minOrders = Number(params.get('minOrders') || 0);
   const limit = Math.min(Number(params.get('limit') || 200), 500);
 
@@ -462,7 +556,14 @@ async function list(supabase, params) {
   );
 
   let rows = all.filter((customer) => {
-    if (platform && (customer.platform || 'counter') !== platform) return false;
+    // The listing filter looks at every listing the customer has ordered on,
+    // not only the one they order on most — a person who came once on Zomato
+    // and twice on Swiggy is a Zomato customer as well as a Swiggy one.
+    if (listing) {
+      const counts = customer.listings && typeof customer.listings === 'object' ? customer.listings : {};
+      const has = Number(counts[listing] || 0) > 0 || customer.listing === listing;
+      if (!has) return false;
+    }
     if (minOrders && Number(customer.order_count || 0) < minOrders) return false;
     if (!search) return true;
     const haystack = `${customer.name || ''} ${customer.phone || ''} ${customer.address || ''}`.toLowerCase();
@@ -490,6 +591,8 @@ async function list(supabase, params) {
       first_order_at: customer.first_order_at,
       last_order_at: customer.last_order_at,
       platform: customer.platform || 'counter',
+      listing: customer.listing || '',
+      listings: customer.listings || {},
       channel_mix: customer.channel_mix || {},
       review_count: customer.review_count || 0,
       avg_rating: customer.avg_rating,
@@ -504,46 +607,68 @@ async function list(supabase, params) {
 // ---------------------------------------------------------------------------
 
 /**
- * Every review, newest first.
+ * Every review, newest first, with the order it was left on.
  *
  * The platform filter is applied here rather than in the browser so the count
- * on each platform chip always shows what is really there.
+ * on each listing chip always shows what is really there.
+ *
+ * **The order is joined on the pair (order number, day)**, which is the
+ * order's own key — an order number on its own is not an identity, because
+ * Petpooja restarts its numbering. That is what lets the page show what the
+ * customer actually ate against the review they left about it.
  */
 async function reviewsView(supabase, params) {
-  const platform = params.get('platform') || '';
+  const listing = params.get('listing') || '';
 
-  const reviews = await readAllRows((from, to) =>
-    supabase.from('customer_reviews').select('*').order('id').range(from, to),
-  );
+  const rows = await selectRows(supabase, `
+    select r.id, r.listing, r.platform, r.rating, r.comment, r.review_date,
+           r.order_no, r.order_date, r.phone, r.is_linked,
+           o.items as order_items, o.amount as order_amount, o.channel as order_channel
+    from public.customer_reviews r
+    left join public.customer_orders o
+      on o.order_no = r.order_no and o.order_date = r.order_date
+    order by r.review_date desc, r.id desc`);
 
-  const picture = buildReviewPicture(reviews);
+  const filtered = rows.filter((review) => !listing || listingBucket(review.listing) === listing);
 
-  const rows = [...reviews]
-    .filter((review) => !platform || (review.platform || '') === platform)
-    .sort((a, b) => String(b.review_date || '').localeCompare(String(a.review_date || '')))
-    .map((review) => ({
-      platform: review.platform,
-      rating: Number(review.rating || 0),
-      comment: review.comment,
-      review_date: review.review_date,
-      order_no: review.order_no,
-      is_linked: !!review.is_linked,
-      phone: review.phone || null,
-      maskedPhone: review.phone ? maskPhone(review.phone) : null,
-    }));
+  const picture = buildReviewPicture(rows, await readOfficialRatings(supabase));
 
   return NextResponse.json({
     success: true,
     data: {
-      count: reviews.length,
+      count: rows.length,
       avgRating: picture.avgRating,
-      platforms: picture.platforms,
+      listings: picture.listings,
       ratingTrend: picture.ratingTrend,
-      linked: reviews.filter((r) => r.is_linked).length,
-      reachedCustomer: reviews.filter((r) => r.phone).length,
-      withComment: reviews.filter((r) => r.comment).length,
-      filter: platform,
-      rows,
+      linked: rows.filter((r) => r.is_linked).length,
+      reachedCustomer: rows.filter((r) => r.phone).length,
+      withComment: rows.filter((r) => r.comment).length,
+      filter: listing,
+      rows: filtered.map((review) => ({
+        id: review.id,
+        // The bucket the review is counted under — its own page, or the one
+        // bucket for reviews that are not on a page of ours.
+        listing: listingBucket(review.listing),
+        platform: review.platform,
+        rating: Number(review.rating || 0),
+        comment: review.comment,
+        review_date: review.review_date,
+        order_no: review.order_no,
+        is_linked: !!review.is_linked,
+        phone: review.phone || null,
+        maskedPhone: review.phone ? maskPhone(review.phone) : null,
+        // The order the review was left on — what was ordered, what it came
+        // to, and how it was placed.
+        order: review.order_items
+          ? {
+              order_no: review.order_no,
+              order_date: review.order_date,
+              items: review.order_items,
+              amount: Number(review.order_amount || 0),
+              channel: review.order_channel || '',
+            }
+          : null,
+      })),
     },
   });
 }
@@ -622,7 +747,7 @@ async function detail(supabase, phone) {
     );
   }
 
-  const [orders, reviews, feedback] = await Promise.all([
+  const [orders, feedback] = await Promise.all([
     supabase
       .from('customer_orders')
       .select('*')
@@ -630,19 +755,27 @@ async function detail(supabase, phone) {
       .order('order_date', { ascending: false })
       .order('id', { ascending: false }),
     supabase
-      .from('customer_reviews')
-      .select('*')
-      .eq('phone', digits)
-      .order('review_date', { ascending: false }),
-    supabase
       .from('customer_feedback')
       .select('*')
       .eq('phone', digits)
       .order('response_date', { ascending: false }),
   ]);
 
+  // The reviews this customer left, each with the order it was left on.
+  // The join is on the pair (order number, day) — an order number on its own
+  // is not an identity, because Petpooja restarts its numbering.
+  const reviewRows = (
+    await selectRows(supabase, `
+      select r.id, r.listing, r.platform, r.rating, r.comment, r.review_date,
+             r.order_no, r.order_date, r.phone, r.is_linked,
+             o.items as order_items, o.amount as order_amount, o.channel as order_channel
+      from public.customer_reviews r
+      left join public.customer_orders o
+        on o.order_no = r.order_no and o.order_date = r.order_date
+      order by r.review_date desc, r.id desc`)
+  ).filter((review) => review.phone === digits);
+
   const orderRows = orders.data || [];
-  const reviewRows = reviews.data || [];
   const feedbackRows = feedback.data || [];
 
   const spent = orderRows.reduce((sum, order) => sum + Number(order.amount || 0), 0);
@@ -662,6 +795,8 @@ async function detail(supabase, phone) {
         first_order_at: customer.first_order_at,
         last_order_at: customer.last_order_at,
         platform: customer.platform || 'counter',
+        listing: customer.listing || '',
+        listings: customer.listings || {},
         channel_mix: customer.channel_mix || {},
         review_count: reviewRows.length,
         avg_rating: scored.length
@@ -681,11 +816,24 @@ async function detail(supabase, phone) {
         client_order_id: order.client_order_id,
       })),
       reviews: reviewRows.map((review) => ({
+        listing: review.listing || '',
         platform: review.platform,
         rating: Number(review.rating || 0),
         comment: review.comment,
         review_date: review.review_date,
         order_no: review.order_no,
+        order_date: review.order_date,
+        is_linked: !!review.is_linked,
+        // What the customer ordered on the order the review was left on.
+        order: review.order_items
+          ? {
+              order_no: review.order_no,
+              order_date: review.order_date,
+              items: review.order_items,
+              amount: Number(review.order_amount || 0),
+              channel: review.order_channel || '',
+            }
+          : null,
       })),
       feedback: feedbackRows.map((row) => ({
         bill_number: row.bill_number,

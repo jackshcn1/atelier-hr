@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  money, count, rating, ratingPill, formatDate, channelLabel, platformLabel, customerName,
+  money, count, rating, ratingPill, formatDate, channelLabel, listingLabel,
+  customerListingLabel, customerName,
 } from '../../../lib/customerFormat';
 
 /**
@@ -121,7 +122,9 @@ export default function CustomerDetailPage() {
           <div className="panel">
             <div className="panel-body">
               <p className="text-2xs uppercase tracking-wide text-ink-muted">They order through</p>
-              <p className="font-serif text-[1.75rem] leading-tight mt-2">{platformLabel(c.platform)}</p>
+              <p className="font-serif text-[1.75rem] leading-tight mt-2">
+                {customerListingLabel(c.listing, c.listings)}
+              </p>
               <p className="text-sm text-ink-muted mt-1">
                 {Object.entries(c.channel_mix || {})
                   .filter(([, n]) => Number(n) > 0)
@@ -214,7 +217,7 @@ export default function CustomerDetailPage() {
                     <div key={`${review.order_no}-${index}`} className="py-3">
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-sm font-medium text-ink">
-                          {platformLabel(review.platform)}
+                          {listingLabel(review.listing)}
                         </span>
                         <span className={`pill ${ratingPill(review.rating)}`}>
                           {rating(review.rating)} ★
@@ -226,6 +229,14 @@ export default function CustomerDetailPage() {
                         <p className="text-sm text-ink-muted mt-2">No written comment.</p>
                       )}
                       <p className="text-xs text-ink-muted mt-1">{formatDate(review.review_date)}</p>
+                      {review.order ? (
+                        <p className="text-xs text-ink-muted mt-1">
+                          On order #{review.order.order_no}
+                          {review.order.order_date ? ` · ${formatDate(review.order.order_date)}` : ''}
+                          {review.order.items ? ` — ${review.order.items}` : ''}
+                          {review.order.amount ? ` — ${money(review.order.amount)}` : ''}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>

@@ -59,9 +59,14 @@ that person's orders, reviews and feedback responses, and the full number.
 
 ## Gate 8: The reviews page
 CHECK: /customers/reviews
-EXPECT: the platform chips carry the real counts (All, Zomato, Swiggy); clicking
-one narrows the table to that platform only; the rating is shown month by
-month; every review is listed newest first.
+EXPECT: **three listing cards** — Zomato, Swiggy — Atelier, Swiggy — Ambrosia — each
+showing the rating the platform itself publishes (star and number of ratings)
+beside the site's own average over the reviews it holds, and the number of
+reviews on that listing. The listing chips carry the real counts (All, and one
+per listing); clicking one narrows the table to that listing only; the rating
+is shown month by month for the whole set and for one listing at a time; every
+review is listed newest first **with the order it was left on** — order number,
+day, what was ordered and what it came to.
 
 ## Gate 9: The feedback page
 CHECK: /customers/feedback
@@ -71,7 +76,7 @@ shown as it was written.
 
 ## Gate 10: The Google gap is honest
 CHECK: the reviews panel on /customers/overview, and /customers/reviews
-EXPECT: Zomato and Swiggy show real numbers; Google says "Not connected yet"
+EXPECT: the three listings show real numbers; Google says "Not connected yet"
 and explains why. It must not show a zero as if it were a rating.
 
 ## Gate 11: The nav is right
@@ -79,3 +84,35 @@ CHECK: the Customers dropdown in the navbar
 EXPECT: four links — Overview, All Customers, Reviews, Feedback. On a
 customer's own page, "All Customers" is the one lit; on /customers itself,
 none of the four is lit, because that is the landing page.
+
+## Gate 12: A review names the listing it was left on
+CHECK: `select listing, count(*) from customer_reviews group by 1`
+EXPECT: three listings carry the bulk — `zomato_atelier`, `swiggy_atelier`,
+`swiggy_ambrosia` — plus a small plain-`swiggy` bucket for the orders that came
+through the marketplace without saying which brand they were for. The listing
+comes from the order the review was matched to, never from the marketplace, and
+it is never guessed. A review that matched no order carries no listing, and the
+page says how many there are rather than hiding them.
+
+## Gate 13: A review names the order it was left on
+CHECK: `select count(*) from customer_reviews where order_date is null`
+EXPECT: **as near zero as the data allows** — every review that has an order
+carries the pair (order number, day), because an order number on its own is not
+an identity: Petpooja restarts its numbering. A review with no matching order
+is **kept** — it is still a review — and it is reported as unlinked rather than
+thrown away.
+
+## Gate 14: The platform's own rating is stored
+CHECK: `select listing, rating, rating_count, rating_count_text, fetched_at from platform_listings`
+EXPECT: three rows — Zomato 4.3 from 4,401; Swiggy — Atelier 4.4 with "2.6K+";
+Swiggy — Ambrosia 4.5 with "10K+". Swiggy publishes no exact count, so its
+exact-count column stays empty and the abbreviation is kept as the text
+Swiggy writes. `fetched_at` says when the number was last read.
+
+## Gate 15: The books hold every review Petpooja holds
+CHECK: `select to_char(review_date, 'YYYY-MM'), platform, count(*) from customer_reviews group by 1, 2`
+EXPECT: one row per month per platform, and each month's number must equal
+what Petpooja's own count endpoint says for that month. The history starts at
+**March 2026** — every month before it answers zero — and runs to the last day
+the books are up to. A month that comes up short is **failed, not written**,
+because a window that crosses a calendar month comes back short silently.
