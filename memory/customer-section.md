@@ -196,28 +196,87 @@ window holds (`total_reviews`, plus a breakdown of one to five stars). That is
 the only thing that says whether a pull was complete, exactly as
 `#total_records` is for the orders.
 
-Reviews are therefore pulled **a day at a time**, and the day's rows are
-checked against the count endpoint before they are written. A day holds a
-handful of reviews — one page — so the shifting page order cannot bite.
+### How big a window can one walk be? Measured, 21 Nov 2026
+
+Each window was walked **three times** and compared with the count endpoint.
+
+**The rule is not "a month". The rule is: never cross a calendar month.**
+
+| Window | Zomato count | Walks | Verdict |
+|---|---|---|---|
+| 1 day | 6 | 6/6/6 | complete |
+| 1 week | 0 | 0/0/0 | complete |
+| 1 month (March) | 46 | 46/46/46 | complete |
+| 1 month (April) | 117 | 117/117/117 | complete |
+| 1 month (May) | 131 | 131/131/131 | complete |
+| 1 month (August) | 157 | 157/157/157 | complete |
+| 22 Aug → 4 Sep | 61 | 50/41/51 | **short** — crosses a month |
+| 25 Sep → 4 Oct | 34 | 34/20/24 | **short** — crosses a month |
+| 20 Oct → 2 Nov | 38 | 20/38/36 | **short** — crosses a month |
+| 1 Nov → 21 Nov | 58 | 41/38/47 | **short** — the month is still open |
+| 90 days | 281 | 203/210/189 | **short** |
+| 2 months | 248 | 196/188/186 | **short** |
+| 3 months | 366 | 252/258/238 | **short** |
+| 6 months | 690 | 468/529/498 | **short** |
+
+**Crossing a month boundary is short even at 34 rows.** A window inside one
+month of the same size is complete (1–14 Sep = 36/36/36, 1–21 Oct = 66/66/66).
+And splitting a boundary-crossing span into two inside-month halves recovers
+it **exactly**: 22 Aug → 4 Sep is 61, and 22–31 Aug (45) + 1–4 Sep (16) is 61.
+
+**A whole month that is over is walked in one go.** Every month from March 2026
+to October 2026 was walked three times and came back complete and identical,
+both platforms — and the set of rows is the same set the day-at-a-time walk
+returns.
+
+**Anything else is walked a day at a time.** The part of a month at either end
+of a window, and the month still being written, are both cut this way: a day
+is one page of rows, so the shifting order cannot bite, and every day measured
+walked completely.
+
+So `ratingChunks()` cuts a window into calendar months and then chooses:
+**a whole month that is over → one walk; anything else → a day at a time.**
+Each walk's rows are counted and compared against the count endpoint before
+they are written, and a walk that comes up short is **failed**, not written.
+
+The page dump shows why a long walk fails — the endpoint's own ordering is
+scrambled within it: page 7 of the 90-day walk ran *backwards*
+(2026-11-13 → 2026-08-25) and page 15 repeated page 1 exactly.
+
+### The reviews only go back to March 2026 — but Petpooja says so
+
+Every month before March 2026 answers **0** on the count endpoint: February
+2026, January 2026, all of 2025, all of 2024, all of 2023. Petpooja's review
+history starts at **2026-03-01**.
 
 **What this bought:** the 90-day window holds **420 reviews** — 280 Zomato and
 140 Swiggy — and all 420 are now on the books. Before, the same window
 produced 301.
 
+But Petpooja holds far more than the books did: measured on the count
+endpoint, **2026-03-01 → 2026-11-20 holds 926 Zomato and 422 Swiggy — 1,348
+reviews**. The books held 420, because the sync only ever pulled the 90-day
+window. So the pull was widened to the whole history Petpooja holds, as
+**group 14** (`customer_ratings_history`).
+
 ### Most reviews cannot be attached to a customer — and that is the data
 
-A review is joined to its order through the **platform order id**, and every
-one of the 420 finds its order. But a **platform order usually carries no
-contact number**: of the 11,877 Zomato and Swiggy orders on record, only **330
-have a real phone number** — the platform holds the customer's number, not
-Petpooja. So only **4 of the 420 reviews** reach a customer.
+A review is joined to its order through the **platform order id**, and **1,337
+of the 1,349** find their order. (The 12 that do not are orders Petpooja does
+not hold at all — no order carries their platform id, its order number or even
+its first digits. They are kept, and reported.)
+
+But a **platform order usually carries no contact number**: of the 11,877 Zomato
+and Swiggy orders on record, only **330 have a real phone number** — the
+platform holds the customer's number, not Petpooja. So only **29 of the 1,349
+reviews** reach a customer.
 
 The reviews are still worth having: the **platform dashboard** counts them,
 averages them, trends them month by month and shows what people wrote. That is
 the "reviews tracking" the section is for. What a review *cannot* do is attach
 to a person, and the page says so rather than pretending.
 
-**The row's `cus_name` is empty on every one of the 420** — the endpoint does
+**The row's `cus_name` is empty on every one of them** — the endpoint does
 not name the customer either.
 
 ## Where each piece of data comes from
@@ -235,6 +294,55 @@ Petpooja's **Sub Order Type** says where the order came from: `Dine In`,
 `Pick Up`, `Delivery`, `Zomato`, `Atelier - Swiggy`, `Ambrosia - Swiggy`,
 `IGST Area`. The platform comes from that — never from the length of the
 platform order id.
+
+## Three pages, three ratings
+
+**A marketplace is not a listing.** Swiggy carries two of our restaurants, and
+they are two different pages with two different ratings — so the books count
+**three listings**, not two marketplaces:
+
+| Listing | Platform | Page |
+|---|---|---|
+| `zomato_atelier` | Zomato | `zomato.com/it/trivandrum/atelier-by-ambrosia-…/order` |
+| `swiggy_atelier` | Swiggy | `swiggy.com/city/thiruvananthapuram/atelier-by-ambrosia-…-rest272534` |
+| `swiggy_ambrosia` | Swiggy | `swiggy.com/city/thiruvananthapuram/ambrosia-…-rest78577` |
+
+`platform` keeps its meaning (`zomato` / `swiggy`) and stays part of the
+review's database key `(platform, client_order_id, review_date)`. The
+**listing** is a separate column, so setting it never moves a row. It is
+**read, never guessed**: an order's listing comes from its Sub Order Type, and
+a review's listing comes from the order it was matched to — a review never
+says which of the two Swiggy pages it was left on.
+
+### Two ratings, each labelled
+
+| Listing | The platform's own rating | The site's own average |
+|---|---|---|
+| Zomato | **4.3** from 4,401 ratings (delivery) | 4.08 ★ over 917 reviews |
+| Swiggy — Atelier | **4.4** (2.6K+) | 4.17 ★ over 192 reviews |
+| Swiggy — Ambrosia | **4.5** (10K+) | 4.16 ★ over 222 reviews |
+
+The two numbers answer different questions and are shown side by side. The
+platform's rating is **lifetime** — every review the platform has, going back
+years. The site's own average is over **the reviews Petpooja holds**, which
+start at March 2026. They will never agree, and the page says so.
+
+**Zomato's delivery rating is the one that counts** — the listing page also
+carries a DINING rating (3.1 from 24) and a JSON-LD aggregate that is the
+dining one. The scraper reads `rating_new` → `DELIVERY` → `"rating":"4.3"`
+and `"reviewCount":"4,401"`.
+
+**Swiggy refuses a plain fetch** (a bare HTTP GET answers 202 with an empty
+body — an AWS WAF) and refuses headless Playwright (403). It answers a **real,
+headed Chrome** launched with `--disable-blink-features=AutomationControlled`,
+a persistent profile and `locale: en-IN`. The rating is read from the page
+text: `4.4 (2.6K+ ratings)`. **Swiggy publishes no exact count**, so the
+exact-count column stays empty and `2.6K+` / `10K+` are kept as the text
+Swiggy writes. A platform that refuses is **kept at its last known value**,
+and the page says when that number was last read.
+
+The scraper runs **locally**, like the Petpooja sync — Swiggy's own page is
+not reachable from the serverless host.
 
 ### Reviews and feedback are joined on different keys
 
@@ -264,14 +372,16 @@ hiding it.
 
 ## The sync groups
 
-| Group | What | Window |
-|---|---|---|
-| 11 `customer_orders` | the orders | the last **90 days**, a month at a time |
-| 12 `customer_ratings` | the platform reviews | the last 90 days |
-| 13 `customer_orders_history` | the orders | the **285 days before** that |
+| Group | What | Window | When |
+|---|---|---|---|
+| 11 `customer_orders` | the orders | the last **90 days**, a month at a time | every night |
+| 12 `customer_ratings` | the platform reviews | the last **90 days** | every night |
+| 13 `customer_orders_history` | the orders | the **285 days before** that | once a week |
+| 14 `customer_ratings_history` | the platform reviews | **1 Mar 2026** → the day before the recent window | once a week |
 
-11 and 12 run every night; 13 runs once a week, because the older history
-does not change with the day. Together they cover about a year.
+11 and 12 run every night; 13 and 14 run once a week, because the older history
+does not change with the day. Together they cover about a year of orders and
+**every review Petpooja holds**.
 
 **The writes are upserts**, never replacements: an order keeps its order
 number **and the day it was placed**, a review keeps its platform + order id +
@@ -281,6 +391,30 @@ ever has to be pulled once, and a re-pull updates the same rows.
 **The roll-up is worked out from the whole orders table**, not from the
 window that was just pulled — so a customer's total spend is their spend over
 all the time the books cover.
+
+### The link is written in one statement, not one request per review
+
+A single-row update takes **234ms** round trip — so attaching 1,349 reviews to
+their orders one at a time would cost five minutes of nothing but waiting, and
+the run has three hundred seconds to do everything in. The link is therefore
+**one `UPDATE … FROM (VALUES …)`** (measured: under a second), and the
+customer totals are one more.
+
+The orders a review could point at are read with **one query** (423 rows in
+1.7 seconds) rather than by reading all 27,719 orders (twenty-eight paged
+requests).
+
+The database **refuses an UPDATE with no WHERE clause**, so the totals
+statement carries one — and it carries the one that keeps the run from
+touching every row: *only the customers whose totals changed*.
+
+### A `values` row is a tuple, and a tuple needs its brackets
+
+The link statement is a list of tuples. A row without its brackets is not a
+tuple, and the parser says so in the least helpful way possible — **"syntax
+error at or near 774"**, naming the first number it could not read. It cost a
+whole history pull to find that one. `reviewLinkStatement()` is now a pure
+function with a test of its own.
 
 ## The tables
 
@@ -300,14 +434,17 @@ reviews, feedback — are read whole and worked out in JavaScript.
 Every query is a constant string. Nothing a visitor sends is ever put into
 SQL text.
 
-## What the books hold (20 Nov 2026)
+## What the books hold (21 Nov 2026)
 
 | | |
 |---|---|
 | Orders | **27,719**, from 1 Mar to 20 Nov 2026, worth **₹1,63,01,815** |
 | Customers | **512**, worth **₹14,15,978** between them (8.7% of the order value) |
 | The gap | **26,899 orders worth ₹1,48,85,837** carry no contact number |
-| Reviews | **420** — 280 Zomato (4.08 ★), 140 Swiggy (3.92 ★) |
+| Reviews | **1,349** from 9 Mar to 21 Nov 2026 — 927 Zomato, 422 Swiggy |
+| Of those | **1,337 matched an order**, 12 did not — Petpooja does not hold those orders |
+| By listing | Zomato 918, Swiggy — Ambrosia 222, Swiggy — Atelier 192, plain Swiggy 5 |
+| Reach a customer | **29** reviews carry a phone number — **27** customers have any |
 | Feedback | 1 response so far — the form's bill number does not match an order yet |
 
 The gap is the number worth closing at the counter: it is 91.3% of the order

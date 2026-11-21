@@ -33,7 +33,7 @@ const MODULES = [
     title: 'Reviews',
     subtitle: 'What People Say',
     description:
-      'The ratings and comments left on Zomato and Swiggy, month by month, with the Google listing waiting to be connected.',
+      'The rating and comments on each of our three listings — Zomato, Swiggy Atelier and Swiggy Ambrosia — month by month, with the order behind each review.',
     href: '/customers/reviews',
   },
   {

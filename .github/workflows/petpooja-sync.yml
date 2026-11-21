@@ -31,7 +31,7 @@ on:
         description: 'Optional Pay Period End Date (YYYY-MM-DD)'
         required: false
       group:
-        description: 'Run only one report group (1-10). Leave empty for the finance groups.'
+        description: 'Run only one report group (1-14). Leave empty for the finance groups.'
         required: false
       variable_pay:
         description: 'Write the variable-pay metrics as well (they are paused by default)'
@@ -90,6 +90,10 @@ jobs:
           # pulled once a week rather than every night. The day of the week
           # is taken from the runner's clock (UTC), and 0 is Sunday.
           #
+          # Group 14 is the older half of the platform reviews — everything
+          # from March 2026 up to the day before the last 90. It is pulled
+          # once a week for the same reason.
+          #
           # The other groups feed variable pay, which is paused.
           #
           # Asking for the variable pay back (the `variable_pay` switch) runs
@@ -105,7 +109,7 @@ jobs:
           elif [ "$VARIABLE_PAY" = "true" ]; then
             SYNC_GROUPS="1 2 3 4 5 6 7 8 9 10 11 12"
           elif [ "$(date -u +%w)" = "0" ]; then
-            SYNC_GROUPS="5 6 9 10 11 12 13"
+            SYNC_GROUPS="5 6 9 10 11 12 13 14"
           else
             SYNC_GROUPS="5 6 9 10 11 12"
           fi

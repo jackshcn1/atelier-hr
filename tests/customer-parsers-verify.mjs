@@ -20,14 +20,29 @@ import {
   buildCustomers,
   parseRatingsExport,
   linkReviewsToOrders,
+  listingBucket,
+  UNLISTED_KEY,
   parseFeedbackSheet,
   linkFeedbackToOrders,
   ratingScore,
   splitTags,
   parseDate,
   toNumber,
+  listingOf,
+  listingByKey,
+  LISTINGS,
 } from '../lib/customerParsers.js';
-import { monthChunks, splitRange, customerWindowFor, orderKey, dayChunks } from '../lib/customerSync.js';
+import {
+  monthChunks,
+  splitRange,
+  customerWindowFor,
+  orderKey,
+  dayChunks,
+  ratingChunks,
+  ratingsHistoryWindow,
+  isWholeCalendarMonth,
+  reviewLinkStatement,
+} from '../lib/customerSync.js';
 
 let passed = 0;
 async function check(name, fn) {
@@ -324,6 +339,96 @@ await check('the platform a customer came through is read from the sub order typ
 });
 
 // ---------------------------------------------------------------------------
+// A marketplace is not a listing.
+// ---------------------------------------------------------------------------
+
+await check('the listing is read from the sub order type', () => {
+  // We are on three pages: Zomato, Swiggy — Atelier and Swiggy — Ambrosia.
+  // Swiggy carries two of them, so the marketplace alone cannot say which
+  // page an order was placed on. Petpooja names the outlet on the order, so
+  // the listing is read and never guessed.
+  assert.equal(listingOf('Zomato'), 'zomato_atelier');
+  assert.equal(listingOf('Atelier - Swiggy'), 'swiggy_atelier');
+  assert.equal(listingOf('Ambrosia - Swiggy'), 'swiggy_ambrosia');
+  // Petpooja wrote plain `Swiggy` on 98 orders in March and April 2026. That
+  // names the marketplace but not the outlet, and says so.
+  assert.equal(listingOf('Swiggy'), 'swiggy');
+  assert.equal(listingOf('Dine In'), '');
+  assert.equal(listingOf(''), '');
+  assert.equal(listingOf(null), '');
+
+  // The three listings are the ones we are actually on.
+  assert.deepEqual(
+    LISTINGS.map((listing) => listing.key),
+    ['zomato_atelier', 'swiggy_atelier', 'swiggy_ambrosia'],
+  );
+  // Zomato and Swiggy share a marketplace; the listing is what tells them
+  // apart, and it never does.
+  assert.equal(listingByKey('swiggy_atelier').platform, 'swiggy');
+  assert.equal(listingByKey('swiggy_ambrosia').platform, 'swiggy');
+  assert.equal(listingByKey('zomato_atelier').platform, 'zomato');
+  assert.equal(listingByKey('nope'), null);
+});
+
+await check('an order carries its listing, and a customer counts them', () => {
+  const zomato = parseOrdersExport([
+    ORDERS_COLUMNS,
+    orderRow({ no: '1', phone: '8590418886', type: 'Delivery', subType: 'Zomato' }),
+    orderRow({ no: '2', phone: '8590418886', type: 'Delivery', subType: 'Atelier - Swiggy' }),
+    orderRow({ no: '3', phone: '8590418886', type: 'Delivery', subType: 'Ambrosia - Swiggy' }),
+  ]).orders;
+
+  assert.equal(zomato[0].listing, 'zomato_atelier');
+  assert.equal(zomato[1].listing, 'swiggy_atelier');
+  assert.equal(zomato[2].listing, 'swiggy_ambrosia');
+
+  const { customers } = buildCustomers(zomato);
+  assert.deepEqual(customers[0].listings, {
+    zomato_atelier: 1,
+    swiggy_atelier: 1,
+    swiggy_ambrosia: 1,
+  });
+  // The listing a customer orders on most.
+  assert.equal(customers[0].listing, 'zomato_atelier');
+});
+
+await check('a review takes the listing of the order it was left on', () => {
+  // The review itself never names the outlet — only the order it was matched
+  // to does. This is why the listing on a review is never guessed.
+  const orders = parseOrdersExport([
+    ORDERS_COLUMNS,
+    orderRow({ no: '25001', clientId: '8866657208', type: 'Delivery', subType: 'Atelier - Swiggy' }),
+    orderRow({ no: '25002', clientId: '1112223334', type: 'Delivery', subType: 'Ambrosia - Swiggy' }),
+  ]).orders;
+
+  const reviews = parseRatingsExport([
+    ['Provider', 'Client Order Id', 'Client Restaurant Id', 'Rating', 'Created Date', 'Identifier', 'Feedback'],
+    ['swiggy', '8866657208', 'abc', '3', '11/20/26', 'Atelier', 'Good'],
+    ['swiggy', '1112223334', 'abc', '5', '11/19/26', 'Ambrosia', 'Great'],
+  ]).reviews;
+
+  const result = linkReviewsToOrders(reviews, orders);
+  assert.equal(result.reviews[0].listing, 'swiggy_atelier');
+  assert.equal(result.reviews[1].listing, 'swiggy_ambrosia');
+  // The order's day travels with the review, because an order number on its
+  // own is not an identity.
+  assert.equal(result.reviews[0].order_date, '2026-11-19');
+  assert.equal(result.reviews[1].order_date, '2026-11-19');
+});
+
+await check('a review that matched no order carries no listing', () => {
+  const reviews = parseRatingsExport([
+    ['Provider', 'Client Order Id', 'Client Restaurant Id', 'Rating', 'Created Date', 'Identifier', 'Feedback'],
+    ['zomato', '9999999999', 'abc', '1', '11/20/26', 'Atelier', 'Bad'],
+  ]).reviews;
+
+  const result = linkReviewsToOrders(reviews, []);
+  assert.equal(result.reviews[0].is_linked, false);
+  assert.equal(result.reviews[0].listing || '', '');
+  assert.equal(result.reviews[0].order_date, null);
+});
+
+// ---------------------------------------------------------------------------
 // The reviews.
 // ---------------------------------------------------------------------------
 
@@ -604,6 +709,95 @@ await check('the two order reports cover the year between them', () => {
   // is pulled twice and none is missed between them.
   assert.equal(history.to < recent.from, true);
   assert.equal(history.to !== recent.from, true);
+});
+
+await check('the older reviews reach back to the first day Petpooja holds one', () => {
+  const recent = customerWindowFor('customer_orders', '2026-11-20');
+  const history = ratingsHistoryWindow('2026-11-20');
+  // March 2026 is where the reviews start: the count endpoint answers zero
+  // for every day before it.
+  assert.equal(history.from, '2026-03-01');
+  // It ends the day before the recent window begins, so no review is pulled
+  // twice and none is missed between the two.
+  assert.equal(history.to, '2026-08-21');
+  assert.equal(history.to < recent.from, true);
+  assert.equal(history.to !== recent.from, true);
+});
+
+await check('a review walk never crosses a calendar month', () => {
+  // The endpoint's page order shifts between calls, so a window that crosses
+  // a month boundary comes back short — and it comes back short silently.
+  // Measured: a window counting 61 reviews returned 50, 41 and 51 of them.
+  const chunks = ratingChunks('2026-08-23', '2026-11-21', '2026-11-21');
+  assert.equal(chunks.length, 4);
+  for (const chunk of chunks) {
+    const from = chunk.from.slice(0, 7);
+    const to = chunk.to.slice(0, 7);
+    assert.equal(from, to);
+  }
+});
+
+await check('a whole month that is over is walked in one go', () => {
+  const chunks = ratingChunks('2026-03-01', '2026-11-21', '2026-11-21');
+  // March to October are whole months that are over.
+  const whole = chunks.filter((chunk) => chunk.mode === 'month');
+  assert.equal(whole.length, 8);
+  assert.deepEqual(whole[0], { from: '2026-03-01', to: '2026-03-31', mode: 'month' });
+  assert.deepEqual(whole[7], { from: '2026-10-01', to: '2026-10-31', mode: 'month' });
+  // November is the month being written now, so it is walked a day at a time.
+  assert.deepEqual(chunks[8], { from: '2026-11-01', to: '2026-11-21', mode: 'days' });
+});
+
+await check('a part of a month is walked a day at a time', () => {
+  // The first and the last month of a window are cut short, and a cut-short
+  // month is not walked in one go — the day-at-a-time walk is the one
+  // measured complete everywhere.
+  const chunks = ratingChunks('2026-08-23', '2026-11-21', '2026-11-21');
+  assert.deepEqual(chunks[0], { from: '2026-08-23', to: '2026-08-31', mode: 'days' });
+  assert.deepEqual(chunks[3], { from: '2026-11-01', to: '2026-11-21', mode: 'days' });
+});
+
+await check('a month is only whole when it runs from its first day to its last', () => {
+  assert.equal(isWholeCalendarMonth('2026-03-01', '2026-03-31'), true);
+  assert.equal(isWholeCalendarMonth('2026-03-01', '2026-03-30'), false);
+  assert.equal(isWholeCalendarMonth('2026-03-02', '2026-03-31'), false);
+  // February in a leap year, and in a common one.
+  assert.equal(isWholeCalendarMonth('2028-02-01', '2028-02-29'), true);
+  assert.equal(isWholeCalendarMonth('2026-02-01', '2026-02-28'), true);
+});
+
+await check('the link is written as a list of tuples', () => {
+  // A row of a `values` list is a tuple — it needs its brackets. Without
+  // them the parser stops at the first number and says "syntax error at or
+  // near 774", which names nothing useful.
+  const sql = reviewLinkStatement([
+    { id: 774, order_no: '659', order_date: '2026-03-12', phone: '', is_linked: true, listing: 'zomato_atelier' },
+  ]);
+  assert.equal(sql.includes("(774,'659','2026-03-12'::date,'',true,'zomato_atelier')"), true);
+  assert.equal(sql.includes('values (774'), true);
+});
+
+await check('a quote in a value cannot break the statement', () => {
+  const sql = reviewLinkStatement([
+    { id: 1, order_no: "66'5", order_date: null, phone: '', is_linked: false, listing: '' },
+  ]);
+  // The quote is doubled, so the value stays inside its own quotes.
+  assert.equal(sql.includes("'66''5'"), true);
+});
+
+await check('each of our three pages is counted on its own', () => {
+  assert.equal(listingBucket('zomato_atelier'), 'zomato_atelier');
+  assert.equal(listingBucket('swiggy_atelier'), 'swiggy_atelier');
+  assert.equal(listingBucket('swiggy_ambrosia'), 'swiggy_ambrosia');
+});
+
+await check('a review that is not on a page of ours shares one bucket', () => {
+  // A review with no order names no page, and a Swiggy order with no brand
+  // names only the marketplace. Both go into the same bucket — one bucket,
+  // not one per reason.
+  assert.equal(listingBucket(''), UNLISTED_KEY);
+  assert.equal(listingBucket('swiggy'), UNLISTED_KEY);
+  assert.equal(listingBucket(null), UNLISTED_KEY);
 });
 
 console.log(`\n${passed} checks passed.`);

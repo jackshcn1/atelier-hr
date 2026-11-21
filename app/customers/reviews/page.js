@@ -3,16 +3,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  count, rating, ratingPill, formatDate, formatMonth, platformLabel,
+  count, rating, ratingPill, formatDate, formatMonth, money, listingLabel,
 } from '../../../lib/customerFormat';
+import { UNLISTED_KEY } from '../../../lib/customerParsers';
 
 /**
  * app/customers/reviews/page.js — what people said about us.
  *
- * The reviews come from the platforms the food is ordered from: Zomato and
- * Swiggy, both read out of Petpooja. Google is shown as a gap on purpose —
- * "we have no Google reviews" and "we have not connected Google" are
- * different things, and only one of them is true.
+ * ## The three listings, not two platforms
+ *
+ * The restaurant is on **three** pages: Zomato, Swiggy — Atelier and
+ * Swiggy — Ambrosia. Swiggy carries two of them, and they are two different
+ * pages with two different ratings and two different sets of people
+ * complaining. Averaging them into one "Swiggy" is what made the number on
+ * the site disagree with the number on the platform. So every count and
+ * every average on this page is **per listing**.
+ *
+ * ## Two ratings, side by side, each labelled
+ *
+ *   On the platform   the rating the platform publishes — Zomato 4.3 from
+ *                     4,401 ratings. It is read from the platform's own
+ *                     page, and it covers the whole life of the listing.
+ *
+ *   From our reviews  the average of the reviews Petpooja holds. Petpooja
+ *                     only holds them **from March 2026**, so this number is
+ *                     always the smaller history.
+ *
+ * They are different numbers because they are different questions, and the
+ * page says which is which rather than picking one.
+ *
+ * ## Which order the review came from
+ *
+ * Every review is matched to the order it was left on, and the order is
+ * shown with the review — what was ordered, what it came to. The join is on
+ * the pair (order number, day), because Petpooja restarts its order
+ * numbering and a number on its own is not an identity.
  *
  * **The honest limit, stated on the page.** A platform order usually carries
  * no contact number — the platform holds the customer's number, not
@@ -56,16 +81,115 @@ function Bar({ share, tone = 'accent' }) {
   );
 }
 
+/**
+ * The rating a platform publishes, in words.
+ *
+ * Swiggy publishes an abbreviation ("2.6K+") and no exact count, so the
+ * abbreviation is what is shown — an expanded guess would be a number the
+ * platform never published.
+ */
+function officialCount(official) {
+  if (!official) return '—';
+  if (official.countText) return official.countText;
+  if (official.count !== null && official.count !== undefined) return count(official.count);
+  return '—';
+}
+
+/** One listing: the platform's rating beside ours, and the reviews behind it. */
+function ListingCard({ listing }) {
+  const official = listing.official;
+
+  return (
+    <div className="border border-rule-soft rounded-card p-4 flex flex-col">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-serif text-lg text-ink">{listing.label}</h3>
+        {official && official.rating ? (
+          <span className={`pill ${ratingPill(official.rating)}`}>
+            {rating(official.rating)} ★ on the platform
+          </span>
+        ) : (
+          <span className="pill pill-quiet">Not read yet</span>
+        )}
+      </div>
+
+      {/* ---- The platform's own rating ---------------------------------- */}
+      {official && official.rating ? (
+        <div className="mt-3 border border-rule-soft rounded-card p-3 bg-page">
+          <p className="text-2xs uppercase tracking-wide text-ink-muted">On the platform</p>
+          <p className="font-serif text-[1.9rem] leading-tight mt-1 tnum text-ink">
+            {rating(official.rating)} ★
+            <span className="text-base text-ink-muted ml-2 font-sans">
+              {officialCount(official)} ratings
+            </span>
+          </p>
+          <p className="text-xs text-ink-muted mt-1">
+            {official.name ? `${official.name} — ` : ''}
+            read on {formatDate(official.fetchedAt)}
+            {official.url ? (
+              <>
+                {' · '}
+                <a
+                  href={official.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline"
+                >
+                  see the listing
+                </a>
+              </>
+            ) : null}
+          </p>
+        </div>
+      ) : null}
+
+      {/* ---- Our own average over the reviews we hold -------------------- */}
+      <div className="mt-3">
+        <p className="text-2xs uppercase tracking-wide text-ink-muted">From the reviews we hold</p>
+        <p className="font-serif text-[1.9rem] leading-tight mt-1 tnum text-ink">
+          {listing.count ? rating(listing.avgRating) : '—'}
+          <span className="text-base text-ink-muted ml-2 font-sans">★</span>
+        </p>
+        <p className="text-sm text-ink-muted mt-1">
+          {count(listing.count)} review{listing.count === 1 ? '' : 's'} since March 2026 ·{' '}
+          {count(listing.linked)} matched to an order
+        </p>
+        <div className="mt-2">
+          <Bar
+            share={listing.avgRating ? (listing.avgRating / 5) * 100 : 0}
+            tone={listing.avgRating >= 4 ? 'good' : listing.avgRating >= 3 ? 'warn' : 'accent'}
+          />
+        </div>
+      </div>
+
+      {listing.comments.length > 0 ? (
+        <div className="hairline-list mt-3">
+          {listing.comments.slice(0, 4).map((comment, index) => (
+            <div key={`${comment.date}-${index}`} className="py-2">
+              <p className="text-sm text-ink">“{comment.comment}”</p>
+              <p className="text-xs text-ink-muted mt-1">
+                {rating(comment.rating)} ★ · {formatDate(comment.date)}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-ink-muted mt-3">No written comment on this listing.</p>
+      )}
+    </div>
+  );
+}
+
 export default function CustomerReviewsPage() {
   const [data, setData] = useState(null);
-  const [platform, setPlatform] = useState('');
+  const [listing, setListing] = useState('');
+  const [trendListing, setTrendListing] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     const params = new URLSearchParams({ view: 'reviews' });
-    if (platform) params.set('platform', platform);
+    if (listing) params.set('listing', listing);
 
     fetch(`/api/customers?${params.toString()}`)
       .then((res) => res.json())
@@ -82,12 +206,19 @@ export default function CustomerReviewsPage() {
       });
 
     return () => { alive = false; };
-  }, [platform]);
+  }, [listing]);
+
+  // The month-by-month rating, for the listing being read or for all of them.
+  const trend = useMemo(() => {
+    if (!data) return [];
+    if (!trendListing) return data.ratingTrend;
+    const line = (data.listings || []).find((entry) => entry.listing === trendListing);
+    return line ? line.trend || [] : [];
+  }, [data, trendListing]);
 
   const bestMonth = useMemo(() => {
-    if (!data) return 0;
-    return data.ratingTrend.reduce((max, row) => Math.max(max, Number(row.avgRating || 0)), 0);
-  }, [data]);
+    return trend.reduce((max, row) => Math.max(max, Number(row.avgRating || 0)), 0);
+  }, [trend]);
 
   if (loading) {
     return (
@@ -110,6 +241,12 @@ export default function CustomerReviewsPage() {
   }
 
   const r = data;
+  const listings = r.listings || [];
+  // The three pages we are on, and the one bucket for the reviews that are
+  // not on a page of ours.
+  const ourPages = listings.filter((line) => line.listing !== UNLISTED_KEY);
+  const leftovers = listings.filter((line) => line.listing === UNLISTED_KEY);
+  const ourListings = listings.filter((line) => line.count > 0);
 
   return (
     <main className="min-h-screen bg-page text-ink">
@@ -125,8 +262,8 @@ export default function CustomerReviewsPage() {
           <div>
             <h1 className="page-title">Reviews</h1>
             <p className="page-purpose">
-              What people said after eating with us, on the platforms they order from — and the
-              Google listing waiting to be connected.
+              What people said about us on each of our three listings — the rating the platform
+              publishes, the reviews we hold, and the order each review was left on.
             </p>
           </div>
           <Link href="/customers/overview" className="btn-secondary">Overview</Link>
@@ -140,15 +277,15 @@ export default function CustomerReviewsPage() {
             sub={`${count(r.withComment)} with a written comment`}
           />
           <Stat
-            label="Average rating"
+            label="Our average"
             value={rating(r.avgRating)}
-            sub="Out of five, across every platform"
+            sub="Out of five, over the reviews we hold since March 2026"
             accent
           />
           <Stat
-            label="Platforms"
-            value={count(r.platforms.length)}
-            sub={r.platforms.map((p) => platformLabel(p.platform)).join(' · ') || 'None yet'}
+            label="Listings"
+            value={count(ourPages.length)}
+            sub={ourPages.map((line) => line.label).join(' · ') || 'None yet'}
           />
           <Stat
             label="Reached a customer"
@@ -157,53 +294,43 @@ export default function CustomerReviewsPage() {
           />
         </div>
 
-        {/* ---- The platforms ---------------------------------------------- */}
+        {/* ---- The listings ---------------------------------------------- */}
         <section className="panel mb-8">
           <div className="panel-body">
             <SectionHead
-              title="By platform"
-              note="The rating people gave, and what they wrote about us."
+              title="By listing"
+              note="We are on three pages. Each has its own rating and its own reviews, so each is counted on its own."
             />
-            {r.platforms.length === 0 ? (
+            {listings.length === 0 ? (
               <p className="note">No reviews have been pulled in yet. The nightly sync brings them in.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {r.platforms.map((platform) => (
-                  <div key={platform.platform} className="border border-rule-soft rounded-card p-4">
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {ourPages.map((line) => (
+                    <ListingCard key={line.listing} listing={line} />
+                  ))}
+                </div>
+
+                {/* The reviews that are not on a page of ours. */}
+                {leftovers.map((line) => (
+                  <div key={line.listing} className="border border-rule-soft rounded-card p-4 bg-page mt-6">
                     <div className="flex items-center justify-between gap-3">
-                      <h3 className="font-serif text-lg text-ink">{platformLabel(platform.platform)}</h3>
-                      <span className={`pill ${ratingPill(platform.avgRating)}`}>
-                        {rating(platform.avgRating)} out of 5
+                      <h3 className="font-serif text-lg text-ink">Not on a listing</h3>
+                      <span className="pill pill-quiet">
+                        {count(line.count)} review{line.count === 1 ? '' : 's'}
                       </span>
                     </div>
-                    <p className="text-sm text-ink-muted mt-1">
-                      {count(platform.count)} reviews · {count(platform.linked)} matched to an order
+                    <p className="text-sm text-ink-muted mt-2">
+                      {count(line.linked)} of these sit behind an order and {count(line.unlinked)} sit
+                      behind none — Petpooja does not hold those orders, so nothing says which page
+                      they were left on. They are kept and counted here rather than pushed onto a
+                      page they may not belong to.
                     </p>
-                    <div className="mt-3">
-                      <Bar
-                        share={platform.avgRating ? (platform.avgRating / 5) * 100 : 0}
-                        tone={platform.avgRating >= 4 ? 'good' : platform.avgRating >= 3 ? 'warn' : 'accent'}
-                      />
-                    </div>
-                    {platform.comments.length > 0 ? (
-                      <div className="hairline-list mt-3">
-                        {platform.comments.slice(0, 4).map((comment, index) => (
-                          <div key={`${comment.date}-${index}`} className="py-2">
-                            <p className="text-sm text-ink">“{comment.comment}”</p>
-                            <p className="text-xs text-ink-muted mt-1">
-                              {rating(comment.rating)} ★ · {formatDate(comment.date)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-ink-muted mt-3">No written comment on this platform.</p>
-                    )}
                   </div>
                 ))}
 
                 {/* The Google gap, said plainly. */}
-                <div className="border border-rule-soft rounded-card p-4 bg-page">
+                <div className="border border-rule-soft rounded-card p-4 bg-page mt-6">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="font-serif text-lg text-ink">Google</h3>
                     <span className="pill pill-quiet">Not connected yet</span>
@@ -218,7 +345,7 @@ export default function CustomerReviewsPage() {
                     is Google's approval for this app to read them.
                   </p>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </section>
@@ -230,8 +357,33 @@ export default function CustomerReviewsPage() {
               title="The rating, month by month"
               note="A fall in the rating is a fall in the business. This is where it would show first."
             />
-            {r.ratingTrend.length === 0 ? (
-              <p className="note">No dated reviews yet.</p>
+
+            <div className="flex flex-wrap gap-1.5 mb-6">
+              <button
+                type="button"
+                onClick={() => setTrendListing('')}
+                className={trendListing === '' ? 'btn-primary text-xs px-3 py-1.5' : 'btn-secondary text-xs px-3 py-1.5'}
+              >
+                All listings
+              </button>
+              {ourListings.map((line) => (
+                <button
+                  key={line.listing}
+                  type="button"
+                  onClick={() => setTrendListing(line.listing)}
+                  className={
+                    trendListing === line.listing
+                      ? 'btn-primary text-xs px-3 py-1.5'
+                      : 'btn-secondary text-xs px-3 py-1.5'
+                  }
+                >
+                  {line.label} · {count(line.count)}
+                </button>
+              ))}
+            </div>
+
+            {trend.length === 0 ? (
+              <p className="note">No dated reviews for this listing yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[30rem]">
@@ -243,7 +395,7 @@ export default function CustomerReviewsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {r.ratingTrend.map((row) => (
+                    {trend.map((row) => (
                       <tr key={row.month}>
                         <td className="table-cell whitespace-nowrap">{formatMonth(row.month)}</td>
                         <td className="table-cell tnum">{count(row.count)}</td>
@@ -272,52 +424,53 @@ export default function CustomerReviewsPage() {
           <div className="panel-body">
             <SectionHead
               title="Every review"
-              note="Newest first. Click a platform to narrow the list."
+              note="Newest first, with the order it was left on — so the dish behind a good or bad review can be looked at."
             />
 
             <div className="flex flex-wrap gap-1.5 mb-6">
               <button
                 type="button"
-                onClick={() => setPlatform('')}
-                className={platform === '' ? 'btn-primary text-xs px-3 py-1.5' : 'btn-secondary text-xs px-3 py-1.5'}
+                onClick={() => setListing('')}
+                className={listing === '' ? 'btn-primary text-xs px-3 py-1.5' : 'btn-secondary text-xs px-3 py-1.5'}
               >
                 All · {count(r.count)}
               </button>
-              {r.platforms.map((p) => (
+              {ourListings.map((line) => (
                 <button
-                  key={p.platform}
+                  key={line.listing}
                   type="button"
-                  onClick={() => setPlatform(p.platform)}
+                  onClick={() => setListing(line.listing)}
                   className={
-                    platform === p.platform
+                    listing === line.listing
                       ? 'btn-primary text-xs px-3 py-1.5'
                       : 'btn-secondary text-xs px-3 py-1.5'
                   }
                 >
-                  {platformLabel(p.platform)} · {count(p.count)}
+                  {line.label} · {count(line.count)}
                 </button>
               ))}
             </div>
 
             {r.rows.length === 0 ? (
-              <p className="note">No reviews on this platform yet.</p>
+              <p className="note">No reviews on this listing yet.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[44rem]">
+                <table className="w-full min-w-[58rem]">
                   <thead>
                     <tr>
                       <th className="table-head">Date</th>
-                      <th className="table-head">Platform</th>
+                      <th className="table-head">Listing</th>
                       <th className="table-head">Rating</th>
                       <th className="table-head">What they said</th>
+                      <th className="table-head">The order</th>
                       <th className="table-head">Reached</th>
                     </tr>
                   </thead>
                   <tbody>
                     {r.rows.map((row, index) => (
-                      <tr key={`${row.platform}-${row.review_date}-${index}`}>
+                      <tr key={`${row.listing}-${row.review_date}-${index}`}>
                         <td className="table-cell whitespace-nowrap">{formatDate(row.review_date)}</td>
-                        <td className="table-cell whitespace-nowrap">{platformLabel(row.platform)}</td>
+                        <td className="table-cell whitespace-nowrap">{listingLabel(row.listing)}</td>
                         <td className="table-cell">
                           <span className={`pill whitespace-nowrap ${ratingPill(row.rating)}`}>
                             {rating(row.rating)} ★
@@ -328,6 +481,27 @@ export default function CustomerReviewsPage() {
                             <span className="text-ink">“{row.comment}”</span>
                           ) : (
                             <span className="text-ink-muted">No comment</span>
+                          )}
+                        </td>
+                        <td className="table-cell">
+                          {row.order ? (
+                            <div>
+                              <span className="text-ink tnum whitespace-nowrap">
+                                #{row.order.order_no}
+                                {row.order.order_date ? ` · ${formatDate(row.order.order_date)}` : ''}
+                              </span>
+                              {row.order.items ? (
+                                <span className="text-xs text-ink-muted block">
+                                  {row.order.items}
+                                </span>
+                              ) : null}
+                              <span className="text-xs text-ink-muted block">
+                                {money(row.order.amount)}
+                                {row.order.channel ? ` · ${row.order.channel.replace('_', ' ')}` : ''}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-ink-muted">Not matched</span>
                           )}
                         </td>
                         <td className="table-cell whitespace-nowrap">

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  money, count, rating, ratingPill, formatDate, platformLabel, customerName,
+  money, count, rating, ratingPill, formatDate, customerName, customerListingLabel,
 } from '../../../lib/customerFormat';
+import { LISTINGS } from '../../../lib/customerParsers';
 
 /**
  * app/customers/list/page.js — every customer, in one table.
@@ -30,7 +31,7 @@ export default function CustomerListPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('spend');
-  const [platform, setPlatform] = useState('');
+  const [listing, setListing] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -40,7 +41,7 @@ export default function CustomerListPage() {
     try {
       const params = new URLSearchParams({ view: 'list', sort });
       if (search.trim()) params.set('search', search.trim());
-      if (platform) params.set('platform', platform);
+      if (listing) params.set('listing', listing);
 
       const res = await fetch(`/api/customers?${params.toString()}`);
       const json = await res.json();
@@ -55,16 +56,11 @@ export default function CustomerListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, sort, platform]);
+  }, [search, sort, listing]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  const platforms = useMemo(() => {
-    const seen = new Set(rows.map((row) => row.platform));
-    return [...seen].filter(Boolean);
-  }, [rows]);
 
   return (
     <main className="min-h-screen bg-page text-ink">
@@ -119,16 +115,16 @@ export default function CustomerListPage() {
               </select>
             </div>
             <div>
-              <label className="field-label" htmlFor="customer-platform">Where they order</label>
+              <label className="field-label" htmlFor="customer-listing">Where they order</label>
               <select
-                id="customer-platform"
+                id="customer-listing"
                 className="field"
-                value={platform}
-                onChange={(event) => setPlatform(event.target.value)}
+                value={listing}
+                onChange={(event) => setListing(event.target.value)}
               >
                 <option value="">Everyone</option>
-                {platforms.map((key) => (
-                  <option key={key} value={key}>{platformLabel(key)}</option>
+                {LISTINGS.map((entry) => (
+                  <option key={entry.key} value={entry.key}>{entry.label}</option>
                 ))}
               </select>
             </div>
@@ -184,7 +180,7 @@ export default function CustomerListPage() {
                         <td className="table-cell tnum">{money(row.total_spend)}</td>
                         <td className="table-cell tnum">{money(row.avg_order_value)}</td>
                         <td className="table-cell whitespace-nowrap">{formatDate(row.last_order_at)}</td>
-                        <td className="table-cell">{platformLabel(row.platform)}</td>
+                        <td className="table-cell">{customerListingLabel(row.listing, row.listings)}</td>
                         <td className="table-cell">
                           {row.avg_rating ? (
                             <span className={`pill ${ratingPill(row.avg_rating)}`}>

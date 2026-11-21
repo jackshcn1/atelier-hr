@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   money, count, percent, rating, ratingPill, formatDate, formatMonth,
-  platformLabel, customerName,
+  listingLabel, customerName,
 } from '../../../lib/customerFormat';
+import { UNLISTED_KEY } from '../../../lib/customerParsers';
 
 /**
  * app/customers/overview/page.js — the Customer section's overview.
@@ -17,8 +18,9 @@ import {
  *   1. **How much of the business belongs to a person** — the order value, the
  *      number of people, how many of them come back, and how much of the value
  *      has no contact number attached to it (the gap).
- *   2. **What people say** — the reviews left on Zomato and Swiggy, and the
- *      ratings they gave.
+ *   2. **What people say** — the reviews left on each of our three listings
+ *      (Zomato, Swiggy — Atelier, Swiggy — Ambrosia), the ratings they gave,
+ *      and the rating each platform itself publishes.
  *   3. **What people want improved** — the feedback form, question by
  *      question, with the tags people used and the waiter they were about.
  *
@@ -113,6 +115,9 @@ export default function CustomersPage() {
   const g = data.gap;
   const r = data.reviews;
   const f = data.feedback;
+  // The three pages we are on. The reviews that are not on a page of ours are
+  // counted too, but they are not one of our listings.
+  const pages = (r.listings || []).filter((line) => line.listing !== UNLISTED_KEY);
   const bestMonth = data.trend.reduce(
     (max, row) => Math.max(max, Number(row.customerAmount || 0)),
     0,
@@ -165,7 +170,7 @@ export default function CustomersPage() {
           <Stat
             label="Average rating"
             value={rating(r.avgRating)}
-            sub={`${count(r.count)} reviews on the delivery platforms`}
+            sub={`${count(r.count)} reviews across ${count(pages.length)} listings`}
           />
         </div>
 
@@ -266,9 +271,9 @@ export default function CustomersPage() {
                 <div className="py-3">
                   <p className="text-2xs uppercase tracking-wide text-ink-muted">Orders came from</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {Object.entries(c.byPlatform).map(([platform, n]) => (
-                      <span key={platform} className="pill pill-quiet">
-                        {platformLabel(platform)} · {count(n)}
+                    {Object.entries(c.byListing).map(([listing, n]) => (
+                      <span key={listing} className="pill pill-quiet">
+                        {listingLabel(listing)} · {count(n)}
                       </span>
                     ))}
                   </div>
@@ -285,7 +290,7 @@ export default function CustomersPage() {
               <div>
                 <h2 className="panel-title">Reviews</h2>
                 <p className="text-sm text-ink-muted mt-1">
-                  What people said after eating with us, on the platforms they order from.
+                  What people said after eating with us, on the three pages we are listed on.
                 </p>
               </div>
               <Link href="/customers/reviews" className="btn-secondary text-xs px-3 py-1.5 whitespace-nowrap">
@@ -294,32 +299,41 @@ export default function CustomersPage() {
             </div>
             {r.count > 0 ? (
               <p className="note mb-6">
-                {count(r.count)} reviews on the delivery platforms.{' '}
+                {count(r.count)} reviews on the books, from March 2026.{' '}
                 {count(r.reachedCustomer)} of them reached a customer by name — a platform order usually
                 carries no contact number, because the platform holds the customer's number and not
                 Petpooja. The rest are still counted, rated and shown.
               </p>
             ) : null}
-            {r.platforms.length === 0 ? (
+            {r.listings.length === 0 ? (
               <p className="note mb-6">
                 No reviews have been pulled in yet. The nightly sync brings them in.
               </p>
             ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {r.platforms.map((platform) => (
-                <div key={platform.platform} className="border border-rule-soft rounded-card p-4">
+              {r.listings.map((line) => (
+                <div key={line.listing} className="border border-rule-soft rounded-card p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-serif text-lg text-ink">{platformLabel(platform.platform)}</h3>
-                    <span className={`pill ${ratingPill(platform.avgRating)}`}>
-                      {rating(platform.avgRating)} out of 5
+                    <h3 className="font-serif text-lg text-ink">{line.label}</h3>
+                    <span className={`pill ${ratingPill(line.avgRating)}`}>
+                      {rating(line.avgRating)} out of 5
                     </span>
                   </div>
                   <p className="text-sm text-ink-muted mt-1">
-                    {count(platform.count)} reviews · {count(platform.linked)} matched to an order
+                    {count(line.count)} reviews · {count(line.linked)} matched to an order
                   </p>
-                  {platform.comments.length > 0 ? (
+                  {line.official && line.official.rating ? (
+                    <p className="text-sm text-ink-muted mt-1">
+                      On the platform:{' '}
+                      <span className="text-ink tnum">
+                        {rating(line.official.rating)} ★
+                      </span>
+                      {line.official.countText ? ` · ${line.official.countText} ratings` : ''}
+                    </p>
+                  ) : null}
+                  {line.comments.length > 0 ? (
                     <div className="hairline-list mt-3">
-                      {platform.comments.slice(0, 2).map((comment, index) => (
+                      {line.comments.slice(0, 2).map((comment, index) => (
                         <div key={`${comment.date}-${index}`} className="py-2">
                           <p className="text-sm text-ink">“{comment.comment}”</p>
                           <p className="text-xs text-ink-muted mt-1">
@@ -329,13 +343,19 @@ export default function CustomersPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-ink-muted mt-3">No written comment on this platform.</p>
+                    <p className="text-sm text-ink-muted mt-3">No written comment on this listing.</p>
                   )}
+                  {line.listing === UNLISTED_KEY ? (
+                    <p className="text-sm text-ink-muted mt-3">
+                      These came through a marketplace but not from a page of ours, so nothing says
+                      which page they were left on. They are kept and counted here.
+                    </p>
+                  ) : null}
                 </div>
               ))}
 
               {/* The Google gap, said plainly. It is shown whether or not the
-                  other platforms have anything, because "we have no Google
+                  other listings have anything, because "we have no Google
                   reviews" and "we have not connected Google" are different
                   things and only one of them is true. */}
               <div className="border border-rule-soft rounded-card p-4 bg-page">
