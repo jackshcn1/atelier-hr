@@ -70,10 +70,10 @@ export default function CustomerListPage() {
     <main className="min-h-screen bg-page text-ink">
       <div className="max-w-shell mx-auto px-6 py-16 lg:py-24">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
-            ← Home
+          <Link href="/customers" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
+            ← Back to Customers
           </Link>
-          <span className="text-ink-muted text-sm">Module / Customers</span>
+          <span className="text-ink-muted text-sm">Customers / All Customers</span>
         </div>
 
         <div className="page-head">
@@ -84,9 +84,11 @@ export default function CustomerListPage() {
               one person — so nobody is counted twice.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/customers" className="btn-secondary">Overview</Link>
+          <div className="flex gap-2 flex-wrap">
+            <Link href="/customers/overview" className="btn-secondary">Overview</Link>
             <Link href="/customers/list" className="btn-secondary">All customers</Link>
+            <Link href="/customers/reviews" className="btn-secondary">Reviews</Link>
+            <Link href="/customers/feedback" className="btn-secondary">Feedback</Link>
           </div>
         </div>
 
