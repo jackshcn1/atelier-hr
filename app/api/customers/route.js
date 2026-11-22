@@ -159,7 +159,7 @@ function buildReviewPicture(reviews, official = {}) {
         }))
         .sort((a, b) => a.month.localeCompare(b.month)),
     }))
-    // The three listings in the order they are listed in the app, so the page
+    // The listings in the order they are listed in the app, so the page
     // does not reshuffle itself as the number of reviews changes.
     .sort((a, b) => listingOrder(a.listing) - listingOrder(b.listing) || b.count - a.count);
 
@@ -295,7 +295,7 @@ function buildFeedbackPicture(feedback) {
  */
 async function readOfficialRatings(supabase) {
   const rows = await selectRows(supabase, `
-    select listing, name, platform, rating, rating_count, rating_count_text, source_url, fetched_at
+    select listing, name, platform, rating, rating_count, rating_count_text, source_url, source, fetched_at
     from public.platform_listings`);
 
   const byListing = {};
@@ -308,6 +308,7 @@ async function readOfficialRatings(supabase) {
       count: row.rating_count === null ? null : Number(row.rating_count),
       countText: row.rating_count_text || '',
       url: row.source_url || '',
+      source: row.source || '',
       fetchedAt: row.fetched_at,
     };
   }
@@ -531,9 +532,11 @@ async function overview(supabase) {
       })),
       atRiskCount: atRisk.length,
       google: {
-        connected: false,
+        // The rating is read from the Places API and needs no approval. The
+        // **reviews** are the thing still waiting on Google.
+        reviewsConnected: false,
         note:
-          'Google reviews are not in Petpooja. They come from the Google Business Profile API, which needs access granted by Google (7–14 working days). The column is ready and waiting.',
+          'Google reviews are not in Petpooja. They come from the Google Business Profile API, which needs access granted by Google (7–14 working days). A manager of the listing can then read every review and reply to it.',
       },
       generatedAt: todayInIST(),
     },

@@ -31,7 +31,12 @@ import {
   listingOf,
   listingByKey,
   LISTINGS,
+  ORDERABLE_LISTINGS,
+  GOOGLE_LISTING_KEY,
+  GOOGLE_PLACE_ID,
 } from '../lib/customerParsers.js';
+import { listingLabel } from '../lib/customerFormat.js';
+import { parsePlacesRating } from '../scripts/sync-platform-ratings.mjs';
 import {
   monthChunks,
   splitRange,
@@ -357,10 +362,11 @@ await check('the listing is read from the sub order type', () => {
   assert.equal(listingOf(''), '');
   assert.equal(listingOf(null), '');
 
-  // The three listings are the ones we are actually on.
+  // The four listings are the ones we are actually on: the three marketplaces
+  // Petpooja knows about, and Google.
   assert.deepEqual(
     LISTINGS.map((listing) => listing.key),
-    ['zomato_atelier', 'swiggy_atelier', 'swiggy_ambrosia'],
+    ['zomato_atelier', 'swiggy_atelier', 'swiggy_ambrosia', 'google_atelier'],
   );
   // Zomato and Swiggy share a marketplace; the listing is what tells them
   // apart, and it never does.
@@ -771,10 +777,11 @@ await check('a quote in a value cannot break the statement', () => {
   assert.equal(sql.includes("'66''5'"), true);
 });
 
-await check('each of our three pages is counted on its own', () => {
+await check('each of our four pages is counted on its own', () => {
   assert.equal(listingBucket('zomato_atelier'), 'zomato_atelier');
   assert.equal(listingBucket('swiggy_atelier'), 'swiggy_atelier');
   assert.equal(listingBucket('swiggy_ambrosia'), 'swiggy_ambrosia');
+  assert.equal(listingBucket('google_atelier'), 'google_atelier');
 });
 
 await check('a review that is not on a page of ours shares one bucket', () => {
@@ -784,6 +791,52 @@ await check('a review that is not on a page of ours shares one bucket', () => {
   assert.equal(listingBucket(''), UNLISTED_KEY);
   assert.equal(listingBucket('swiggy'), UNLISTED_KEY);
   assert.equal(listingBucket(null), UNLISTED_KEY);
+});
+
+await check('Google is a listing, but not somewhere anyone orders', () => {
+  const google = listingByKey(GOOGLE_LISTING_KEY);
+  assert.ok(google, 'the Google listing is one of ours');
+  assert.equal(google.platform, 'google');
+  assert.equal(google.source, 'google');
+  // The Places API answers for a place by this string.
+  assert.match(google.placeId, /^ChIJ[A-Za-z0-9_-]+$/);
+  assert.equal(google.placeId, GOOGLE_PLACE_ID);
+  assert.equal(listingLabel(GOOGLE_LISTING_KEY), 'Google');
+
+  // Nobody orders on Google, so it must not appear as a place a customer
+  // orders from. If it did, the filter would offer a choice that matches
+  // nobody and would quietly rename the marketplaces.
+  assert.deepEqual(
+    ORDERABLE_LISTINGS.map((listing) => listing.key),
+    ['zomato_atelier', 'swiggy_atelier', 'swiggy_ambrosia'],
+  );
+  assert.equal(ORDERABLE_LISTINGS.includes(google), false);
+});
+
+await check('Google is read by the Places API, which needs only a key', () => {
+  // What the API answers with.
+  const found = parsePlacesRating({
+    id: GOOGLE_PLACE_ID,
+    displayName: { text: 'Atelier by Ambrosia' },
+    rating: 4,
+    userRatingCount: 3628,
+  });
+  assert.equal(found.rating, 4);
+  assert.equal(found.count, 3628);
+  assert.equal(found.countText, '3628');
+  assert.equal(found.name, 'Atelier by Ambrosia');
+
+  // A place with no rating yet is not a rating, and must not be read as one.
+  assert.equal(parsePlacesRating({ id: GOOGLE_PLACE_ID }), null);
+  assert.equal(parsePlacesRating({ rating: 0, userRatingCount: 10 }), null);
+  assert.equal(parsePlacesRating(null), null);
+  assert.equal(parsePlacesRating('nonsense'), null);
+
+  // A count that is missing is missing — it is never invented.
+  const noCount = parsePlacesRating({ rating: 4.5, userRatingCount: 0 });
+  assert.equal(noCount.rating, 4.5);
+  assert.equal(noCount.count, null);
+  assert.equal(noCount.countText, '');
 });
 
 console.log(`\n${passed} checks passed.`);

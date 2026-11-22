@@ -290,6 +290,7 @@ not name the customer either.
 | Reviews | The **Ratings & Reviews** endpoint (`online_review_data/428501`), 5409 = Zomato, 6736 = Swiggy | the **platform order id** (`Client OrderID`) |
 | Feedback | The **Customer Feedback Form** sheet, read through the service account | the **bill number** only — the form has no phone column |
 | Google reviews | **Not in Petpooja.** They need the Google Business Profile API | — |
+| Google rating | **Places API** — an API key only, no approval | the Place ID |
 
 ### The platform is read, never guessed
 
@@ -298,17 +299,18 @@ Petpooja's **Sub Order Type** says where the order came from: `Dine In`,
 `IGST Area`. The platform comes from that — never from the length of the
 platform order id.
 
-## Three pages, three ratings
+## Four pages, four ratings
 
 **A marketplace is not a listing.** Swiggy carries two of our restaurants, and
 they are two different pages with two different ratings — so the books count
-**three listings**, not two marketplaces:
+**four listings**, not two marketplaces and not one Google:
 
 | Listing | Platform | Page |
 |---|---|---|
 | `zomato_atelier` | Zomato | `zomato.com/it/trivandrum/atelier-by-ambrosia-…/order` |
 | `swiggy_atelier` | Swiggy | `swiggy.com/city/thiruvananthapuram/atelier-by-ambrosia-…-rest272534` |
 | `swiggy_ambrosia` | Swiggy | `swiggy.com/city/thiruvananthapuram/ambrosia-…-rest78577` |
+| `google_atelier` | Google | our Google Maps listing (Place ID `ChIJ2dZj-yO7BTsR3dRz2zTaMjg`) |
 
 `platform` keeps its meaning (`zomato` / `swiggy`) and stays part of the
 review's database key `(platform, client_order_id, review_date)`. The
@@ -321,9 +323,10 @@ says which of the two Swiggy pages it was left on.
 
 | Listing | The platform's own rating | The site's own average |
 |---|---|---|
-| Zomato | **4.3** from 4,401 ratings (delivery) | 4.08 ★ over 917 reviews |
+| Zomato | **4.3** from 4,404 ratings (delivery) | 4.08 ★ over 917 reviews |
 | Swiggy — Atelier | **4.4** (2.6K+) | 4.17 ★ over 192 reviews |
 | Swiggy — Ambrosia | **4.5** (10K+) | 4.16 ★ over 222 reviews |
+| Google | **4.0** from 3,628 ratings | none held yet — see "The Google gap" |
 
 The two numbers answer different questions and are shown side by side. The
 platform's rating is **lifetime** — every review the platform has, going back
@@ -372,6 +375,47 @@ approval for this app.
 `customer_reviews.platform` already accepts `google`, so the connector slots
 in when the access arrives. The page shows the gap as a gap, rather than
 hiding it.
+
+### But the rating does not have to wait — 22 Nov 2026
+
+The 12-day wait is on the **reviews**. The **rating** is a different door:
+the **Places API** answers for any place by its Place ID with nothing but an
+API key — no OAuth, no approval, no waiting.
+
+| | Business Profile API | Places API |
+|---|---|---|
+| Approval | Google reviews the application — 7–14 days | none |
+| Gives | every review, dated, and the right to reply | the average rating and the number of ratings |
+| Auth | OAuth `business.manage` | an API key |
+
+Our listing: **Atelier by Ambrosia**, Ground Floor, Koluthara Towers,
+Marappalam Road, Pattom — Place ID **`ChIJ2dZj-yO7BTsR3dRz2zTaMjg`** —
+**4.0 ★ from 3,628 ratings**, measured on the Maps listing on 22 Nov 2026.
+
+So Google became a **fourth listing** (`google_atelier`) with a card on the
+Reviews page, while the other three stay as they were.
+
+**Google is not a marketplace.** Nobody orders on it, so it is left out of
+`ORDERABLE_LISTINGS` (the "where they order" filter on the customer list) —
+offering it there would be a choice that matches nobody. It is a page people
+**review** us on and nothing else.
+
+**Only the rating and the count are asked for.** The field mask is
+`id,displayName,rating,userRatingCount`: no review text is fetched, so none
+is stored, which is what Google's terms require. It also keeps the call in
+the cheaper billing tier (Place Details Enterprise, ~$17/1,000 after 10,000
+free a month — one call a day never reaches that).
+
+**The source is recorded, and the page says it.** `platform_listings.source`
+holds `places_api` (read from the API), `platform_page` (Zomato and Swiggy's
+own page) or `maps_page` (measured on the Maps listing). The card prints
+which one it was, so a number measured one way is never shown as though it
+were measured another. A run that cannot read a platform **keeps the old
+value and keeps its old source** — a refused API must not relabel a value
+that came from somewhere else.
+
+The key lives in `.env.local` as `GOOGLE_PLACES_API_KEY` (gitignored). The
+script reads `.env.local` itself, the way the other scripts do.
 
 ## The sync groups
 

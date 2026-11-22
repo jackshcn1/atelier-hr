@@ -6,7 +6,7 @@ import {
   money, count, percent, rating, ratingPill, formatDate, formatMonth,
   listingLabel, customerName,
 } from '../../../lib/customerFormat';
-import { UNLISTED_KEY } from '../../../lib/customerParsers';
+import { UNLISTED_KEY, GOOGLE_LISTING_KEY } from '../../../lib/customerParsers';
 
 /**
  * app/customers/overview/page.js — the Customer section's overview.
@@ -18,18 +18,20 @@ import { UNLISTED_KEY } from '../../../lib/customerParsers';
  *   1. **How much of the business belongs to a person** — the order value, the
  *      number of people, how many of them come back, and how much of the value
  *      has no contact number attached to it (the gap).
- *   2. **What people say** — the reviews left on each of our three listings
- *      (Zomato, Swiggy — Atelier, Swiggy — Ambrosia), the ratings they gave,
- *      and the rating each platform itself publishes.
+ *   2. **What people say** — the reviews left on each of our listings
+ *      (Zomato, Swiggy — Atelier, Swiggy — Ambrosia, Google), the ratings they
+ *      gave, and the rating each platform itself publishes.
  *   3. **What people want improved** — the feedback form, question by
  *      question, with the tags people used and the waiter they were about.
  *
  * The reviews and the feedback have pages of their own — `/customers/reviews`
  * and `/customers/feedback` — so here they are the headline only.
  *
- * Google reviews are shown as a gap on purpose. They are not in Petpooja, and
- * they need Google's Business Profile API, which is granted by Google itself
- * after an application — not something this app can switch on.
+ * Google is the odd one out: its **rating** is read from the Places API and is
+ * shown here, but the **reviews** behind that rating are not in Petpooja and
+ * need Google's Business Profile API, which is granted by Google itself after
+ * an application — not something this app can switch on. So the card says what
+ * is known and says what is not.
  */
 
 /** One figure, with the line that explains it. */
@@ -115,7 +117,7 @@ export default function CustomersPage() {
   const g = data.gap;
   const r = data.reviews;
   const f = data.feedback;
-  // The three pages we are on. The reviews that are not on a page of ours are
+  // The pages we are on. The reviews that are not on a page of ours are
   // counted too, but they are not one of our listings.
   const pages = (r.listings || []).filter((line) => line.listing !== UNLISTED_KEY);
   const bestMonth = data.trend.reduce(
@@ -290,7 +292,7 @@ export default function CustomersPage() {
               <div>
                 <h2 className="panel-title">Reviews</h2>
                 <p className="text-sm text-ink-muted mt-1">
-                  What people said after eating with us, on the three pages we are listed on.
+                  What people said after eating with us, on the pages we are listed on.
                 </p>
               </div>
               <Link href="/customers/reviews" className="btn-secondary text-xs px-3 py-1.5 whitespace-nowrap">
@@ -311,16 +313,29 @@ export default function CustomersPage() {
               </p>
             ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {r.listings.map((line) => (
+              {r.listings.map((line) => {
+                // Google holds no reviews of ours yet, so "0 reviews" would
+                // read as if nobody had ever reviewed us there. It is a page
+                // with 3,628 ratings behind it.
+                const isGoogle = line.listing === GOOGLE_LISTING_KEY;
+                return (
                 <div key={line.listing} className="border border-rule-soft rounded-card p-4">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="font-serif text-lg text-ink">{line.label}</h3>
-                    <span className={`pill ${ratingPill(line.avgRating)}`}>
-                      {rating(line.avgRating)} out of 5
-                    </span>
+                    {isGoogle && line.official && line.official.rating ? (
+                      <span className={`pill ${ratingPill(line.official.rating)}`}>
+                        {rating(line.official.rating)} ★ on the platform
+                      </span>
+                    ) : (
+                      <span className={`pill ${ratingPill(line.avgRating)}`}>
+                        {rating(line.avgRating)} out of 5
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-ink-muted mt-1">
-                    {count(line.count)} reviews · {count(line.linked)} matched to an order
+                    {isGoogle
+                      ? 'The reviews behind this rating are not held yet.'
+                      : `${count(line.count)} reviews · ${count(line.linked)} matched to an order`}
                   </p>
                   {line.official && line.official.rating ? (
                     <p className="text-sm text-ink-muted mt-1">
@@ -331,7 +346,9 @@ export default function CustomersPage() {
                       {line.official.countText ? ` · ${line.official.countText} ratings` : ''}
                     </p>
                   ) : null}
-                  {line.comments.length > 0 ? (
+                  {isGoogle ? (
+                    <p className="text-sm text-ink-muted mt-3">{data.google.note}</p>
+                  ) : line.comments.length > 0 ? (
                     <div className="hairline-list mt-3">
                       {line.comments.slice(0, 2).map((comment, index) => (
                         <div key={`${comment.date}-${index}`} className="py-2">
@@ -352,23 +369,8 @@ export default function CustomersPage() {
                     </p>
                   ) : null}
                 </div>
-              ))}
-
-              {/* The Google gap, said plainly. It is shown whether or not the
-                  other listings have anything, because "we have no Google
-                  reviews" and "we have not connected Google" are different
-                  things and only one of them is true. */}
-              <div className="border border-rule-soft rounded-card p-4 bg-page">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-serif text-lg text-ink">Google</h3>
-                  <span className="pill pill-quiet">Not connected yet</span>
-                </div>
-                <p className="text-sm text-ink-muted mt-2">{data.google.note}</p>
-                <p className="text-sm text-ink-muted mt-2">
-                  A manager of the listing can read and reply to reviews — the only thing missing
-                  is Google's approval for this app to read them.
-                </p>
-              </div>
+                );
+              })}
             </div>
           </div>
         </section>

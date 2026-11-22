@@ -5,19 +5,24 @@ import Link from 'next/link';
 import {
   count, rating, ratingPill, formatDate, formatMonth, money, listingLabel,
 } from '../../../lib/customerFormat';
-import { UNLISTED_KEY } from '../../../lib/customerParsers';
+import { UNLISTED_KEY, GOOGLE_LISTING_KEY } from '../../../lib/customerParsers';
 
 /**
  * app/customers/reviews/page.js — what people said about us.
  *
- * ## The three listings, not two platforms
+ * ## The listings, not the platforms
  *
- * The restaurant is on **three** pages: Zomato, Swiggy — Atelier and
- * Swiggy — Ambrosia. Swiggy carries two of them, and they are two different
- * pages with two different ratings and two different sets of people
- * complaining. Averaging them into one "Swiggy" is what made the number on
- * the site disagree with the number on the platform. So every count and
- * every average on this page is **per listing**.
+ * The restaurant is on **four** pages: Zomato, Swiggy — Atelier,
+ * Swiggy — Ambrosia and Google. Swiggy carries two of them, and they are two
+ * different pages with two different ratings and two different sets of
+ * people complaining. Averaging them into one "Swiggy" is what made the
+ * number on the site disagree with the number on the platform. So every
+ * count and every average on this page is **per listing**.
+ *
+ * Google is the odd one out: it is a page people review us on, but nobody
+ * orders there, so it carries no reviews of its own until the Business
+ * Profile API is connected. It shows Google's own rating, which is bigger
+ * than either marketplace's.
  *
  * ## Two ratings, side by side, each labelled
  *
@@ -95,9 +100,27 @@ function officialCount(official) {
   return '—';
 }
 
+/**
+ * Where a rating was read from, in words.
+ *
+ * A number that was measured one way must not be shown as though it were
+ * measured another way — so the page says which way it was.
+ */
+function sourceLabel(source) {
+  if (source === 'places_api') return 'Google’s Places API';
+  if (source === 'maps_page') return 'the Google Maps listing';
+  if (source === 'platform_page') return 'the platform’s own page';
+  return '';
+}
+
 /** One listing: the platform's rating beside ours, and the reviews behind it. */
 function ListingCard({ listing }) {
   const official = listing.official;
+  // Google is the one listing that is not a marketplace. Petpooja holds no
+  // Google review at all, so "the reviews we hold" is not a number for it —
+  // saying "0 reviews" would read as if nobody had reviewed us on Google,
+  // which is the opposite of the truth.
+  const isGoogle = listing.listing === GOOGLE_LISTING_KEY;
 
   return (
     <div className="border border-rule-soft rounded-card p-4 flex flex-col">
@@ -125,6 +148,7 @@ function ListingCard({ listing }) {
           <p className="text-xs text-ink-muted mt-1">
             {official.name ? `${official.name} — ` : ''}
             read on {formatDate(official.fetchedAt)}
+            {official.source ? `, from ${sourceLabel(official.source)}` : ''}
             {official.url ? (
               <>
                 {' · '}
@@ -143,23 +167,38 @@ function ListingCard({ listing }) {
       ) : null}
 
       {/* ---- Our own average over the reviews we hold -------------------- */}
-      <div className="mt-3">
-        <p className="text-2xs uppercase tracking-wide text-ink-muted">From the reviews we hold</p>
-        <p className="font-serif text-[1.9rem] leading-tight mt-1 tnum text-ink">
-          {listing.count ? rating(listing.avgRating) : '—'}
-          <span className="text-base text-ink-muted ml-2 font-sans">★</span>
-        </p>
-        <p className="text-sm text-ink-muted mt-1">
-          {count(listing.count)} review{listing.count === 1 ? '' : 's'} since March 2026 ·{' '}
-          {count(listing.linked)} matched to an order
-        </p>
-        <div className="mt-2">
-          <Bar
-            share={listing.avgRating ? (listing.avgRating / 5) * 100 : 0}
-            tone={listing.avgRating >= 4 ? 'good' : listing.avgRating >= 3 ? 'warn' : 'accent'}
-          />
+      {isGoogle ? (
+        <div className="mt-3">
+          <p className="text-2xs uppercase tracking-wide text-ink-muted">The reviews themselves</p>
+          <p className="text-sm text-ink-muted mt-2">
+            Google reviews are not in Petpooja, so we do not hold any of them yet — this rating
+            is Google's own and it covers every rating the listing has ever had.
+          </p>
+          <p className="text-sm text-ink-muted mt-2">
+            They come from the Google Business Profile API, which needs access granted by Google
+            (7–14 working days). A manager of the listing can then read every review and reply to
+            it — the only thing missing is Google's approval for this app to read them.
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="mt-3">
+          <p className="text-2xs uppercase tracking-wide text-ink-muted">From the reviews we hold</p>
+          <p className="font-serif text-[1.9rem] leading-tight mt-1 tnum text-ink">
+            {listing.count ? rating(listing.avgRating) : '—'}
+            <span className="text-base text-ink-muted ml-2 font-sans">★</span>
+          </p>
+          <p className="text-sm text-ink-muted mt-1">
+            {count(listing.count)} review{listing.count === 1 ? '' : 's'} since March 2026 ·{' '}
+            {count(listing.linked)} matched to an order
+          </p>
+          <div className="mt-2">
+            <Bar
+              share={listing.avgRating ? (listing.avgRating / 5) * 100 : 0}
+              tone={listing.avgRating >= 4 ? 'good' : listing.avgRating >= 3 ? 'warn' : 'accent'}
+            />
+          </div>
+        </div>
+      )}
 
       {listing.comments.length > 0 ? (
         <div className="hairline-list mt-3">
@@ -172,7 +211,7 @@ function ListingCard({ listing }) {
             </div>
           ))}
         </div>
-      ) : (
+      ) : isGoogle ? null : (
         <p className="text-sm text-ink-muted mt-3">No written comment on this listing.</p>
       )}
     </div>
@@ -242,7 +281,7 @@ export default function CustomerReviewsPage() {
 
   const r = data;
   const listings = r.listings || [];
-  // The three pages we are on, and the one bucket for the reviews that are
+  // The pages we are on, and the one bucket for the reviews that are
   // not on a page of ours.
   const ourPages = listings.filter((line) => line.listing !== UNLISTED_KEY);
   const leftovers = listings.filter((line) => line.listing === UNLISTED_KEY);
@@ -262,7 +301,7 @@ export default function CustomerReviewsPage() {
           <div>
             <h1 className="page-title">Reviews</h1>
             <p className="page-purpose">
-              What people said about us on each of our three listings — the rating the platform
+              What people said about us on each of our listings — the rating the platform
               publishes, the reviews we hold, and the order each review was left on.
             </p>
           </div>
@@ -299,7 +338,7 @@ export default function CustomerReviewsPage() {
           <div className="panel-body">
             <SectionHead
               title="By listing"
-              note="We are on three pages. Each has its own rating and its own reviews, so each is counted on its own."
+              note="We are on four pages. Each has its own rating and its own reviews, so each is counted on its own."
             />
             {listings.length === 0 ? (
               <p className="note">No reviews have been pulled in yet. The nightly sync brings them in.</p>
@@ -328,23 +367,6 @@ export default function CustomerReviewsPage() {
                     </p>
                   </div>
                 ))}
-
-                {/* The Google gap, said plainly. */}
-                <div className="border border-rule-soft rounded-card p-4 bg-page mt-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-serif text-lg text-ink">Google</h3>
-                    <span className="pill pill-quiet">Not connected yet</span>
-                  </div>
-                  <p className="text-sm text-ink-muted mt-2">
-                    Google reviews are not in Petpooja. They come from the Google Business Profile
-                    API, which needs access granted by Google (7–14 working days). The column is
-                    ready and waiting.
-                  </p>
-                  <p className="text-sm text-ink-muted mt-2">
-                    A manager of the listing can read and reply to reviews — the only thing missing
-                    is Google's approval for this app to read them.
-                  </p>
-                </div>
               </>
             )}
           </div>
