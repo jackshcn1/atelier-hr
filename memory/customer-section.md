@@ -501,3 +501,75 @@ SQL text.
 The gap is the number worth closing at the counter: it is 91.3% of the order
 value, and it exists because the number is not asked for at the till.
 
+## The runbook — the two things only the owner can do
+
+Both live in the **`atelier-hr-drive`** Google Cloud project, which holds
+nothing sensitive. Sign in at <https://console.cloud.google.com/> and pick
+that project from the picker at the top of the page.
+
+### 1. The Places API key (about 10 minutes, no approval)
+
+The rating is read from the Places API, which needs an API key and nothing
+else.
+
+1. **APIs & Services → Library** (the ☰ menu, top left). Search **"Places
+   API (New)"**. Open it → **Enable**.
+2. **Billing.** Places API needs a billing account on the project. If it has
+   none, open **Billing** in the left menu and create one. A card is needed
+   on file, but Google's free tier is 10,000 calls a month per SKU and we
+   make **one call a day** — so this will not cost anything. New Cloud
+   accounts also get $300 for 90 days.
+3. **APIs & Services → Credentials** → **+ CREATE CREDENTIALS → API key**.
+   Copy the key (it starts `AIza`).
+4. Open **`.env.local`** in the project folder and paste it after
+   `GOOGLE_PLACES_API_KEY=`. The line is already there, waiting.
+5. Run `node scripts/sync-platform-ratings.mjs`. The card on
+   `/customers/reviews` will then say *"from Google's Places API"* instead of
+   *"from the Google Maps listing"*.
+
+**Restrict the key** (worth doing): click the key → **Edit** → **API
+restrictions → Restrict key → Places API (New)**. The key is only ever used
+by the local sync script, so an IP restriction on the office connection can
+be added too.
+
+### 2. The Business Profile API application (the 12-day one)
+
+This is the one that gives the **reviews** — every review the listing has
+ever received, dated, with the right to reply to them.
+
+Google asks for four things, and the restaurant already has all four:
+
+| Google asks for | We have |
+|---|---|
+| a verified, active Business Profile, 60+ days old | the restaurant's own Google Maps listing, rated for years |
+| a business website | theambrosia.com (it is on the listing) |
+| a Google Cloud project | `atelier-hr-drive` |
+| an email that is an owner/manager of the listing | the owner's own Gmail, **as long as it is the one that manages the listing** |
+
+The steps:
+
+1. Open the project in the Cloud Console and read the **Project number**
+   off the **Project info** card on the Dashboard. The application form asks
+   for it.
+2. Open <https://support.google.com/business/contact/api_default>, choose
+   **"Application for Basic API Access"**, and fill the form in with the
+   project number, the business name, the website, the APIs wanted
+   (Business Profile API and My Business Account Management API), and the
+   reason: *"Read the customer reviews of our own restaurant and reply to
+   them, from our in-house management system."* Use an email address that is
+   an owner or manager of the listing — Google checks this.
+3. Wait. Google reviews the application within **14 days**.
+4. **To check whether it was approved**: Cloud Console → **APIs & Services →
+   Quotas** → the Business Profile APIs. **0 QPM means not approved yet;
+   300 QPM means approved.**
+5. Once approved, the work left is: enable the Business Profile APIs,
+   create an OAuth client (Web application, scope
+   `https://www.googleapis.com/auth/business.manage`), and build the sync
+   and the reply button. The `customer_reviews` table already accepts
+   `platform = 'google'`, and `google_atelier` is already a listing, so the
+   connector drops in without a schema change.
+
+**Use a separate OAuth client** for this, not the Drive one in
+`scripts/google-oauth-client.json`. Different scopes, and the Drive token
+must never be granted `business.manage`.
+
