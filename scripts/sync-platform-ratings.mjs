@@ -1,6 +1,6 @@
 // scripts/sync-platform-ratings.mjs
 //
-// Read the rating each of our three listings publishes on its own platform.
+// Read the rating each of our four listings publishes on its own platform.
 //
 // ## Why this is a separate script
 //
@@ -8,9 +8,10 @@
 // The site averages the reviews Petpooja holds, and Petpooja holds them
 // only from **March 2026** — measured on the count endpoint, every month
 // before that answers zero. But the platforms have been live for years:
-// Swiggy's Ambrosia page alone shows **10K+ ratings**. So the site's average
-// is a rating over nine months and the platform's is a rating over years,
-// and they are different numbers for the same restaurant.
+// Swiggy's Ambrosia page alone shows **10K+ ratings**, and Google shows
+// 3,628. So the site's average is a rating over nine months and the
+// platform's is a rating over years, and they are different numbers for the
+// same restaurant.
 //
 // The honest answer is to show **both**, and to label which is which.
 //
@@ -28,6 +29,12 @@
 // without that flag Swiggy answers every request with "Access to
 // www.swiggy.com was denied". The Petpooja sync already launches its
 // browser that way, so the same options are used here.
+//
+// **Google** — read from the **Places API**, which needs only an API key:
+// no OAuth, no Business Profile approval, no waiting. Only the rating and
+// the count are asked for, so no review text is fetched and none is stored.
+// The *reviews* behind Google's rating come from the Business Profile API,
+// which Google approves one application at a time.
 //
 // ## When a platform refuses
 //
@@ -59,9 +66,23 @@ function loadConfig() {
       console.error('❌ Could not parse scripts/petpooja-config.json:', error.message);
     }
   }
+
+  // .env.local holds the secrets this machine uses. It is gitignored, so
+  // nothing in it can ever be committed by accident.
+  const envPath = join(__dirname, '..', '.env.local');
+  if (existsSync(envPath)) {
+    for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+      const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (match && process.env[match[1]] === undefined) {
+        process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+      }
+    }
+  }
+
   return {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL || cfg.NEXT_PUBLIC_SUPABASE_URL,
     key: process.env.SUPABASE_SERVICE_ROLE_KEY || cfg.SUPABASE_SERVICE_ROLE_KEY,
+    placesKey: process.env.GOOGLE_PLACES_API_KEY || '',
   };
 }
 
@@ -185,16 +206,84 @@ async function fetchSwiggy(url, browser) {
 }
 
 // ---------------------------------------------------------------------------
+// Google — the rating on our Google Maps listing
+// ---------------------------------------------------------------------------
+
+/**
+ * Read Google's own rating for the restaurant.
+ *
+ * **No approval and no waiting.** The Places API answers for a place by its
+ * Place ID with nothing but an API key — unlike the Business Profile API,
+ * which Google approves one application at a time (7–14 working days) and
+ * which is the only route to the *reviews* themselves.
+ *
+ * The field mask asks for the rating and the number of ratings and nothing
+ * else. That matters twice over: it keeps the call in the cheaper billing
+ * tier, and it means **no review text is fetched at all** — Google's terms
+ * forbid storing that, and the site has no use for it.
+ *
+ * @param {object} body the JSON the API answered with
+ * @returns {{rating: number, count: number|null, countText: string, name: string}|null}
+ */
+export function parsePlacesRating(body) {
+  if (!body || typeof body !== 'object') return null;
+  const rating = Number(body.rating);
+  if (!Number.isFinite(rating) || rating <= 0) return null;
+
+  const raw = Number(body.userRatingCount);
+  const count = Number.isFinite(raw) && raw > 0 ? raw : null;
+
+  return {
+    rating,
+    // Google publishes the exact number of ratings, so it is stored as one.
+    count,
+    countText: count === null ? '' : String(count),
+    name: body.displayName?.text || '',
+  };
+}
+
+/**
+ * Ask Google's Places API for one place's rating and rating count.
+ *
+ * @param {object} listing the listing, carrying its Place ID
+ * @param {string} apiKey the Places API key
+ * @returns {Promise<{rating: number, count: number|null, countText: string, name: string}|null>}
+ */
+async function fetchGoogle(listing, apiKey) {
+  if (!apiKey) {
+    console.log('   ↳ no GOOGLE_PLACES_API_KEY in .env.local — asking Google for nothing.');
+    return null;
+  }
+
+  const response = await fetch(`https://places.googleapis.com/v1/places/${listing.placeId}`, {
+    headers: {
+      'X-Goog-Api-Key': apiKey,
+      // The rating and the count, and nothing else.
+      'X-Goog-FieldMask': 'id,displayName,rating,userRatingCount',
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    const reason = body.slice(0, 200).replace(/\s+/g, ' ');
+    console.log(`   ↳ Google answered ${response.status}. ${reason}`);
+    return null;
+  }
+
+  return parsePlacesRating(await response.json());
+}
+
+// ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
 
 /**
- * Read all three listings and write what was found.
+ * Read all four listings and write what was found.
  *
  * @returns {Promise<void>}
  */
 export async function main() {
-const { url: supabaseUrl, key: supabaseKey } = loadConfig();
+const { url: supabaseUrl, key: supabaseKey, placesKey } = loadConfig();
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ No Supabase credentials. Run: node scripts/setup-petpooja.mjs');
   process.exit(1);
@@ -230,11 +319,13 @@ for (const listing of LISTINGS) {
 
   let found = null;
   try {
-    found = listing.key.startsWith('swiggy_')
-      ? browser
-        ? await fetchSwiggy(listing.url, browser)
-        : null
-      : await fetchZomato(listing.url);
+    found = listing.source === 'google'
+      ? await fetchGoogle(listing, placesKey)
+      : listing.key.startsWith('swiggy_')
+        ? browser
+          ? await fetchSwiggy(listing.url, browser)
+          : null
+        : await fetchZomato(listing.url);
   } catch (error) {
     console.log('   ↳ could not read the page:', error.message.split('\n')[0]);
   }
@@ -245,7 +336,7 @@ for (const listing of LISTINGS) {
     failed += 1;
     const { data } = await supabase
       .from('platform_listings')
-      .select('rating, rating_count_text, fetched_at')
+      .select('rating, rating_count_text, fetched_at, source')
       .eq('listing', listing.key)
       .maybeSingle();
     console.log(
@@ -255,12 +346,16 @@ for (const listing of LISTINGS) {
     );
     // The row is still written, so the page can say the platform exists and
     // that its rating has not been read yet.
+    //
+    // The **source** is not changed when there is already one: a value that
+    // was measured somewhere else must not be relabelled as if it had been
+    // read from the API that just refused.
     await supabase.from('platform_listings').upsert({
       listing: listing.key,
       name: listing.fullName,
       platform: listing.platform,
       source_url: listing.url,
-      source: 'platform_page',
+      source: data?.source || (listing.source === 'google' ? 'places_api' : 'platform_page'),
       updated_at: now,
     }, { onConflict: 'listing' });
     continue;
@@ -274,7 +369,7 @@ for (const listing of LISTINGS) {
     rating_count: found.count ?? null,
     rating_count_text: found.countText ?? (found.count != null ? String(found.count) : ''),
     source_url: listing.url,
-    source: 'platform_page',
+    source: listing.source === 'google' ? 'places_api' : 'platform_page',
     fetched_at: now,
     updated_at: now,
   };

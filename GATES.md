@@ -74,10 +74,13 @@ EXPECT: each of the form's six questions is rated with a bar, the tags people
 chose are listed, the waiter they were about is named, and every response is
 shown as it was written.
 
-## Gate 10: The Google gap is honest
+## Gate 10: The Google card is honest
 CHECK: the reviews panel on /customers/overview, and /customers/reviews
-EXPECT: the three listings show real numbers; Google says "Not connected yet"
-and explains why. It must not show a zero as if it were a rating.
+EXPECT: four listings show real numbers — Zomato, Swiggy — Atelier,
+Swiggy — Ambrosia and Google. The Google card shows Google's own rating and
+the number of ratings, says where that number was read from, and says plainly
+that the reviews behind it are not held yet and why. It must not show a zero
+as if it were a rating, and it must not claim a reading it did not make.
 
 ## Gate 11: The nav is right
 CHECK: the Customers dropdown in the navbar
@@ -92,7 +95,9 @@ EXPECT: three listings carry the bulk — `zomato_atelier`, `swiggy_atelier`,
 through the marketplace without saying which brand they were for. The listing
 comes from the order the review was matched to, never from the marketplace, and
 it is never guessed. A review that matched no order carries no listing, and the
-page says how many there are rather than hiding them.
+page says how many there are rather than hiding them. Google is a listing too
+(`google_atelier`) but it is **not** a marketplace: no review carries it, and it
+is left out of the "where they order" filter.
 
 ## Gate 13: A review names the order it was left on
 CHECK: `select count(*) from customer_reviews where order_date is null`

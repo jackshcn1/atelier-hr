@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   money, count, rating, ratingPill, formatDate, customerName, customerListingLabel,
 } from '../../../lib/customerFormat';
-import { LISTINGS } from '../../../lib/customerParsers';
+import { ORDERABLE_LISTINGS } from '../../../lib/customerParsers';
 
 /**
  * app/customers/list/page.js — every customer, in one table.
@@ -123,7 +123,7 @@ export default function CustomerListPage() {
                 onChange={(event) => setListing(event.target.value)}
               >
                 <option value="">Everyone</option>
-                {LISTINGS.map((entry) => (
+                {ORDERABLE_LISTINGS.map((entry) => (
                   <option key={entry.key} value={entry.key}>{entry.label}</option>
                 ))}
               </select>
