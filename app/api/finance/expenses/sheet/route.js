@@ -4,7 +4,13 @@ import {
   fetchGoogleSheetsData,
   googleSheetsConfigured,
 } from '../../../../../lib/googleSheetsService.js';
-import { parseInvoiceSheet, writeInvoiceSheet } from '../../../../../lib/invoiceSheet.js';
+import {
+  INVOICE_SHEET_NAME,
+  INVOICE_SHEET_RANGE,
+  INVOICE_SHEET_SPREADSHEET_ID,
+  parseInvoiceSheet,
+  writeInvoiceSheet,
+} from '../../../../../lib/invoiceSheet.js';
 import { cleanAttachment } from '../../../../../lib/expenseHelpers.js';
 
 // The site's own bill form.
@@ -17,12 +23,11 @@ import { cleanAttachment } from '../../../../../lib/expenseHelpers.js';
 // GET answers with the cost types the sheet already uses, so the form offers
 // what is already in use instead of a list that has to be kept up by hand.
 
-const SPREADSHEET_ID =
-  process.env.INVOICE_SHEET_SPREADSHEET_ID || '1_25bZSbaJHkKosX7RZ4_LPgQp_NwSvpTXJUFwBLSeig';
-const SHEET_NAME = process.env.INVOICE_SHEET_NAME || 'Form Responses 1';
+const SPREADSHEET_ID = INVOICE_SHEET_SPREADSHEET_ID;
+const SHEET_NAME = INVOICE_SHEET_NAME;
 // The whole tab, not a slice of it — the columns are found by heading, so a
 // range that stopped short would lose a column quietly.
-const RANGE = 'A:AZ';
+const RANGE = INVOICE_SHEET_RANGE;
 
 // The stamp the sheet's own rows carry, in the shape the Form writes it.
 function sheetTimestamp() {

@@ -1024,5 +1024,220 @@ await check('the rows the site form wrote are taken out of the sheet again', asy
   }
 });
 
+// Marking a bill paid.
+//
+// The payment is written into the **sheet** — the record — and the sheet is
+// then pulled into the books. A bill marked paid only in the database would
+// be marked unpaid again by the next pull.
+const { POST: paymentPOST } = await import('../app/api/finance/expenses/sheet/payment/route.js');
+
+let paymentEntryId = null;
+let paymentBillId = null;
+
+await check('a bill is marked paid through the sheet, with the payment details', async () => {
+  // A bill that has not been paid yet.
+  const res = await postToSheet({
+    type: 'variable',
+    costType: 'Gas',
+    vendor: 'Payment Check',
+    amount: 555,
+    invoiceDate: '2026-11-17',
+    invoiceNo: 'PAYMENT-CHECK-1',
+    description: 'Waiting to be paid',
+  });
+  const body = await res.json();
+  if (!body.success) throw new Error(body.error);
+  paymentEntryId = body.data.entryId;
+  paymentBillId = body.data.bill?.id;
+  if (!paymentBillId) throw new Error('the bill was not written to the books');
+
+  const { data: before } = await sb.from('expenses').select('payment_status').eq('id', paymentBillId);
+  if (before[0].payment_status !== 'unpaid') throw new Error(`it started as ${before[0].payment_status}`);
+
+  const paid = await paymentPOST(
+    new Request('https://atelier.test/api/finance/expenses/sheet/payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ids: [paymentBillId],
+        action: 'paid',
+        paymentDate: '2026-11-19',
+        paymentMode: 'UPI',
+        bankReference: 'UTR-CHECK-1',
+      }),
+    }),
+  );
+  const paidBody = await paid.json();
+  if (!paidBody.success) throw new Error(paidBody.error);
+
+  // The books say it is paid, and say how it was paid.
+  const { data: after } = await sb
+    .from('expenses')
+    .select('payment_status, payment_date, payment_mode, bank_reference')
+    .eq('id', paymentBillId);
+  const row = after[0];
+  if (row.payment_status !== 'paid') throw new Error(`it is ${row.payment_status}`);
+  if (row.payment_date !== '2026-11-19') throw new Error(`the payment date is ${row.payment_date}`);
+  if (row.payment_mode !== 'UPI') throw new Error(`the payment mode is ${row.payment_mode}`);
+  if (row.bank_reference !== 'UTR-CHECK-1') throw new Error(`the bank reference is ${row.bank_reference}`);
+
+  // And the sheet says so too — the sheet is the record.
+  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: SHEET_RANGE });
+  const at = rows.findIndex((r) => (r || []).includes(paymentEntryId));
+  if (at === -1) throw new Error('the row is not in the sheet');
+  const headings = rows[0];
+  const cell = (heading) => String(rows[at][headings.indexOf(heading)] ?? '').trim();
+  if (cell('Invoice Paid on (ignore if not paid) (Variable Cost)') !== '2026-11-19') {
+    throw new Error(`the sheet's paid-on cell says "${cell('Invoice Paid on (ignore if not paid) (Variable Cost)')}"`);
+  }
+  if (cell('Payment Mode') !== 'UPI') throw new Error(`the sheet's mode says "${cell('Payment Mode')}"`);
+  if (cell('Bank Reference') !== 'UTR-CHECK-1') {
+    throw new Error(`the sheet's reference says "${cell('Bank Reference')}"`);
+  }
+});
+
+await check('several bills are marked paid under one transfer', async () => {
+  const res = await postToSheet({
+    type: 'variable',
+    costType: 'Gas',
+    vendor: 'Payment Check Two',
+    amount: 556,
+    invoiceDate: '2026-11-17',
+    invoiceNo: 'PAYMENT-CHECK-2',
+  });
+  const body = await res.json();
+  if (!body.success) throw new Error(body.error);
+  sheetEntryIds.push(body.data.entryId);
+  const secondId = body.data.bill?.id;
+
+  const paid = await paymentPOST(
+    new Request('https://atelier.test/api/finance/expenses/sheet/payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ids: [paymentBillId, secondId],
+        action: 'paid',
+        paymentDate: '2026-11-19',
+        paymentMode: 'UPI',
+        bankReference: 'UTR-CHECK-1',
+      }),
+    }),
+  );
+  const paidBody = await paid.json();
+  if (!paidBody.success) throw new Error(paidBody.error);
+  if (paidBody.data.bills.length !== 2) throw new Error(`${paidBody.data.bills.length} bills were marked`);
+
+  const { data } = await sb
+    .from('expenses')
+    .select('id, payment_status, payment_mode, bank_reference')
+    .in('id', [paymentBillId, secondId]);
+  for (const bill of data) {
+    if (bill.payment_status !== 'paid') throw new Error(`bill ${bill.id} is ${bill.payment_status}`);
+    if (bill.payment_mode !== 'UPI') throw new Error(`bill ${bill.id} was paid by ${bill.payment_mode}`);
+    if (bill.bank_reference !== 'UTR-CHECK-1') throw new Error(`bill ${bill.id} has ${bill.bank_reference}`);
+  }
+});
+
+await check('a bill from Petpooja is not marked paid here', async () => {
+  const { data: made, error: madeError } = await sb
+    .from('expenses')
+    .insert({
+      category: 'Other',
+      cost_type: 'variable',
+      entry_type: 'actual',
+      status: 'approved',
+      debit_note: 0,
+      amount: 557,
+      vendor_name: 'Payment Check Petpooja',
+      invoice_number: 'PAYMENT-CHECK-PP',
+      invoice_date: '2026-11-17',
+      payment_status: 'unpaid',
+      source: 'petpooja',
+    })
+    .select()
+    .single();
+  if (madeError) throw madeError;
+
+  try {
+    const res = await paymentPOST(
+      new Request('https://atelier.test/api/finance/expenses/sheet/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: [made.id],
+          action: 'paid',
+          paymentDate: '2026-11-19',
+          paymentMode: 'UPI',
+          bankReference: 'UTR-CHECK-1',
+        }),
+      }),
+    );
+    if (res.status !== 409) throw new Error(`it was answered with ${res.status}, expected 409`);
+    const body = await res.json();
+    if (body.success) throw new Error('the bill was accepted');
+    if (!/petpooja/i.test(body.error)) throw new Error(`the answer does not say why: ${body.error}`);
+
+    const { data } = await sb.from('expenses').select('payment_status').eq('id', made.id);
+    if (data[0].payment_status !== 'unpaid') throw new Error(`it is now ${data[0].payment_status}`);
+  } finally {
+    await sb.from('expenses').delete().eq('id', made.id);
+  }
+});
+
+await check('a bill is marked unpaid again, and the payment is cleared', async () => {
+  const res = await paymentPOST(
+    new Request('https://atelier.test/api/finance/expenses/sheet/payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [paymentBillId], action: 'unpaid' }),
+    }),
+  );
+  const body = await res.json();
+  if (!body.success) throw new Error(body.error);
+
+  const { data } = await sb
+    .from('expenses')
+    .select('payment_status, payment_date, payment_mode')
+    .eq('id', paymentBillId);
+  if (data[0].payment_status !== 'unpaid') throw new Error(`it is ${data[0].payment_status}`);
+  if (data[0].payment_mode) throw new Error(`the payment mode is still ${data[0].payment_mode}`);
+
+  const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: SHEET_RANGE });
+  const at = rows.findIndex((r) => (r || []).includes(paymentEntryId));
+  if (at === -1) throw new Error('the row is not in the sheet');
+  const headings = rows[0];
+  const cell = (heading) => String(rows[at][headings.indexOf(heading)] ?? '').trim();
+  if (cell('Invoice Paid on (ignore if not paid) (Variable Cost)')) {
+    throw new Error('the sheet still has a paid-on date');
+  }
+  if (cell('Payment Mode')) throw new Error(`the sheet still has the mode "${cell('Payment Mode')}"`);
+});
+
+await check('the bills this test wrote are taken away again', async () => {
+  const client = googleSheetsClient();
+  const sheet = await client.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'sheets.properties' });
+  const tab = (sheet.data.sheets || []).map((s) => s.properties).find((p) => p.title === SHEET_TAB);
+
+  for (const entryId of [...sheetEntryIds, paymentEntryId]) {
+    if (!entryId) continue;
+    const rows = await fetchGoogleSheetsData({ spreadsheetId: SHEET_ID, sheetName: SHEET_TAB, range: SHEET_RANGE });
+    const at = rows.findIndex((row) => (row || []).includes(entryId));
+    if (at !== -1) {
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: {
+          requests: [
+            { deleteDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: at, endIndex: at + 1 } } },
+          ],
+        },
+      });
+    }
+    await sb.from('expenses').delete().eq('source_key', `id:${entryId.toLowerCase()}`);
+  }
+
+  const { data: left } = await sb.from('expenses').select('id').like('vendor_name', 'Payment Check%');
+  if (left && left.length > 0) throw new Error(`${left.length} bills were left behind`);
+});
+
 console.log(`\n${passed} check(s) passed`);
 if (process.exitCode) console.error('\nSome checks failed.');
