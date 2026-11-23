@@ -259,15 +259,15 @@ jobs:
             exit 1
           fi
 
-      # The customer feedback form.
+      # Attach the customer feedback to the orders it is about.
       #
-      # The Customer Feedback Form is a Google Sheet, so it needs no browser
-      # and no login — it is its own request, and it takes about a second.
+      # A response is filled in on the floor, and the order it names is not in
+      # the books until the night's pull has brought it in — so the response
+      # is written at once and the link is made here.
       #
-      # It is asked for once, after the Petpooja groups, so the responses land
-      # in the same night's books. A sheet that is not set up yet answers
-      # "skipped" and does not fail the run.
-      - name: Pull the customer feedback sheet
+      # It is asked for once, after the Petpooja groups, so the orders are
+      # already in. It needs no browser and no login.
+      - name: Attach the customer feedback to its orders
         env:
           SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
           SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
@@ -278,23 +278,21 @@ jobs:
             exit 1
           fi
 
-          FEEDBACK_STATUS=$(curl -sS -o "response-feedback.json" -w '%{http_code}' -X POST "$SYNC_URL?sheet=feedback" \
+          LINK_STATUS=$(curl -sS -o "response-feedback.json" -w '%{http_code}' -X POST "$SYNC_URL?link=feedback" \
             -H "x-sync-secret: $SYNC_SECRET" \
             -H 'Content-Type: application/json' \
-            --max-time 120) || FEEDBACK_STATUS="000"
+            --max-time 120) || LINK_STATUS="000"
 
-          echo "HTTP $FEEDBACK_STATUS"
+          echo "HTTP $LINK_STATUS"
           tail -c 4000 "response-feedback.json" || true
           echo ""
 
-          # A sheet that is not set up yet answers "skipped" — that is not a
-          # failure, and the run must not fail over it.
-          if [ "$FEEDBACK_STATUS" != "200" ]; then
-            echo "::error::The customer feedback sheet pull failed with HTTP $FEEDBACK_STATUS"
+          if [ "$LINK_STATUS" != "200" ]; then
+            echo "::error::The feedback link failed with HTTP $LINK_STATUS"
             exit 1
           fi
           if ! grep -q '"ok":true' "response-feedback.json"; then
-            echo "::error::The customer feedback sheet pull did not report ok:true"
+            echo "::error::The feedback link did not report ok:true"
             exit 1
           fi
 

@@ -432,18 +432,23 @@ second request hijack the first one's capture.
   headless Chrome**, and Vercel's `@sparticuz/chromium` is a headless *shell*
   build that cannot run headed at all. See `memory/customer-section.md`.
 
-- The Google service-account key is not on the server, so two things are
-  inactive in the hosted run:
-  - the **Customer Feedback (Google Sheets) sync** — the engine skips it
-    gracefully. The owner decided on 16 Nov to leave it off for now; it is a
-    deliberate gap, not an oversight;
-  - the **accountant's invoice sheet** — `?sheet=1` answers "skipped" and the
-    nightly run carries on.
+- The **customer feedback sheet pull is retired** (23 Nov 2026). The form is
+  filled in inside the app now and a response is written straight into
+  `customer_feedback`; there is no sheet and nothing to pull. The sheet's
+  pull had failed for two nights running — it rewrote all 515 customers one
+  request at a time, which took 126 seconds against a 120-second limit. The
+  replacement is `?link=feedback`, which attaches a response to its order
+  once the order has arrived: one statement, **1.1 seconds**. See
+  `memory/customer-section.md`.
 
-  Both need the same thing: a Google service account, its key on Vercel
-  (`GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`), and the sheet
-  shared with the service account as Viewer. The helper now takes the key as
-  PEM **content**, which is what Vercel can hold.
+- The Google service-account key **is** on the server now, so the
+  **accountant's invoice sheet** pull (`?sheet=1`) runs in the hosted run and
+  writes bills into the books. The key is held as PEM **content**, which is
+  what Vercel can hold.
+
+- The **variable-pay** feedback metrics still read the old feedback sheet
+  through `lib/feedbackParsers.js`. That path is **dormant** — variable pay
+  is paused, and a finance-only run never pulls it.
 
 - SMTP is not configured, so failure email alerts are skipped. GitHub's own
   workflow-failure notification still fires. The owner asked for email alerts to

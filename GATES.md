@@ -142,3 +142,27 @@ A listing that cannot be read keeps its **old value and its old source** and
 is reported as "not read this time"; it is never overwritten with a zero, and
 never relabelled as though it had come from somewhere else. The job holds no
 secret: it reads the credentials out of the gitignored `.env.local` itself.
+
+## Gate 17: The feedback form writes into the books itself
+CHECK: `/customers/feedback/new` — fill it in and save
+EXPECT: the response is in `customer_feedback` **the moment it is saved** —
+there is no sheet and nothing to pull. It must carry:
+
+- `source = 'platform'` — not the old sheet's source;
+- `entered_by` — the signed-in member of staff, which is **who wrote it
+  down**, not who served the table. The two are never the same field;
+- `waiter` — a name from the `employees` list, spelled the way the employees
+  table spells it;
+- the bill number, and `is_linked` + `order_no` + `phone` when the order it
+  names is already in the books.
+
+A bill that is **not** in the books yet is not an error: the order book only
+reaches the previous day, so the response is kept and the night's
+`?link=feedback` step attaches it when the order arrives. A response that
+names a bill we do not have is kept and reported as unlinked — never
+dropped.
+
+**One statement, not one request per row.** The old sheet pull rewrote all
+515 customers one request at a time and took 126 seconds, which is what made
+the nightly run go red for two nights. The link step must be one `values`
+statement, and it must finish well inside the 120-second limit.
