@@ -372,6 +372,10 @@ days**; the project shows 0 QPM until it is approved). A **manager** of the
 listing can read and reply to reviews — the only thing missing is Google's
 approval for this app.
 
+**Applied on 23 Nov 2026 — case `6-7727000042503`, quoted at 7–10 business
+days.** See the runbook at the end of this note for the exact click path and
+the quota check.
+
 `customer_reviews.platform` already accepts `google`, so the connector slots
 in when the access arrives. The page shows the gap as a gap, rather than
 hiding it.
@@ -534,6 +538,10 @@ be added too.
 
 ### 2. The Business Profile API application (the 12-day one)
 
+**Status: APPLIED on 23 Nov 2026.** Google opened a support case:
+**`6-7727000042503`**, quoted at **7–10 business days**. Keep that case ID —
+it is what a follow-up to Google must quote, and what Google will quote back.
+
 This is the one that gives the **reviews** — every review the listing has
 ever received, dated, with the right to reply to them.
 
@@ -560,14 +568,28 @@ The steps:
    an owner or manager of the listing — Google checks this.
 3. Wait. Google reviews the application within **14 days**.
 4. **To check whether it was approved**: Cloud Console → **APIs & Services →
-   Quotas** → the Business Profile APIs. **0 QPM means not approved yet;
-   300 QPM means approved.**
+   Quotas** → filter for `mybusiness` → **0 QPM means not approved yet;
+   300 QPM means approved.** The project's number is **187302776196**
+   (`atelier-hr-drive`). *This has to be read in the console by hand* — the
+   service account in `scripts/google-service-account.json` is a Sheets/Drive
+   account, not a project admin, and the Cloud Resource Manager, IAM and
+   Service Usage APIs are all switched off on the project, so it answers
+   "Permission denied" to every attempt to read the quota from here.
 5. Once approved, the work left is: enable the Business Profile APIs,
    create an OAuth client (Web application, scope
    `https://www.googleapis.com/auth/business.manage`), and build the sync
    and the reply button. The `customer_reviews` table already accepts
    `platform = 'google'`, and `google_atelier` is already a listing, so the
    connector drops in without a schema change.
+
+**One project, not two.** Access is granted **per Cloud project**, and the
+project that gets allowlisted must be the one holding the OAuth client —
+"OAuth tokens cannot cross-authenticate" across projects. `atelier-hr-drive`
+is that project: it already holds the service account, the OAuth client and
+the Drive folder. A second project (e.g. a freshly created "My Project
+NNNNN") must not be used for this, and the Places API key goes in
+`atelier-hr-drive` too, so that every Google credential stays in the one
+dedicated project.
 
 **Use a separate OAuth client** for this, not the Drive one in
 `scripts/google-oauth-client.json`. Different scopes, and the Drive token
