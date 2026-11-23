@@ -143,26 +143,52 @@ is reported as "not read this time"; it is never overwritten with a zero, and
 never relabelled as though it had come from somewhere else. The job holds no
 secret: it reads the credentials out of the gitignored `.env.local` itself.
 
-## Gate 17: The feedback form writes into the books itself
+## Gate 17: The feedback form runs on the sheet
 CHECK: `/customers/feedback/new` — fill it in and save
-EXPECT: the response is in `customer_feedback` **the moment it is saved** —
-there is no sheet and nothing to pull. It must carry:
+EXPECT: the response is **written into the Customer Feedback Form sheet**, and
+the sheet is then pulled into the books — **one place a response is written
+down, and one way into the books**, exactly like the expense entry form. The
+sheet must show a new row, and `customer_feedback` must show the same
+response, carrying:
 
-- `source = 'platform'` — not the old sheet's source;
+- `source = 'google_sheet:customer_feedback_form'` — the sheet is the record;
 - `entered_by` — the signed-in member of staff, which is **who wrote it
-  down**, not who served the table. The two are never the same field;
+  down**, not who served the table. The two are never the same field. It comes
+  from the sheet's **"Recorded By"** column;
 - `waiter` — a name from the `employees` list, spelled the way the employees
   table spells it;
 - the bill number, and `is_linked` + `order_no` + `phone` when the order it
   names is already in the books.
 
+**The same bill cannot be entered twice.** Enter a bill that is already in the
+sheet, on the same day: it must be **refused**, with a message that names the
+date it was recorded, and **nothing may be written** — neither a new row in the
+sheet nor a new row in the books.
+
 A bill that is **not** in the books yet is not an error: the order book only
 reaches the previous day, so the response is kept and the night's
-`?link=feedback` step attaches it when the order arrives. A response that
-names a bill we do not have is kept and reported as unlinked — never
-dropped.
+`?sheet=feedback` step attaches it when the order arrives. A response that
+names a bill we do not have is kept and reported as unlinked — never dropped.
+
+**A customer is a person whose order carried a real contact number.** A
+response attached to an order with **no** number is kept and counted, but it
+does not make anybody a customer, and the page must say so rather than telling
+the captain that the guest is now a customer of ours.
 
 **One statement, not one request per row.** The old sheet pull rewrote all
 515 customers one request at a time and took 126 seconds, which is what made
 the nightly run go red for two nights. The link step must be one `values`
-statement, and it must finish well inside the 120-second limit.
+statement, and the whole pull must finish well inside the 120-second limit —
+measured at **1.3 seconds**.
+
+**The answer about one response must come from that response.** The counts a
+pull returns are the whole sheet's, so they cannot answer a question about one
+of its parts — a sheet holding one linked and one unlinked response would say
+"linked" about both. The row the response wrote is read back, and the form's
+own message comes from it.
+
+**The pull must not read a stale copy of the orders.** Next.js caches a GET on
+disk, and the cache survives a restart and a deployment; a route marked
+`force-dynamic` does not switch it off. The pull reads the orders through the
+server's **no-store** client, so it can never attach a response to a stale
+order.

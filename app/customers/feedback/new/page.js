@@ -8,8 +8,10 @@ import { createClient } from '../../../../lib/supabaseClient';
  * app/customers/feedback/new/page.js — the customer feedback form, filled in
  * on the floor.
  *
- * The form used to be a paper register, then a Google Sheet. It is now this
- * page: **a response is written into the books the moment it is given.**
+ * The form used to be a paper register. It is now this page, and it works
+ * exactly like the **expense entry form**: the response is written into the
+ * **Customer Feedback Form** sheet, and the sheet is then pulled into the
+ * books. One place a response is written down, and one way into the books.
  *
  * ## What the platform can do that paper could not
  *
@@ -19,10 +21,9 @@ import { createClient } from '../../../../lib/supabaseClient';
  * - **The waiter is picked, not spelled.** The name comes from the
  *   restaurant's own list of people, so "Chingkab" is always written the
  *   same way and a captain's ratings add up.
- * - **It is signed.** The person filling the form in is the signed-in member
- *   of staff, so a response can always be traced back to who wrote it down.
- * - **The guest's phone comes from the order.** The form never asks for it —
- *   the bill already knows.
+ * - **It is signed.** The sheet's **Recorded By** column says who wrote the
+ *   row down, so a response can always be traced back.
+ * - **The guest's phone comes from the order.** The form never asks for it.
  *
  * ## What it cannot do, and does not pretend to
  *
@@ -191,9 +192,12 @@ export default function RecordFeedbackPage() {
       }
       setSaved(json.data);
       setMessage(
-        json.data.is_linked
-          ? 'Recorded, and attached to the order — this guest is now a customer of ours.'
-          : 'Recorded. It will be attached to the order once tonight’s orders are in.',
+        (json.data.is_linked
+          ? json.data.has_phone
+            ? 'Recorded, and attached to the order — this guest is now a customer of ours.'
+            : 'Recorded, and attached to the order. That order has no phone number on it, so it is not counted as a customer of ours.'
+          : 'Recorded. It will be attached to the order once tonight’s orders are in.') +
+          ' It is in the feedback sheet.',
       );
     } catch {
       setError('The feedback could not be recorded.');
@@ -278,8 +282,8 @@ export default function RecordFeedbackPage() {
         <div className="page-head mb-10">
           <h1 className="page-title">Record Feedback</h1>
           <p className="page-purpose">
-            What the guest said, while they are still at the table. It goes into the books as soon
-            as you press save.
+            What the guest said, while they are still at the table. It goes into the feedback
+            sheet and the books as soon as you press save.
           </p>
         </div>
 

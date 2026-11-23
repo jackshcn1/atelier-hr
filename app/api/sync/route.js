@@ -52,7 +52,14 @@ import { fetchGoogleSheetsData, googleSheetsConfigured } from '../../../lib/goog
 import { parseInvoiceSheet, writeInvoiceSheet } from '../../../lib/invoiceSheet.js';
 import { parseBackfillRequest } from '../../../lib/syncBackfill.js';
 import { parseRefreshRequest } from '../../../lib/purchaseRefresh.js';
-import { linkFeedback } from '../../../lib/customerSync.js';
+import { getSupabase } from '../../../lib/supabaseServer.js';
+import {
+  FEEDBACK_SHEET_ID,
+  FEEDBACK_SHEET_NAME,
+  FEEDBACK_SHEET_RANGE,
+  parseFeedbackSheet,
+  syncFeedback,
+} from '../../../lib/feedbackSheet.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -158,38 +165,17 @@ async function handle(req) {
     return await pullInvoiceSheet(push, started);
   }
 
-  // Attach the feedback to the orders it is about.
+  // The Customer Feedback Form sheet.
   //
-  // A response is filled in on the floor, and the order it names is not in
-  // the books until the night's pull has brought it in. So the response is
-  // written at once and the link is made here, once the order has arrived.
+  // The sheet is the record — the same arrangement as the accountant's
+  // invoice sheet. It is a Google Sheet, so it needs no browser and no
+  // login: one API call.
   //
-  // It is asked for once, after the Petpooja groups, so the orders are
-  // already in. It is cheap: only the responses that are not attached yet
-  // are looked at, and the writes are one statement each.
-  if (new URL(req.url).searchParams.get('link') === 'feedback') {
-    return await linkFeedbackResponses(push, started);
-  }
-
-  // The Customer Feedback Form sheet — retired.
-  //
-  // The feedback form is filled in on the floor and now goes straight into
-  // the books, so there is no sheet to pull and no nightly step that pulls
-  // one.
-  //
-  // This branch stays as an **answer**, not as a writer. A stale caller must
-  // never fall through to the Petpooja path below, which would start a
-  // browser and pull a pay cycle it was never asked for.
+  // The site's own form writes into this sheet and then pulls it in, so a
+  // response is in the books the moment it is saved. This step is the same
+  // pull, for the rows that were typed into the sheet by hand.
   if (new URL(req.url).searchParams.get('sheet') === 'feedback') {
-    return NextResponse.json(
-      {
-        ok: false,
-        retired: true,
-        reason:
-          'The customer feedback sheet is no longer read. Feedback is recorded in the app itself.',
-      },
-      { status: 410 },
-    );
+    return await pullFeedbackSheet(push, started);
   }
 
   // The sync engine writes its progress straight to the console. Tee it into
@@ -577,37 +563,77 @@ export async function POST(req) {
 }
 
 /**
- * Attach the feedback responses to the orders their bill numbers name.
+ * Pull the customer feedback sheet and write it into the books.
  *
- * The form is filled in on the floor, and the order it is about is not in
- * the books until the night's pull has brought it in — so the response is
- * written the moment it is given and the link is made here.
+ * The sheet is the record — the same arrangement as the accountant's invoice
+ * sheet. The site's own form writes into it and then pulls it in, so a
+ * response is in the books the moment it is saved; this step is the same
+ * pull, for the rows typed into the sheet by hand.
  *
- * @see linkFeedback() in lib/customerSync.js
+ * @see lib/feedbackSheet.js
  */
-async function linkFeedbackResponses(push, started) {
-  try {
-    push('📝 Attaching the feedback to the orders that have arrived...');
+async function pullFeedbackSheet(push, started) {
+  // Not configured is not a failure — the same rule as the invoice sheet. The
+  // nightly run has to keep working whether or not the sheet is set up yet.
+  if (!googleSheetsConfigured()) {
+    push('📝 The customer feedback sheet is not set up yet — nothing was pulled.');
+    push('   It needs GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY on the server.');
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: 'Google Sheets is not configured.',
+      durationMs: Date.now() - started,
+    });
+  }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-    );
-    const written = await linkFeedback(supabase);
+  try {
+    push('📝 Reading the customer feedback sheet...');
+    // The whole tab. The columns are found **by heading**, so a range that
+    // stopped one column short would lose that column quietly.
+    const rows = await fetchGoogleSheetsData({
+      spreadsheetId: FEEDBACK_SHEET_ID,
+      sheetName: FEEDBACK_SHEET_NAME,
+      range: FEEDBACK_SHEET_RANGE,
+    });
+
+    const parsed = parseFeedbackSheet(rows);
+    if (!parsed.ok) {
+      push(`❌ The feedback sheet could not be read: ${parsed.error}`);
+      return NextResponse.json(
+        { ok: false, error: parsed.error, durationMs: Date.now() - started },
+        { status: 500 },
+      );
+    }
+
+    // The server's own client, which asks for **no-store** on every read.
+    //
+    // A bare client would let Next.js cache the GETs on disk — and the cache
+    // survives a restart and a deployment. A pull that reads a stale copy of
+    // the orders would attach a response to the wrong order, or to none.
+    const supabase = getSupabase();
+    const written = await syncFeedback(supabase, parsed.responses);
 
     push(
-      `✓ Feedback: ${written.checked} response(s) checked — ` +
-        `${written.linked} attached to an order, ${written.unlinked} still without one.`,
+      `✓ Feedback sheet: ${written.responses} response(s) written — ` +
+        `${written.linked} matched to an order, ${written.unlinked} without one.`,
     );
+
+    // A row that could not be identified is **reported**, not quietly dropped
+    // and not quietly written again every night. It says which line, so it
+    // can be found and fixed.
+    for (const row of parsed.skipped || []) {
+      push(`↷ Line ${row.line} was not counted — ${row.reason}.`);
+    }
 
     return NextResponse.json({
       ok: true,
       durationMs: Date.now() - started,
       ...written,
+      skipped: parsed.skipped || [],
     });
   } catch (err) {
     const message = err?.message || String(err);
-    push(`❌ The feedback could not be attached to its orders: ${message}`);
+    push(`❌ The feedback sheet could not be pulled: ${message}`);
     return NextResponse.json(
       { ok: false, error: message, durationMs: Date.now() - started },
       { status: 500 },

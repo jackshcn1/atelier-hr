@@ -432,14 +432,15 @@ second request hijack the first one's capture.
   headless Chrome**, and Vercel's `@sparticuz/chromium` is a headless *shell*
   build that cannot run headed at all. See `memory/customer-section.md`.
 
-- The **customer feedback sheet pull is retired** (23 Nov 2026). The form is
-  filled in inside the app now and a response is written straight into
-  `customer_feedback`; there is no sheet and nothing to pull. The sheet's
-  pull had failed for two nights running — it rewrote all 515 customers one
-  request at a time, which took 126 seconds against a 120-second limit. The
-  replacement is `?link=feedback`, which attaches a response to its order
-  once the order has arrived: one statement, **1.1 seconds**. See
-  `memory/customer-section.md`.
+- The **customer feedback sheet pull is back** (23 Nov 2026). The form is
+  filled in inside the app, but the response is written into the **Customer
+  Feedback Form sheet** first and the sheet is then pulled into the books —
+  the same arrangement as the accountant's invoice sheet. The nightly step is
+  `?sheet=feedback`, which is the **same pull** the form makes when it saves.
+  The old sheet pull had failed for two nights running — it rewrote all 515
+  customers one request at a time, which took 126 seconds against a
+  120-second limit; the replacement is one statement, **1.3 seconds** for the
+  whole pull. See `memory/customer-section.md`.
 
 - The Google service-account key **is** on the server now, so the
   **accountant's invoice sheet** pull (`?sheet=1`) runs in the hosted run and
