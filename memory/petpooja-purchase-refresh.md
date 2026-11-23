@@ -27,6 +27,32 @@ It is a **separate workflow**, not a second cron on the nightly one — the
 nightly run must stay small and fast, and a failed refresh must not disturb
 it.
 
+## When a bill's paid state is actually found
+
+Two ways, and they cover different bills:
+
+1. **The nightly run** pulls the pay cycle that is running — the 20th to the
+   19th — so a bill dated inside the current cycle is looked at **every
+   night**.
+2. **The twice-weekly refresh** re-reads the **last 90 days**, so a bill that
+   has closed its cycle is looked at **twice a week**. Ninety days is the same
+   window Petpooja itself allows a bill to be edited in.
+
+**The limit, stated plainly: a bill dated more than 90 days ago that is paid
+now is not picked up automatically.** It has to be corrected by hand.
+
+**The red nightly run is the alarm.** A run that goes red says *"the books may
+not have been pulled"* — so the reason it went red has to be read, not
+ignored. On 20, 22 and 23 November 2026 it went red, and on all three nights
+**the purchase groups themselves succeeded** — the failure was elsewhere (a
+report group on the 20th, the customer feedback pull on the 22nd and 23rd).
+A red run for a reason that has nothing to do with the bills is a run that
+teaches people to ignore the alarm.
+
+**GitHub's schedule runs late.** The cron says 23:30 UTC; the runs have
+started at 04:00–04:40 UTC — four to five hours later. A job on a schedule is
+not a job that has happened.
+
 ## What a refresh may do
 
 `?refresh=90` on `/api/sync`:
