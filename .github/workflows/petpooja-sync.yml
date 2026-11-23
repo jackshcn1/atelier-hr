@@ -262,11 +262,17 @@ jobs:
       # The customer feedback form.
       #
       # The Customer Feedback Form is a Google Sheet, so it needs no browser
-      # and no login — it is its own request, and it takes about a second.
+      # and no login — it is its own request.
       #
       # It is asked for once, after the Petpooja groups, so the responses land
       # in the same night's books. A sheet that is not set up yet answers
       # "skipped" and does not fail the run.
+      #
+      # The wait is 600 seconds, like the report groups. The function itself is
+      # allowed 300 (`maxDuration` in app/api/sync/route.js), so a shorter
+      # wait here would give up while the server was still working — the run
+      # went red on 22 and 23 Nov with nothing received in 120 seconds, while
+      # the pull was still going.
       - name: Pull the customer feedback sheet
         env:
           SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
@@ -281,7 +287,7 @@ jobs:
           FEEDBACK_STATUS=$(curl -sS -o "response-feedback.json" -w '%{http_code}' -X POST "$SYNC_URL?sheet=feedback" \
             -H "x-sync-secret: $SYNC_SECRET" \
             -H 'Content-Type: application/json' \
-            --max-time 120) || FEEDBACK_STATUS="000"
+            --max-time 600) || FEEDBACK_STATUS="000"
 
           echo "HTTP $FEEDBACK_STATUS"
           tail -c 4000 "response-feedback.json" || true
