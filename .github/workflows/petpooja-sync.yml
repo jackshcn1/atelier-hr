@@ -262,11 +262,19 @@ jobs:
       # The customer feedback form.
       #
       # The Customer Feedback Form is a Google Sheet, so it needs no browser
-      # and no login — it is its own request, and it takes about a second.
+      # and no login — it is its own request.
       #
       # It is asked for once, after the Petpooja groups, so the responses land
       # in the same night's books. A sheet that is not set up yet answers
       # "skipped" and does not fail the run.
+      #
+      # The wait is 600 seconds, like the report groups, and the pull is asked
+      # for twice. The function itself is allowed 300 (`maxDuration` in
+      # app/api/sync/route.js), so a shorter wait here would give up while the
+      # server was still working. And the step failed on both of its first two
+      # nights — 22 and 23 November — with nothing received at all in 120
+      # seconds, while the same pull answers in three; a second try rides out
+      # a moment when the server is busy.
       - name: Pull the customer feedback sheet
         env:
           SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
@@ -278,14 +286,26 @@ jobs:
             exit 1
           fi
 
-          FEEDBACK_STATUS=$(curl -sS -o "response-feedback.json" -w '%{http_code}' -X POST "$SYNC_URL?sheet=feedback" \
-            -H "x-sync-secret: $SYNC_SECRET" \
-            -H 'Content-Type: application/json' \
-            --max-time 120) || FEEDBACK_STATUS="000"
+          FEEDBACK_STATUS=""
+          for ATTEMPT in 1 2; do
+            if [ "$ATTEMPT" != "1" ]; then
+              echo "::warning::The customer feedback pull did not answer on attempt $((ATTEMPT - 1)) — waiting 30s and trying again."
+              sleep 30
+            fi
 
-          echo "HTTP $FEEDBACK_STATUS"
-          tail -c 4000 "response-feedback.json" || true
-          echo ""
+            FEEDBACK_STATUS=$(curl -sS -o "response-feedback.json" -w '%{http_code}' -X POST "$SYNC_URL?sheet=feedback" \
+              -H "x-sync-secret: $SYNC_SECRET" \
+              -H 'Content-Type: application/json' \
+              --max-time 600) || FEEDBACK_STATUS="000"
+
+            echo "HTTP $FEEDBACK_STATUS"
+            tail -c 4000 "response-feedback.json" || true
+            echo ""
+
+            if [ "$FEEDBACK_STATUS" = "200" ] && grep -q '"ok":true' "response-feedback.json"; then
+              break
+            fi
+          done
 
           # A sheet that is not set up yet answers "skipped" — that is not a
           # failure, and the run must not fail over it.
