@@ -37,6 +37,13 @@ import {
   FEEDBACK_SCALE,
   FEEDBACK_TAGS,
 } from '../lib/customerParsers.js';
+import {
+  parseFeedbackSheet,
+  nextSerial,
+  alreadyInSheet,
+  sheetDate,
+  feedbackOutcome,
+} from '../lib/feedbackSheet.js';
 import { listingLabel } from '../lib/customerFormat.js';
 import { parsePlacesRating, parseEnvText } from '../scripts/sync-platform-ratings.mjs';
 import {
@@ -977,6 +984,173 @@ await check('the feedback link is written as a list of tuples', () => {
   assert.equal(sql.includes("(12,'25319','9447001122',true)"), true);
   assert.equal(sql.includes("(13,'','','false')") || sql.includes("(13,'','',false)"), true);
   assert.equal(sql.includes('update public.customer_feedback'), true);
+});
+
+// ---------------------------------------------------------------------------
+// The feedback sheet — the record, the same way the invoice sheet is.
+// ---------------------------------------------------------------------------
+
+const FEEDBACK_SHEET_HEADER = [
+  'Date', 'Feedback Sl No.', 'Bill Number', 'Waiter', 'Overall Experience',
+  'Food Quality', 'Taste of the food', 'Service', 'Staff Hospitality',
+  'Waiting Time', 'Would you visit Atelier again?', 'What can we improve',
+  'Comment', 'Recorded By',
+];
+
+await check('the feedback sheet is read by heading', () => {
+  const result = parseFeedbackSheet([
+    FEEDBACK_SHEET_HEADER,
+    ['September 29, 2026', '1', '25001', 'Chingkab', 'Excellent', 'Very Good', 'Good', 'Excellent', 'Good', 'Average', 'Very Good', 'Portion Size, Cleanliness', 'Nice', 'Rishab'],
+    ['November 23, 2026', '2', '25002', 'Along', 'Good', 'Good', 'Very Good', 'Good', 'Very Good', 'Good', 'Very Good', 'Waiting Time', '', 'Chingkab Yaham'],
+  ]);
+  assert.equal(result.ok, true);
+  assert.equal(result.responses.length, 2);
+  assert.equal(result.responses[0].bill_number, '25001');
+  assert.equal(result.responses[0].overall, 5);
+  assert.equal(result.responses[0].food_quality, 4);
+  assert.equal(result.responses[0].taste, 3);
+  assert.equal(result.responses[0].service, 5);
+  assert.equal(result.responses[0].hospitality, 3);
+  assert.equal(result.responses[0].waiting_time, 2);
+  assert.equal(result.responses[0].waiter, 'Chingkab');
+  assert.equal(result.responses[0].response_date, '2026-09-29');
+  assert.deepEqual(result.responses[0].improvement_tags, ['Portion Size', 'Cleanliness']);
+  assert.equal(result.responses[0].comment, 'Nice');
+  // Who wrote it down. A row typed into the sheet by hand has none.
+  assert.equal(result.responses[0].entered_by, 'Rishab');
+  assert.equal(result.responses[1].entered_by, 'Chingkab Yaham');
+  // The date the app writes is the sheet's own shape.
+  assert.equal(result.responses[1].response_date, '2026-11-23');
+  assert.equal(result.responses[1].serial, '2');
+});
+
+await check('a row that cannot be identified is reported, not written again', () => {
+  const result = parseFeedbackSheet([
+    FEEDBACK_SHEET_HEADER,
+    ['November 23, 2026', '1', '25001', 'Chingkab', 'Excellent', '', '', '', '', '', 'Very Good', '', '', 'Rishab'],
+    // No bill number — it cannot find its order, and it cannot be told apart
+    // from another row with no bill number.
+    ['November 23, 2026', '2', '', 'Amol', 'Good', '', '', '', '', '', 'Good', '', '', 'Rishab'],
+    ['November 24, 2026', '3', '25003', 'Amol', 'Good', '', '', '', '', '', 'Good', '', '', 'Rishab'],
+    // No date. A blank date is not equal to itself in a unique index, so
+    // this row would be written again on every single pull.
+    ['no date here', '4', '25004', 'Amol', 'Good', '', '', '', '', '', 'Good', '', '', 'Rishab'],
+  ]);
+
+  assert.equal(result.ok, true);
+  // Only the rows that can be identified are responses.
+  assert.equal(result.responses.length, 2);
+  assert.equal(result.responses[0].bill_number, '25001');
+  assert.equal(result.responses[1].bill_number, '25003');
+
+  // The others are reported, with the line they are on.
+  assert.equal(result.skipped.length, 2);
+  assert.equal(result.skipped[0].line, 3);
+  assert.equal(result.skipped[0].reason.includes('bill number'), true);
+  assert.equal(result.skipped[1].line, 5);
+  assert.equal(result.skipped[1].reason.includes('date'), true);
+});
+
+await check('the same bill on the same day is one response', () => {
+  const responses = parseFeedbackSheet([
+    FEEDBACK_SHEET_HEADER,
+    ['November 23, 2026', '1', '25001', 'Chingkab', 'Excellent', '', '', '', '', '', 'Very Good', '', '', 'Rishab'],
+  ]).responses;
+
+  // The same bill, the same day — that is the one that is refused.
+  const same = alreadyInSheet(responses, { bill_number: '25001', response_date: '2026-11-23' });
+  assert.equal(same !== null, true);
+  assert.equal(same.entered_by, 'Rishab');
+
+  // A different bill is a different response.
+  assert.equal(alreadyInSheet(responses, { bill_number: '25002', response_date: '2026-11-23' }), null);
+  // The same bill on another day is a different response too.
+  assert.equal(alreadyInSheet(responses, { bill_number: '25001', response_date: '2026-11-24' }), null);
+});
+
+await check('the sheet keeps its own numbering going', () => {
+  assert.equal(nextSerial([]), 1);
+  assert.equal(nextSerial([{ serial: '1' }, { serial: '2' }]), 3);
+  // A blank or a nonsense serial does not stop the count.
+  assert.equal(nextSerial([{ serial: '' }, { serial: 'x' }]), 1);
+});
+
+await check('the date is written in the sheet’s own shape', () => {
+  assert.equal(sheetDate('2026-11-23'), 'November 23, 2026');
+  // A date that is already written is left alone.
+  assert.equal(sheetDate('September 29, 2026'), 'September 29, 2026');
+});
+
+await check('one response is asked about itself, not the whole sheet', async () => {
+  // The counts that come back from a pull are the whole sheet's, so they
+  // cannot answer a question about one response. This is the row that one
+  // response wrote, read back.
+  const written = [];
+  const row = { order_no: '25319', phone: '9447001122', is_linked: true };
+
+  const supabase = {
+    from(table) {
+      const self = {
+        select() {
+          return self;
+        },
+        eq(column, value) {
+          written.push([table, column, value]);
+          return self;
+        },
+        maybeSingle() {
+          return Promise.resolve({ data: row, error: null });
+        },
+      };
+      return self;
+    },
+  };
+
+  const outcome = await feedbackOutcome(supabase, {
+    bill_number: '25319',
+    response_date: '2026-11-23',
+  });
+  assert.equal(outcome.is_linked, true);
+  // A customer is a person whose order carried a real contact number.
+  assert.equal(outcome.has_phone, true);
+  // The row is looked up by the pair — a bill number on its own is not an
+  // identity, because Petpooja restarts its numbering.
+  assert.equal(written[0][1], 'bill_number');
+  assert.equal(written[0][2], '25319');
+  assert.equal(written[1][1], 'response_date');
+  assert.equal(written[1][2], '2026-11-23');
+});
+
+await check('an order with no phone number makes nobody a customer', async () => {
+  const supabase = {
+    from() {
+      const self = {
+        select() {
+          return self;
+        },
+        eq() {
+          return self;
+        },
+        maybeSingle() {
+          return Promise.resolve({
+            data: { order_no: '25319', phone: '', is_linked: true },
+            error: null,
+          });
+        },
+      };
+      return self;
+    },
+  };
+
+  const outcome = await feedbackOutcome(supabase, {
+    bill_number: '25319',
+    response_date: '2026-11-23',
+  });
+  // The response is attached to its order...
+  assert.equal(outcome.is_linked, true);
+  // ...but that order carried no contact number, so the guest is not a
+  // customer of ours, and the page must not say they are.
+  assert.equal(outcome.has_phone, false);
 });
 
 console.log(`\n${passed} checks passed.`);

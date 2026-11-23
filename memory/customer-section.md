@@ -4,7 +4,7 @@ description: "The Customer section — who a customer is (a real contact number)
 metadata:
   node_type: memory
   type: project
-  modified: 2026-11-21T06:30:00.000Z
+  modified: 2026-11-23T15:30:00.000Z
 ---
 
 # The Customer section
@@ -291,7 +291,7 @@ not name the customer either.
 |---|---|---|
 | Order value | Petpooja's **All Orders export**, a month at a time | — |
 | Reviews | The **Ratings & Reviews** endpoint (`online_review_data/428501`), 5409 = Zomato, 6736 = Swiggy | the **platform order id** (`Client OrderID`) |
-| Feedback | **The app's own form**, on the floor — written straight into `customer_feedback` | the **bill number** — the phone comes from the order it names |
+| Feedback | **The app's own form**, on the floor — written into the **Customer Feedback Form sheet**, which is then pulled into the books | the **bill number** — the phone comes from the order it names |
 | Google reviews | **Not in Petpooja.** They need the Google Business Profile API | — |
 | Google rating | **Places API** — an API key only, no approval | the Place ID |
 
@@ -365,23 +365,31 @@ owner's decision on 20 Nov 2026, because the form has no phone column. A
 response that does not match is **kept**, still counts in the ratings, and is
 reported as unlinked.
 
-## The feedback form lives in the app (23 Nov 2026)
+## The feedback form: the sheet is the record (23 Nov 2026)
 
-The form used to be a **Google Sheet** — "Customer Feedback Form", created
-28 Sep 2026. It was **not** a Form's response sheet; it was a plain
-spreadsheet with a dropdown, and it had **one row in it** — a test row from
+The form is filled in **in the app**, on the floor — but the response is written
+into the **Customer Feedback Form** sheet first, and the sheet is then pulled into
+the books. That is **exactly the arrangement the accountant's expense entry form
+uses**, and for the same reason: **one place a response is written down, and one
+way into the books.**
+
+```
+the form  →  the Customer Feedback Form sheet  →  the books
+```
+
+The sheet (`1M0jVGEh1aekFYnMtVkHSA4oobZq5Pg1i3-D6TenF9kU`, tab `Sheet1`, range
+`A:AZ`) is **not** a Google Form's response sheet — it is a plain spreadsheet
+with a dropdown, created 28 Sep 2026, which held **one row**: a test row from
 29 September. The floor had been writing the feedback on **paper**.
 
-### Why it moved into the app
+> **This was changed twice in one day, and the second time wins.**
+> PR #103 moved the form into the app and wrote a response **straight into
+> `customer_feedback`**. The owner then asked for the expense-form arrangement
+> instead: *form → sheet → pull into the books*, and the old routine killed. So
+> the sheet came back, and `source` went back to
+> `google_sheet:customer_feedback_form`.
 
-Not because spreadsheets are hard to maintain — the accountant's **invoice**
-sheet stays, and rightly so: one person enters bills at a desk and wants to
-be able to fix a typo in the sheet and have the books pick it up. The
-feedback form is different. It is filled in by **many people, on the floor,
-in a hurry, on a phone**, and every field on it is about **an order we already
-hold**.
-
-So the form can do things the sheet never could:
+### What the form can do that the sheet never could
 
 - **The bill number finds the order.** Type the number printed on the guest's
   bill and the order is looked up, so it is certain which meal is being
@@ -390,23 +398,53 @@ So the form can do things the sheet never could:
   table, so "Chingkab" is always written the same way and a captain's
   ratings add up. `Chingkab Yaham` on the picker is the same person as the
   `Chingkab` on the old sheet's test row.
-- **It is signed.** `customer_feedback.entered_by` records **who wrote it
-  down** — the signed-in member of staff. The waiter is who *served* the
-  table; this is who held the pen. The sheet could not say that at all.
+- **It is signed.** The sheet's **Recorded By** column (added 23 Nov 2026)
+  records **who wrote it down** — the signed-in member of staff — and it travels
+  into `customer_feedback.entered_by`. The waiter is who *served* the table;
+  this is who held the pen. The sheet could not say that at all before.
 - **The guest's phone comes from the order.** The form never asks for it.
 
-The form's own words were **recovered from the old sheet** rather than
-invented: the scale (Excellent / Very Good / Good / Average / Poor) and the
-nine improvement tags (Food, Service, Staff Hospitality, Waiting Time, Menu
-Variety, Portion Size, Price, Cleanliness, Nothing - everything was Great)
-came from the sheet's dropdown rules. A guest may also name something that is
-not on the list, and it is kept as a tag of its own — so a new word does not
-need a code change to be counted.
+The form's own words were **recovered from the sheet** rather than invented: the
+scale (Excellent / Very Good / Good / Average / Poor) and the nine improvement
+tags (Food, Service, Staff Hospitality, Waiting Time, Menu Variety, Portion
+Size, Price, Cleanliness, Nothing - everything was Great) came from the sheet's
+dropdown rules. A guest may also name something that is not on the list, and it
+is kept as a tag of its own — so a new word does not need a code change to be
+counted.
 
 Only the **overall rating** and **"would you visit again"** are required. A
 guest in a hurry is not made to answer six questions, and the page reports
 how many were answered, so an average is never taken over more people than
 there were.
+
+### The columns, and why they are found by heading
+
+The sheet's columns are found **by heading**, not by position, so a question can
+be added to the sheet without the others shifting into the wrong column:
+
+| Heading | What it holds |
+|---|---|
+| Date | the day the response was given — the sheet's own shape, `November 23, 2026` |
+| Feedback Sl No. | the sheet's own serial number; the form continues it |
+| Bill Number | the bill it is about — **how it finds its order** |
+| Waiter | who served the table |
+| Overall Experience | the rating |
+| Food Quality … Waiting Time | the five detail ratings |
+| Would you visit Atelier again? | answered on the same scale |
+| What can we improve | the tags, separated by commas |
+| Comment | what they said, in their own words |
+| **Recorded By** | **who wrote it down** — added 23 Nov 2026 |
+
+### The same bill cannot be entered twice
+
+A response is identified by the **bill it is about and the day it was given** —
+the same pair the books are keyed on, because a bill number on its own is not an
+identity (Petpooja restarts its numbering).
+
+The sheet is read **before** the row is written, and a response already there is
+refused with a message that names it: *"This bill already has feedback recorded
+for September 29, 2026 — entered by somebody."* Nothing is written when it is
+refused.
 
 ### The link to the customer happens at night, not at the table
 
@@ -417,10 +455,20 @@ order was 22 Nov. Petpooja's orders are pulled once a night.
 So a response is **written the moment it is given**, and the link to its
 order is made by the night's run, once the order has arrived. A response
 about a bill that is already in the books is attached at once. The form says
-which happened, in plain words.
+which happened, in plain words — and it says **three** things, not two:
 
-The nightly step is `?link=feedback` on the sync endpoint, asked for once
-after the Petpooja groups so the orders are already in.
+- attached to the order, and the order carried a phone number → *"this guest is
+  now a customer of ours"*
+- attached to the order, but the order carried **no** number → *"that order has
+  no phone number on it, so it is not counted as a customer of ours"* — a
+  customer is a person whose order carried a real contact number, so an order
+  without one does not make anybody a customer
+- not attached yet → *"it will be attached to the order once tonight's orders
+  are in"*
+
+The nightly step is `?sheet=feedback` on the sync endpoint, asked for once
+after the Petpooja groups so the orders are already in. It is the **same pull**
+the form makes when it saves — one way into the books, not two.
 
 ### The old pull was the reason the nightly run went red
 
@@ -441,19 +489,39 @@ already use:
 - only the rows whose link **actually changed** are written;
 - the customers' counts are one statement, and only where the count differs.
 
-Measured: **1.1 seconds** for the whole thing, against 126 before.
+Measured: **1.1 seconds** for the whole thing, against 126 before. The whole
+pull — read the sheet, write the rows, attach them — measures **1.3 seconds**.
 
-### The sheet is gone, and gone completely
+### The counts are the sheet's; the answer about one response is that one's
 
-The sheet pull was retired at every layer — the workflow step, the endpoint,
-`syncFeedback()`, `parseFeedbackSheet()`, and the sheet id in the environment.
-`?sheet=feedback` now answers **410 Gone** with a message, rather than
-falling through to the Petpooja path — a stale caller must never start a
-browser and pull a pay cycle it was never asked for.
+The counts a pull returns are **the whole sheet's**. So they cannot answer a
+question about **one** response: a sheet holding one linked and one unlinked
+response would say "linked" about both.
+
+So the row that a particular response wrote is **read back**, and the answer
+comes from it — `feedbackOutcome()` in `lib/feedbackSheet.js`. This is the same
+lesson as the cached-fetch rule: a number about the whole thing is not a number
+about one of its parts.
+
+### The sheet pull is not allowed to read a stale copy of the orders
+
+The sync route reads the orders through the **server's own client**
+(`getSupabase()`), which asks for `cache: 'no-store'` on every request. A bare
+client would let Next.js cache the GETs on disk — and that cache survives a
+restart and a deployment. A pull that read a stale copy of the orders would
+attach a response to the wrong order, or to none.
+
+### What was retired
+
+The old **`?link=feedback`** routine is gone: its branch, its
+`linkFeedbackResponses()` and the workflow step that asked for it. The nightly
+run now asks for `?sheet=feedback`, which is the same pull the form makes.
 
 **The one row the sheet had is kept**, with its own source
 (`google_sheet:customer_feedback_form`). A row's history is not rewritten:
-the source records where a thing really came from.
+the source records where a thing really came from. `entered_by` is what tells
+a response written through the app's form from one typed into the sheet by
+hand — a hand-typed row has none.
 
 The **variable-pay** feedback metrics (`kit_food_quality`, `hlp_quality`,
 `cap_quality`) still read the same sheet, through `lib/feedbackParsers.js`.
@@ -649,7 +717,7 @@ SQL text.
 | Of those | **1,337 matched an order**, 12 did not — Petpooja does not hold those orders |
 | By listing | Zomato 918, Swiggy — Ambrosia 222, Swiggy — Atelier 192, plain Swiggy 5 |
 | Reach a customer | **29** reviews carry a phone number — **27** customers have any |
-| Feedback | 1 response so far — the old sheet's test row, and its bill number does not match an order yet. The form now writes into the books itself |
+| Feedback | 1 response so far — the sheet's own test row, and its bill number does not match an order yet. The form writes into the sheet, and the sheet is pulled into the books |
 
 The gap is the number worth closing at the counter: it is 91.3% of the order
 value, and it exists because the number is not asked for at the till.

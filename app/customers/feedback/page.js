@@ -9,9 +9,10 @@ import {
 /**
  * app/customers/feedback/page.js — the customer feedback form, answered.
  *
- * The feedback form is filled in on the floor, in the app itself, and a
- * response is written into the books the moment it is given. This page reads
- * it back as a dashboard of what people want improved.
+ * The feedback form is filled in on the floor, in the app, and the response
+ * is written into the **Customer Feedback Form** sheet — which is the record,
+ * the same way the accountant's invoice sheet is. The sheet is pulled into
+ * the books, so a response is counted the moment it is saved.
  *
  * **The honest limit, stated on the page.** A response reaches a customer
  * only when its bill number is an order number (the owner's decision,
@@ -159,8 +160,8 @@ export default function CustomerFeedbackPage() {
             <div className="panel-body">
               <p className="note">
                 No feedback has been recorded yet. It is filled in on the floor and goes into the
-                books as soon as it is saved — open <strong>Record Feedback</strong> to write the
-                first one.
+                feedback sheet — and into the books — as soon as it is saved. Open{' '}
+                <strong>Record Feedback</strong> to write the first one.
               </p>
             </div>
           </section>
