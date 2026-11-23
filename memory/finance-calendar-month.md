@@ -246,6 +246,30 @@ batches of 150. Looking them up by supplier name was wrong: the name is
 written by a third party and can change its capitalisation or its tag between
 one day and the next, and a bill would then be written twice.
 
+## Where a bill's paid state comes from
+
+**A bill from Petpooja is marked paid in Petpooja.** Its paid state is
+Petpooja's to say, and the books read it from Petpooja's own purchase report.
+The Bills page **does not offer a "Mark paid" button** for such a bill — it
+shows **"From Petpooja"** instead — and the route refuses one with a `409`
+that says why. See `memory/finance-invoice-sheet.md` for the other half: a
+bill on the accountant's sheet *is* marked paid on this site, and the payment
+is written into the sheet, which is then pulled into the books.
+
+**How often Petpooja's paid state is found — two ways:**
+
+1. **The nightly run** pulls the pay cycle that is running, so a bill dated
+   inside the current cycle is checked every night.
+2. **The twice-weekly purchase refresh** (`.github/workflows/petpooja-refresh.yml`,
+   Monday and Thursday at 05:00 IST, `?refresh=90`) re-reads the **last 90
+   days** of purchases and rewrites those bills with Petpooja's own payment
+   column. So a bill dated within the last 90 days is checked twice a week.
+   The 90 days is the same window Petpooja itself allows a bill to be edited
+   in. See `memory/petpooja-purchase-refresh.md`.
+
+**The limit, stated plainly:** a bill dated **more than 90 days ago** that is
+paid now is **not picked up automatically**. It has to be corrected by hand.
+
 ## The dashboards say what is missing
 
 `lib/financePosition.js` returns, for a month, the money owed by customers,

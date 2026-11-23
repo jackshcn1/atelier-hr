@@ -21,6 +21,7 @@ import {
   normaliseDate,
   normaliseAmount,
   normalisePaymentStatus,
+  paymentCellTargets,
   resolveCostCategory,
   resolvePettyCategory,
 } from '../lib/invoiceSheet.js';
@@ -314,6 +315,80 @@ check('a row that cannot be read is skipped with the reason, not dropped', () =>
   }
 });
 
+// ---- the payment of a bill ----------------------------------------------
+
+// The columns of the real sheet, by position, so a cell can be pointed at.
+// The sheet counts its columns from 1, so A is 1.
+const COLUMN = Object.fromEntries(HEADINGS.map((heading, index) => [heading, index + 1]));
+
+check('marking a bill paid writes the date, the mode and the reference', () => {
+  const parsed = parseInvoiceSheet(sheet);
+  const gas = parsed.entries.find((e) => e.costTypeName === 'Gas');
+
+  const targets = paymentCellTargets(sheet, [
+    { sourceKey: gas.sourceKey, date: '2026-11-18', mode: 'UPI', reference: 'UTR-44921' },
+  ]);
+
+  assert(targets.ok, targets.error);
+  assert(targets.missing.length === 0, `missing: ${targets.missing.join(', ')}`);
+  assert(targets.found.length === 1, `found ${targets.found.length} bills`);
+
+  const at = (heading) => targets.updates.find((u) => u.column === COLUMN[heading]);
+  const paidOn = at('Invoice Paid on (ignore if not paid) (Variable Cost)');
+  const mode = at('Payment Mode');
+  const reference = at('Bank Reference');
+
+  assert(paidOn, 'the paid-on cell was not found');
+  assert(paidOn.value === '2026-11-18', `the date is ${paidOn.value}`);
+  assert(paidOn.line === gas.line, `the date went to line ${paidOn.line}, not ${gas.line}`);
+  assert(mode && mode.value === 'UPI', `the mode is ${mode?.value}`);
+  assert(reference && reference.value === 'UTR-44921', `the reference is ${reference?.value}`);
+});
+
+check('a fixed bill is marked paid in its own block', () => {
+  const parsed = parseInvoiceSheet(sheet);
+  const rent = parsed.entries.find((e) => e.costTypeName === 'Outlet Rent');
+
+  const targets = paymentCellTargets(sheet, [
+    { sourceKey: rent.sourceKey, date: '2026-11-18', mode: 'Cash', reference: '' },
+  ]);
+
+  assert(targets.ok, targets.error);
+  const paidOn = targets.updates.find(
+    (u) => u.column === COLUMN['Invoice Paid on (ignore if not paid) (Fixed Cost)']
+  );
+  assert(paidOn, "the fixed block's paid-on cell was not found");
+  assert(paidOn.value === '2026-11-18', `the date is ${paidOn.value}`);
+  // The variable block's cell must not be touched.
+  assert(
+    !targets.updates.some(
+      (u) => u.column === COLUMN['Invoice Paid on (ignore if not paid) (Variable Cost)']
+    ),
+    'the variable block was written as well',
+  );
+});
+
+check('marking a bill unpaid clears the payment', () => {
+  const parsed = parseInvoiceSheet(sheet);
+  const gas = parsed.entries.find((e) => e.costTypeName === 'Gas');
+
+  const targets = paymentCellTargets(sheet, [{ sourceKey: gas.sourceKey, date: '', mode: '', reference: '' }]);
+
+  assert(targets.ok, targets.error);
+  assert(targets.updates.length === 3, `wrote ${targets.updates.length} cells`);
+  for (const update of targets.updates) {
+    assert(update.value === '', `a cell was left as "${update.value}"`);
+  }
+});
+
+check('a bill that is not on the sheet is reported, not written', () => {
+  const targets = paymentCellTargets(sheet, [{ sourceKey: 'id:not-a-real-entry', date: '2026-11-18' }]);
+  assert(targets.ok, targets.error);
+  assert(targets.found.length === 0, `found ${targets.found.length} bills`);
+  assert(targets.missing.length === 1, `missing ${targets.missing.length}`);
+  assert(targets.updates.length === 0, `wrote ${targets.updates.length} cells`);
+});
+
 check('a sheet without the type of expense column is reported by name', () => {
   const short = [['Invoice Date', 'Vendor', 'Amount', 'Bucket'], ['17/11/2026', 'KSEB', '4250', 'Variable']];
   const parsed = parseInvoiceSheet(short);
@@ -350,8 +425,7 @@ const STANDING = [
   { name: 'Staff Accommodation Rent', category: 'Staff Accommodation Rent' },
 ];
 
-check('a cost type finds the standing cost it is the invoice for', () => {
-  assert(resolveCostCategory('Airtel Broadband Monthly', STANDING) === 'Airtel Broadband', 'broadband');
+check('a cost type finds the standing cost it is the invoice for', () => {  assert(resolveCostCategory('Airtel Broadband Monthly', STANDING) === 'Airtel Broadband', 'broadband');
   assert(resolveCostCategory('Digital Marketing Monthly', STANDING) === 'Digital Marketing Retainer', 'marketing');
   assert(resolveCostCategory('Internal Signage Rent', STANDING) === 'Internal Signage Rental', 'signage');
   assert(resolveCostCategory('Pest Control', STANDING) === 'Sequire Pest Control', 'pest control');

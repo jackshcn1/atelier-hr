@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { normalizePaymentStatus } from '../../../lib/expenseHelpers.js';
-import { monthLabel } from '../../../lib/financePeriod.js';
+import { monthLabel, todayInIST } from '../../../lib/financePeriod.js';
 import { billsInPeriod, periodNote } from '../../../lib/financeBills.js';
 
 // The link to the invoice itself. Only a Drive link is followed — anything
@@ -26,6 +26,26 @@ const SORTS = [
   { value: 'name', label: 'A–Z' },
 ];
 
+// How a bill can be paid. Typing is allowed as well — the list is what is
+// used most, not a closed set.
+const PAYMENT_MODES = ['UPI', 'NEFT', 'RTGS', 'Cash', 'Credit Card', 'Cheque'];
+
+/**
+ * Can this bill be marked paid from here?
+ *
+ * Only a bill on the accountant's sheet can. Its payment is written into the
+ * sheet, and the sheet is what the books follow — so the record and the books
+ * never disagree.
+ *
+ * A bill that came from Petpooja cannot: Petpooja says whether it is paid,
+ * and the books read that from the purchase report.
+ */
+const canMarkPaid = (bill) => bill?.source === 'sheet' && Number(bill.debit_note || 0) <= 0;
+
+/** Can this bill be picked for a payment? Only the ones still to be paid. */
+const canSelect = (bill) =>
+  canMarkPaid(bill) && normalizePaymentStatus(bill.payment_status) !== 'paid';
+
 export default function BillsPage() {
   const [bills, setBills] = useState([]);
   const [totals, setTotals] = useState(null);
@@ -38,6 +58,13 @@ export default function BillsPage() {
   const [openVendor, setOpenVendor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
+
+  // The bills picked for a payment, and the payment being described.
+  const [selected, setSelected] = useState([]);
+  const [paymentBills, setPaymentBills] = useState(null);
+  const [payment, setPayment] = useState({ date: todayInIST(), mode: '', reference: '' });
+  const [paymentError, setPaymentError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -61,13 +88,24 @@ export default function BillsPage() {
   }, [load]);
 
   // Mark a bill paid (or unpaid again).
+  //
+  // The payment is written into the **accountant's sheet**, not into the
+  // database: the sheet is the record, and the books follow it. A bill marked
+  // paid only in the database would be marked unpaid again by the next pull.
   const setPaid = async (bill, paid) => {
-    const res = await fetch(`/api/finance/expenses/${bill.id}`, {
-      method: 'PATCH',
+    const res = await fetch('/api/finance/expenses/sheet/payment', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        payment_status: paid ? 'paid' : 'unpaid',
-        ...(paid ? { payment_date: bill.payment_date || new Date().toISOString().slice(0, 10) } : {}),
+        ids: [bill.id],
+        action: paid ? 'paid' : 'unpaid',
+        ...(paid
+          ? {
+              paymentDate: payment.date,
+              paymentMode: payment.mode,
+              bankReference: payment.reference,
+            }
+          : {}),
       }),
     });
     const json = await res.json();
@@ -76,6 +114,64 @@ export default function BillsPage() {
       load();
     } else {
       setMessage(`Could not update the bill: ${json.error}`);
+    }
+  };
+
+  // Pick a bill, or put it back.
+  const toggleSelected = (bill) => {
+    setSelected((prev) =>
+      prev.includes(bill.id) ? prev.filter((id) => id !== bill.id) : [...prev, bill.id]
+    );
+  };
+
+  // Open the payment form for one bill or for several.
+  const openPayment = (bills) => {
+    setPaymentBills(bills);
+    setPaymentError('');
+    setPayment({ date: todayInIST(), mode: '', reference: '' });
+  };
+
+  // Write the payment into the sheet, and let the sheet bring it into the books.
+  const savePayment = async (action) => {
+    if (!paymentBills || paymentBills.length === 0) return;
+    setSaving(true);
+    setPaymentError('');
+
+    try {
+      const res = await fetch('/api/finance/expenses/sheet/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: paymentBills.map((bill) => bill.id),
+          action,
+          ...(action === 'paid'
+            ? {
+                paymentDate: payment.date,
+                paymentMode: payment.mode,
+                bankReference: payment.reference,
+              }
+            : {}),
+        }),
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        const count = paymentBills.length;
+        setMessage(
+          action === 'paid'
+            ? `${count === 1 ? 'Bill' : `${count} bills`} marked paid — the payment is on the sheet.`
+            : `${count === 1 ? 'Bill' : `${count} bills`} marked unpaid.`
+        );
+        setPaymentBills(null);
+        setSelected([]);
+        load();
+      } else {
+        setPaymentError(json.error || 'The payment could not be saved.');
+      }
+    } catch (error) {
+      setPaymentError('The payment could not be saved.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -164,6 +260,13 @@ export default function BillsPage() {
   const grandPaid = vendors.reduce((sum, line) => sum + line.paid, 0);
   const grandCredit = vendors.reduce((sum, line) => sum + line.credit, 0);
   const unpaidCount = vendors.reduce((sum, line) => sum + line.unpaidCount, 0);
+
+  // The bills that are picked for a payment.
+  const selectedBills = useMemo(
+    () => bills.filter((bill) => selected.includes(bill.id)),
+    [bills, selected]
+  );
+  const selectedTotal = selectedBills.reduce((sum, bill) => sum + Number(bill.amount || 0), 0);
 
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
@@ -262,6 +365,36 @@ export default function BillsPage() {
             To enter a new bill → Invoice Entry
           </Link>
         </div>
+
+        {/* Where a bill's paid state comes from. A bill from Petpooja is
+            marked paid in Petpooja; a bill on the accountant's sheet is
+            marked paid here, and the payment is written into the sheet so
+            the record and the books never disagree. */}
+        <p className="text-xs text-[#6b635c] mb-6 max-w-3xl">
+          A bill that came from <strong>Petpooja</strong> is marked paid in Petpooja — the books
+          read that from the purchase report, twice a week. A bill entered on the Invoice Entry
+          page or in the accountant&apos;s sheet is marked paid here, and the payment is written
+          into the sheet, which is what the books follow.
+        </p>
+
+        {/* The bills that are picked, and what can be done with them. */}
+        {selectedBills.length > 0 && (
+          <div className="sticky top-4 z-10 mb-4 panel bg-white border border-[#ebe8e4] rounded-card shadow-sm px-5 py-4 flex items-center gap-4 flex-wrap">
+            <p className="text-sm">
+              <strong>{selectedBills.length}</strong> bill(s) picked ·{' '}
+              ₹{selectedTotal.toLocaleString('en-IN')}
+            </p>
+            <button onClick={() => openPayment(selectedBills)} className="btn-primary text-sm px-4 py-2">
+              Mark them paid
+            </button>
+            <button onClick={() => setSelected([])} className="btn-secondary text-sm px-3 py-2">
+              Clear
+            </button>
+            <p className="text-xs text-[#6b635c]">
+              They were paid under one transfer, so one payment is asked for.
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-8 flex-wrap">
           <label htmlFor="bills-month" className="text-sm text-[#6b635c]">
@@ -364,6 +497,7 @@ export default function BillsPage() {
                     <table className="w-full text-sm border-t border-[#f0ede9]">
                       <thead>
                         <tr className="table-head">
+                          <th className="table-cell w-8" />
                           <th className="table-cell text-left">Bill</th>
                           <th className="table-cell text-left">Date</th>
                           <th className="table-cell text-right">Amount</th>
@@ -389,6 +523,17 @@ export default function BillsPage() {
                               : Number(bill.amount || 0);
                             return (
                               <tr key={bill.id} className="border-t border-[#f0ede9]">
+                                <td className="table-cell w-8 align-top">
+                                  {canSelect(bill) && (
+                                    <input
+                                      type="checkbox"
+                                      checked={selected.includes(bill.id)}
+                                      onChange={() => toggleSelected(bill)}
+                                      aria-label={`Pick ${bill.vendor_name}`}
+                                      className="mt-1.5 accent-[#1e1812]"
+                                    />
+                                  )}
+                                </td>
                                 <td className="table-cell">
                                   {bill.invoice_number || '—'}
                                   {bill.description && (
@@ -396,8 +541,14 @@ export default function BillsPage() {
                                   )}
                                   {/* How it was paid, and the bank's reference for it —
                                       the two facts that tell a payment apart from
-                                      another payment of the same amount. */}
-                                  {(bill.payment_mode || bill.bank_reference) && (
+                                      another payment of the same amount.
+
+                                      Only for a bill that **is** paid. The bank
+                                      reference falls back to the invoice number
+                                      when there is no UTR, so it is on every sheet
+                                      bill — a bill still to be paid must not be
+                                      described as paid. */}
+                                  {isPaid && (bill.payment_mode || bill.bank_reference) && (
                                     <span className="block text-xs text-[#6b635c]">
                                       {bill.payment_mode ? `Paid by ${bill.payment_mode}` : 'Paid'}
                                       {bill.bank_reference && bill.bank_reference !== bill.invoice_number
@@ -447,13 +598,28 @@ export default function BillsPage() {
                                   )}
                                 </td>
                                 <td className="table-cell text-right">
-                                  {!isCredit && (
-                                    <button
-                                      onClick={() => setPaid(bill, !isPaid)}
-                                      className="text-[#8b6f4e] hover:underline text-xs"
-                                    >
-                                      {isPaid ? 'Mark unpaid' : 'Mark paid'}
-                                    </button>
+                                  {!isCredit && canMarkPaid(bill) && (
+                                    isPaid ? (
+                                      <button
+                                        onClick={() => {
+                                          if (!window.confirm('Mark this bill unpaid? The payment details are cleared from the sheet.')) return;
+                                          setPaid(bill, false);
+                                        }}
+                                        className="text-[#8b6f4e] hover:underline text-xs"
+                                      >
+                                        Mark unpaid
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => openPayment([bill])}
+                                        className="text-[#8b6f4e] hover:underline text-xs"
+                                      >
+                                        Mark paid
+                                      </button>
+                                    )
+                                  )}
+                                  {!isCredit && !canMarkPaid(bill) && (
+                                    <span className="text-xs text-[#6b635c]">From Petpooja</span>
                                   )}
                                 </td>
                               </tr>
@@ -468,6 +634,126 @@ export default function BillsPage() {
           </div>
         )}
       </div>
+
+      {/* The payment.
+          The date it was paid, how it was paid and the bank's reference for
+          it — written into the sheet, which is the record the books follow. */}
+      {paymentBills && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 sm:p-6 overflow-y-auto">
+          <div className="panel bg-white rounded-card shadow-lg w-full max-w-xl mt-10 sm:mt-20">
+            <div className="panel-body p-8">
+              <h2 className="font-serif text-2xl text-[#1e1812] mb-2">
+                {paymentBills.length === 1
+                  ? 'Mark this bill paid'
+                  : `Mark ${paymentBills.length} bills paid`}
+              </h2>
+              <p className="text-sm text-[#6b635c] mb-6">
+                The payment is written into the accountant&apos;s sheet, and the sheet is what the
+                books follow.
+              </p>
+
+              <ul className="text-sm mb-6">
+                {paymentBills.map((bill) => (
+                  <li
+                    key={bill.id}
+                    className="flex justify-between gap-4 border-b border-[#f2efec] py-2"
+                  >
+                    <span className="truncate">
+                      {bill.vendor_name}
+                      {bill.invoice_number ? ` · ${bill.invoice_number}` : ''}
+                    </span>
+                    <span className="text-[#6b635c] shrink-0">
+                      ₹{Number(bill.amount || 0).toLocaleString('en-IN')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="space-y-5">
+                <div className="field">
+                  <label htmlFor="payment-date" className="field-label block text-sm font-medium mb-2">
+                    Date of payment
+                  </label>
+                  <input
+                    id="payment-date"
+                    type="date"
+                    value={payment.date}
+                    onChange={(e) => setPayment((prev) => ({ ...prev, date: e.target.value }))}
+                    required
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="payment-mode" className="field-label block text-sm font-medium mb-2">
+                    Form of payment
+                  </label>
+                  <input
+                    id="payment-mode"
+                    type="text"
+                    list="payment-modes"
+                    value={payment.mode}
+                    onChange={(e) => setPayment((prev) => ({ ...prev, mode: e.target.value }))}
+                    placeholder="UPI"
+                    required
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                  />
+                  <datalist id="payment-modes">
+                    {PAYMENT_MODES.map((mode) => (
+                      <option key={mode} value={mode} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-[#6b635c] mt-1.5">
+                    UPI, cash, a bank transfer — pick one of the usual ones or type your own.
+                  </p>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="payment-reference" className="field-label block text-sm font-medium mb-2">
+                    Bank reference (UTR)
+                  </label>
+                  <input
+                    id="payment-reference"
+                    type="text"
+                    value={payment.reference}
+                    onChange={(e) => setPayment((prev) => ({ ...prev, reference: e.target.value }))}
+                    placeholder="UTR / reference number"
+                    className="w-full px-3 py-2 border border-[#ebe8e4] rounded-control focus:outline-none focus:border-[#8b6f4e]"
+                  />
+                  <p className="text-xs text-[#6b635c] mt-1.5">
+                    The number the bank gave the payment. Leave it empty if it was paid in cash.
+                  </p>
+                </div>
+
+                {paymentBills.length > 1 && (
+                  <p className="text-xs text-[#6b635c]">
+                    The same payment is written to every bill picked — they were all closed under
+                    one transfer.
+                  </p>
+                )}
+
+                {paymentError && <p className="text-sm text-[#8b3a2e]">{paymentError}</p>}
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={() => savePayment('paid')}
+                    disabled={saving}
+                    className="btn-primary text-sm px-5 py-2.5 disabled:opacity-50"
+                  >
+                    {saving ? 'Saving…' : 'Mark as paid'}
+                  </button>
+                  <button
+                    onClick={() => setPaymentBills(null)}
+                    className="btn-secondary text-sm px-4 py-2"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
