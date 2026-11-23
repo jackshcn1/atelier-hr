@@ -17,10 +17,20 @@ const FILTERS = [
   { value: 'all', label: 'All bills' },
 ];
 
+// Which way the suppliers are ordered.
+//
+// Who we owe the most to is the default — that is the list you act on. The
+// alphabetical order is there for finding one supplier in a long list.
+const SORTS = [
+  { value: 'owed', label: 'Owed most' },
+  { value: 'name', label: 'A–Z' },
+];
+
 export default function BillsPage() {
   const [bills, setBills] = useState([]);
   const [totals, setTotals] = useState(null);
   const [filter, setFilter] = useState('unpaid');
+  const [sort, setSort] = useState('owed');
   const [month, setMonth] = useState('all');
   // A custom period: the bills dated from one day to another.
   const [from, setFrom] = useState('');
@@ -137,7 +147,11 @@ export default function BillsPage() {
     grouped.set(name, line);
   }
 
-  const vendors = [...grouped.values()].sort((a, b) => b.unpaid - a.unpaid);
+  const vendors = [...grouped.values()].sort(
+    sort === 'name'
+      ? (a, b) => a.vendor.localeCompare(b.vendor)
+      : (a, b) => b.unpaid - a.unpaid
+  );
 
   const visible = vendors.filter((line) => {
     if (filter === 'unpaid') return line.unpaidCount > 0 || line.credit > 0;
@@ -217,6 +231,29 @@ export default function BillsPage() {
               {option.label}
             </button>
           ))}
+          {/*
+              Which way the suppliers are ordered. Who we owe the most to is
+              the default; the alphabetical order is for finding one supplier
+              in a long list.
+          */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#6b635c]">Order</span>
+            <div className="flex gap-2">
+              {SORTS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setSort(option.value)}
+                  className={`px-3 py-2 rounded-control text-xs border ${
+                    sort === option.value
+                      ? 'bg-[#1e1812] text-white border-[#1e1812]'
+                      : 'bg-white border-[#ebe8e4] text-[#6b635c]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {/*
               Entering a bill has its own page, so a biller never has to open
               this one. The link points there rather than at a form.
