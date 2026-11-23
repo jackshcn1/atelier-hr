@@ -108,11 +108,15 @@ is **kept** — it is still a review — and it is reported as unlinked rather t
 thrown away.
 
 ## Gate 14: The platform's own rating is stored
-CHECK: `select listing, rating, rating_count, rating_count_text, fetched_at from platform_listings`
-EXPECT: three rows — Zomato 4.3 from 4,401; Swiggy — Atelier 4.4 with "2.6K+";
-Swiggy — Ambrosia 4.5 with "10K+". Swiggy publishes no exact count, so its
-exact-count column stays empty and the abbreviation is kept as the text
-Swiggy writes. `fetched_at` says when the number was last read.
+CHECK: `select listing, rating, rating_count, rating_count_text, source, fetched_at from platform_listings`
+EXPECT: **four** rows — Zomato 4.3 from 4,401; Swiggy — Atelier 4.4 with "2.6K+";
+Swiggy — Ambrosia 4.5 with "10K+"; Google 4.0 from 3,628. Swiggy publishes no
+exact count, so its exact-count column stays empty and the abbreviation is kept
+as the text Swiggy writes. `fetched_at` says when the number was last read, and
+`source` says **where it was read from** — `platform_page` (Zomato's and
+Swiggy's own page), `places_api` (the Google Places API) or `maps_page` (a
+one-off reading of the Maps listing). A number measured one way is never shown
+as though it were measured another.
 
 ## Gate 15: The books hold every review Petpooja holds
 CHECK: `select to_char(review_date, 'YYYY-MM'), platform, count(*) from customer_reviews group by 1, 2`
@@ -124,3 +128,17 @@ reach today, because a window that crosses a month boundary comes back short
 silently, and one that reaches today comes back with the same review served
 twice. A month that comes up short is walked a day at a time; a walk that is
 still short is **failed, not written**.
+
+## Gate 16: The four ratings are pulled together, every morning
+CHECK: `launchctl print gui/$(id -u)/com.atelier.platform-ratings`
+EXPECT: a loaded job (`com.atelier.platform-ratings`) running
+`node scripts/sync-platform-ratings.mjs` from the project folder, with a
+`StartCalendarInterval` of **05:00** and `RunAtLoad` false. Its log is at
+`~/Library/Logs/Atelier/platform-ratings.log`, and one run must read **all four
+listings in one go** — Zomato, Swiggy — Atelier, Swiggy — Ambrosia and Google —
+so the four numbers on the page always come from one moment.
+
+A listing that cannot be read keeps its **old value and its old source** and
+is reported as "not read this time"; it is never overwritten with a zero, and
+never relabelled as though it had come from somewhere else. The job holds no
+secret: it reads the credentials out of the gitignored `.env.local` itself.

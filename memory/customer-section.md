@@ -421,6 +421,56 @@ that came from somewhere else.
 The key lives in `.env.local` as `GOOGLE_PLACES_API_KEY` (gitignored). The
 script reads `.env.local` itself, the way the other scripts do.
 
+## The four ratings are pulled together, every morning (23 Nov 2026)
+
+`scripts/sync-platform-ratings.mjs` reads all four listings — Zomato, Swiggy —
+Atelier, Swiggy — Ambrosia and Google — in **one run**, and writes them into
+`platform_listings`. Before this it only ran when somebody remembered to type
+it, so the ratings on the page could be weeks old without anybody noticing.
+
+It now runs **every morning at 05:00 IST**, the same hour the books are pulled
+from Petpooja, so the numbers on the page and the numbers in the books are
+never a day apart.
+
+**It runs on the office Mac, not in the cloud.** The Petpooja sync went to
+Vercel because Petpooja's edge turns away datacenter IP addresses. This one
+cannot, for a different reason: **Swiggy refuses a plain fetch and refuses
+headless Chrome.** It answers a bot with *"Access to www.swiggy.com was
+denied"*, and the scraper needs a real **headed** Chrome. Vercel's Chromium is
+a headless *shell* build (`@sparticuz/chromium`) that cannot run headed at
+all. A GitHub runner is no better — a datacenter IP with no display.
+
+Zomato (a plain fetch) and Google (one HTTPS call with an API key) would both
+be happy in the cloud. They are read in the same run anyway, so that **the
+four numbers on the page always come from one moment** and the run stays in
+one place.
+
+`scripts/setup-ratings-schedule.sh` installs a macOS **launchd** job
+(`com.atelier.platform-ratings`):
+
+```bash
+bash scripts/setup-ratings-schedule.sh                       # install it
+launchctl kickstart -k gui/$(id -u)/com.atelier.platform-ratings   # run it now
+tail -f ~/Library/Logs/Atelier/platform-ratings.log          # watch it
+launchctl bootout gui/$(id -u)/com.atelier.platform-ratings   # take it off
+```
+
+The job holds **no secret**: it runs `node scripts/sync-platform-ratings.mjs`
+with the project's own folder as the working directory, and the script reads
+the credentials out of the gitignored `.env.local` itself. `node` is written
+into the job by absolute path, because **launchd does not read the shell's
+PATH** — not even a login shell's.
+
+**launchd runs a missed calendar job when the machine next wakes**, so a closed
+laptop delays the morning rather than skipping it. The job needs the Mac to be
+awake and connected at some point after 05:00.
+
+**A value pasted with a stray space is trimmed.** A key copied out of the
+Google console very often carries a trailing space, and Google answers a key
+with a space on the end as *"invalid key"* — which reads like a wrong key
+rather than a wrong keystroke. `parseEnvText()` trims the value, then takes off
+a matching pair of quotes, then trims again.
+
 ## The sync groups
 
 | Group | What | Window | When |

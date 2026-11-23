@@ -424,6 +424,14 @@ second request hijack the first one's capture.
 
 ## Still local-only
 
+- The **platform ratings** (Zomato, Swiggy ×2, Google) are read by
+  `scripts/sync-platform-ratings.mjs` on the office Mac, every morning at 05:00
+  IST, through a **launchd** job (`com.atelier.platform-ratings`) installed by
+  `scripts/setup-ratings-schedule.sh`. It cannot go into the hosted run for a
+  different reason than Petpooja's: **Swiggy refuses a plain fetch and refuses
+  headless Chrome**, and Vercel's `@sparticuz/chromium` is a headless *shell*
+  build that cannot run headed at all. See `memory/customer-section.md`.
+
 - The Google service-account key is not on the server, so two things are
   inactive in the hosted run:
   - the **Customer Feedback (Google Sheets) sync** — the engine skips it

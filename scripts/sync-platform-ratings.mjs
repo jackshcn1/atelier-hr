@@ -56,6 +56,28 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Credentials
 // ---------------------------------------------------------------------------
 
+/**
+ * Read the `KEY=value` lines out of a `.env.local` file.
+ *
+ * The trimming is the point of this function. A key pasted into a text file
+ * very often carries a trailing space, and a trailing space in an API key
+ * makes Google answer "invalid key" — which looks like a wrong key rather
+ * than a wrong keystroke. Quotes are taken off only when they are a matching
+ * pair around the whole value.
+ */
+export function parseEnvText(text) {
+  const values = {};
+  for (const line of String(text).split('\n')) {
+    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!match) continue;
+    let value = match[2].trim();
+    const quoted = value.match(/^(['"])(.*)\1$/);
+    if (quoted) value = quoted[2].trim();
+    values[match[1]] = value;
+  }
+  return values;
+}
+
 function loadConfig() {
   const cfg = {};
   const cfgPath = join(__dirname, 'petpooja-config.json');
@@ -71,11 +93,9 @@ function loadConfig() {
   // nothing in it can ever be committed by accident.
   const envPath = join(__dirname, '..', '.env.local');
   if (existsSync(envPath)) {
-    for (const line of readFileSync(envPath, 'utf8').split('\n')) {
-      const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-      if (match && process.env[match[1]] === undefined) {
-        process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
-      }
+    const fromFile = parseEnvText(readFileSync(envPath, 'utf8'));
+    for (const [name, value] of Object.entries(fromFile)) {
+      if (process.env[name] === undefined) process.env[name] = value;
     }
   }
 

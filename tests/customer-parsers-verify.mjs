@@ -36,7 +36,7 @@ import {
   GOOGLE_PLACE_ID,
 } from '../lib/customerParsers.js';
 import { listingLabel } from '../lib/customerFormat.js';
-import { parsePlacesRating } from '../scripts/sync-platform-ratings.mjs';
+import { parsePlacesRating, parseEnvText } from '../scripts/sync-platform-ratings.mjs';
 import {
   monthChunks,
   splitRange,
@@ -837,6 +837,38 @@ await check('Google is read by the Places API, which needs only a key', () => {
   assert.equal(noCount.rating, 4.5);
   assert.equal(noCount.count, null);
   assert.equal(noCount.countText, '');
+});
+
+await check('A key pasted with a stray space is still the right key', () => {
+  const env = parseEnvText(
+    [
+      'NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co',
+      'GOOGLE_PLACES_API_KEY=AIzaSyABC123 ',
+      'QUOTED="a quoted value"',
+      'QUOTED_WITH_SPACE="a quoted value" ',
+      "SINGLE='single quoted'",
+      '# a comment line',
+      'not a key line',
+      'EMPTY=',
+    ].join('\n'),
+  );
+
+  // The trailing space is the whole point: a key with a space on the end is
+  // refused by Google, and the error reads as "bad key", not "stray space".
+  assert.equal(env.GOOGLE_PLACES_API_KEY, 'AIzaSyABC123');
+
+  // A matching pair of quotes comes off. A space after the closing quote
+  // does not stop the quotes from coming off.
+  assert.equal(env.QUOTED, 'a quoted value');
+  assert.equal(env.QUOTED_WITH_SPACE, 'a quoted value');
+  assert.equal(env.SINGLE, 'single quoted');
+
+  // An empty value is empty, not undefined.
+  assert.equal(env.EMPTY, '');
+
+  // A line that is not a key line is not a key.
+  assert.equal(env['not a key line'], undefined);
+  assert.equal(env['# a comment line'], undefined);
 });
 
 console.log(`\n${passed} checks passed.`);
