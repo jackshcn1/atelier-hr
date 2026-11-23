@@ -9,14 +9,18 @@ import {
 /**
  * app/customers/feedback/page.js — the customer feedback form, answered.
  *
- * The feedback form is filled in on the floor and lands in a Google Sheet. The
- * nightly pull brings it into the books, and this page reads it back as a
- * dashboard of what people want improved.
+ * The feedback form is filled in on the floor, in the app itself, and a
+ * response is written into the books the moment it is given. This page reads
+ * it back as a dashboard of what people want improved.
  *
- * **The honest limit, stated on the page.** The form has no phone column, so
- * a response reaches a customer only when its bill number is an order number
- * (the owner's decision, 20 Nov 2026). A response that does not match is kept
- * and still counts in the ratings — it is simply reported as unlinked.
+ * **The honest limit, stated on the page.** A response reaches a customer
+ * only when its bill number is an order number (the owner's decision,
+ * 20 Nov 2026). An order filled in today is not in the books until the
+ * night's pull brings it in, so a response given today is counted straight
+ * away and attached to its customer afterwards. A response that names a bill
+ * we do not have is kept and reported as unlinked.
+ *
+ * The form itself is on its own page: **Customers → Record Feedback**.
  */
 
 /** One figure, with the line that explains it. */
@@ -115,11 +119,14 @@ export default function CustomerFeedbackPage() {
           <div>
             <h1 className="page-title">Feedback</h1>
             <p className="page-purpose">
-              What people wrote when the floor asked them how they were doing — question by
+              What people said when the floor asked them how they were doing — question by
               question, the tags they used, and the waiter they were about.
             </p>
           </div>
-          <Link href="/customers/overview" className="btn-secondary">Overview</Link>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/customers/feedback/new" className="btn-primary">Record Feedback</Link>
+            <Link href="/customers/overview" className="btn-secondary">Overview</Link>
+          </div>
         </div>
 
         {/* ---- The four figures ------------------------------------------ */}
@@ -151,8 +158,9 @@ export default function CustomerFeedbackPage() {
           <section className="panel mb-8">
             <div className="panel-body">
               <p className="note">
-                No feedback form responses have been pulled in yet. The nightly sync brings them in
-                as soon as the floor fills the form in.
+                No feedback has been recorded yet. It is filled in on the floor and goes into the
+                books as soon as it is saved — open <strong>Record Feedback</strong> to write the
+                first one.
               </p>
             </div>
           </section>
@@ -316,6 +324,9 @@ export default function CustomerFeedbackPage() {
                       <span>
                         {row.is_linked ? 'Matched to an order' : 'Not matched to an order'}
                       </span>
+                      {row.entered_by ? (
+                        <span>Recorded by {row.entered_by}</span>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -324,9 +335,9 @@ export default function CustomerFeedbackPage() {
 
             <p className="note mt-6">
               {count(f.linked)} of {count(f.responses)} responses were matched to an order by their
-              bill number. The rest are kept and still counted — the form carries no phone number,
-              so a response can only be given to a customer when the bill it names is an order we
-              have.
+              bill number. The rest are kept and still counted. An order filled in today is not in
+              the books until the night’s pull brings it in, so a response given today is attached
+              to its customer afterwards.
             </p>
           </div>
         </section>

@@ -28,6 +28,7 @@ the way they do: a landing page of cards, each one a job.
 | `/customers/[phone]` | one customer: their orders, their reviews, their feedback |
 | `/customers/reviews` | every review, by platform, with the rating month by month |
 | `/customers/feedback` | every feedback form response, question by question |
+| `/customers/feedback/new` | **the form itself** — filled in on the floor |
 
 **The landing page holds no data of its own** — it is four links. Everything
 is read through `/api/customers`, which dispatches on `view`: `overview`,
@@ -37,10 +38,12 @@ The reviews and the feedback are worked out once, in `buildReviewPicture()` and
 `buildFeedbackPicture()`, and used by both the overview and their own pages —
 so the two can never disagree with each other.
 
-**The nav has four entries**, and `isLinkActive()` needs two special cases:
+**The nav has five entries**, and `isLinkActive()` needs three special cases:
 `/customers` lights only on the landing page (it is a module landing, not an
-overview), and `/customers/list` also lights on a customer's own page
-(`/customers/7034308981`).
+overview), `/customers/list` also lights on a customer's own page
+(`/customers/7034308981`), and `/customers/feedback` lights **only** on itself
+— "Feedback" is the answers and "Record Feedback" is the form, and the two are
+never lit at the same time.
 
 **The card grid adapts to the number of cards**, as the house already does —
 Sales uses two columns for its two modules, Finance three for its six. Four
@@ -288,7 +291,7 @@ not name the customer either.
 |---|---|---|
 | Order value | Petpooja's **All Orders export**, a month at a time | — |
 | Reviews | The **Ratings & Reviews** endpoint (`online_review_data/428501`), 5409 = Zomato, 6736 = Swiggy | the **platform order id** (`Client OrderID`) |
-| Feedback | The **Customer Feedback Form** sheet, read through the service account | the **bill number** only — the form has no phone column |
+| Feedback | **The app's own form**, on the floor — written straight into `customer_feedback` | the **bill number** — the phone comes from the order it names |
 | Google reviews | **Not in Petpooja.** They need the Google Business Profile API | — |
 | Google rating | **Places API** — an API key only, no approval | the Place ID |
 
@@ -361,6 +364,102 @@ A feedback response finds its order through the **bill number only** — the
 owner's decision on 20 Nov 2026, because the form has no phone column. A
 response that does not match is **kept**, still counts in the ratings, and is
 reported as unlinked.
+
+## The feedback form lives in the app (23 Nov 2026)
+
+The form used to be a **Google Sheet** — "Customer Feedback Form", created
+28 Sep 2026. It was **not** a Form's response sheet; it was a plain
+spreadsheet with a dropdown, and it had **one row in it** — a test row from
+29 September. The floor had been writing the feedback on **paper**.
+
+### Why it moved into the app
+
+Not because spreadsheets are hard to maintain — the accountant's **invoice**
+sheet stays, and rightly so: one person enters bills at a desk and wants to
+be able to fix a typo in the sheet and have the books pick it up. The
+feedback form is different. It is filled in by **many people, on the floor,
+in a hurry, on a phone**, and every field on it is about **an order we already
+hold**.
+
+So the form can do things the sheet never could:
+
+- **The bill number finds the order.** Type the number printed on the guest's
+  bill and the order is looked up, so it is certain which meal is being
+  talked about.
+- **The waiter is picked, not spelled.** The name comes from the `employees`
+  table, so "Chingkab" is always written the same way and a captain's
+  ratings add up. `Chingkab Yaham` on the picker is the same person as the
+  `Chingkab` on the old sheet's test row.
+- **It is signed.** `customer_feedback.entered_by` records **who wrote it
+  down** — the signed-in member of staff. The waiter is who *served* the
+  table; this is who held the pen. The sheet could not say that at all.
+- **The guest's phone comes from the order.** The form never asks for it.
+
+The form's own words were **recovered from the old sheet** rather than
+invented: the scale (Excellent / Very Good / Good / Average / Poor) and the
+nine improvement tags (Food, Service, Staff Hospitality, Waiting Time, Menu
+Variety, Portion Size, Price, Cleanliness, Nothing - everything was Great)
+came from the sheet's dropdown rules. A guest may also name something that is
+not on the list, and it is kept as a tag of its own — so a new word does not
+need a code change to be counted.
+
+Only the **overall rating** and **"would you visit again"** are required. A
+guest in a hurry is not made to answer six questions, and the page reports
+how many were answered, so an average is never taken over more people than
+there were.
+
+### The link to the customer happens at night, not at the table
+
+**The order behind a bill filled in today is not in the books yet.** The order
+book only reaches the previous day — measured: on 23 Nov 2026 the newest
+order was 22 Nov. Petpooja's orders are pulled once a night.
+
+So a response is **written the moment it is given**, and the link to its
+order is made by the night's run, once the order has arrived. A response
+about a bill that is already in the books is attached at once. The form says
+which happened, in plain words.
+
+The nightly step is `?link=feedback` on the sync endpoint, asked for once
+after the Petpooja groups so the orders are already in.
+
+### The old pull was the reason the nightly run went red
+
+The sheet pull **failed on 22 and 23 Nov 2026** — a 120-second timeout, which
+failed the whole nightly run. The cause was measured, not guessed:
+`syncFeedback()` recomputed `feedback_count` for **every one of the 515
+customers**, with **one UPDATE per customer, one after another**. Ten
+updates took 2.5 seconds → 515 takes about **126 seconds**, over the limit.
+On top of that it read all **28,008** orders to link one bill number.
+
+The replacement is `linkFeedback()`, and it is the same shape the reviews
+already use:
+
+- only the responses that are **not attached yet** are looked at;
+- the orders are read **once**, with an `in` list, not a query per response;
+- the writes are **one statement** each — a `values` list of tuples, like
+  `reviewLinkStatement()`;
+- only the rows whose link **actually changed** are written;
+- the customers' counts are one statement, and only where the count differs.
+
+Measured: **1.1 seconds** for the whole thing, against 126 before.
+
+### The sheet is gone, and gone completely
+
+The sheet pull was retired at every layer — the workflow step, the endpoint,
+`syncFeedback()`, `parseFeedbackSheet()`, and the sheet id in the environment.
+`?sheet=feedback` now answers **410 Gone** with a message, rather than
+falling through to the Petpooja path — a stale caller must never start a
+browser and pull a pay cycle it was never asked for.
+
+**The one row the sheet had is kept**, with its own source
+(`google_sheet:customer_feedback_form`). A row's history is not rewritten:
+the source records where a thing really came from.
+
+The **variable-pay** feedback metrics (`kit_food_quality`, `hlp_quality`,
+`cap_quality`) still read the same sheet, through `lib/feedbackParsers.js`.
+That path is separate and is **dormant** — variable pay is paused, and a
+finance-only run never pulls it. Moving it to the app would be a change to
+variable pay, and that is the owner's decision.
 
 ## The Google gap
 
@@ -550,7 +649,7 @@ SQL text.
 | Of those | **1,337 matched an order**, 12 did not — Petpooja does not hold those orders |
 | By listing | Zomato 918, Swiggy — Ambrosia 222, Swiggy — Atelier 192, plain Swiggy 5 |
 | Reach a customer | **29** reviews carry a phone number — **27** customers have any |
-| Feedback | 1 response so far — the form's bill number does not match an order yet |
+| Feedback | 1 response so far — the old sheet's test row, and its bill number does not match an order yet. The form now writes into the books itself |
 
 The gap is the number worth closing at the counter: it is 91.3% of the order
 value, and it exists because the number is not asked for at the till.

@@ -22,7 +22,6 @@ import {
   linkReviewsToOrders,
   listingBucket,
   UNLISTED_KEY,
-  parseFeedbackSheet,
   linkFeedbackToOrders,
   ratingScore,
   splitTags,
@@ -34,6 +33,9 @@ import {
   ORDERABLE_LISTINGS,
   GOOGLE_LISTING_KEY,
   GOOGLE_PLACE_ID,
+  cleanFeedbackResponse,
+  FEEDBACK_SCALE,
+  FEEDBACK_TAGS,
 } from '../lib/customerParsers.js';
 import { listingLabel } from '../lib/customerFormat.js';
 import { parsePlacesRating, parseEnvText } from '../scripts/sync-platform-ratings.mjs';
@@ -47,6 +49,7 @@ import {
   ratingsHistoryWindow,
   ratingsWindowFor,
   reviewLinkStatement,
+  feedbackLinkStatement,
 } from '../lib/customerSync.js';
 
 let passed = 0;
@@ -517,12 +520,6 @@ await check('a review with no matching order is kept, and reported as unlinked',
 // Petpooja restarts its order numbering.
 // ---------------------------------------------------------------------------
 
-const FEEDBACK_HEADER = [
-  'Date', 'Feedback Sl No.', 'Bill Number', 'Waiter', 'Overall Experience',
-  'Food Quality', 'Taste of the food', 'Service', 'Staff Hospitality',
-  'Waiting Time', 'Would you visit Atelier again?', 'What can we improve', 'Comment',
-];
-
 await check('two months can hold the same order number', () => {
   // Measured against Petpooja: March 2026 used the numbers 4 to 2,691 and
   // April 2026 used 1 to 3,169 — the same numbers in two months. So an order
@@ -571,10 +568,22 @@ await check('a feedback response joins the order whose day is nearest its own', 
     { order_no: '100', order_date: '2026-03-15', phone: '8590418886', client_order_id: '' },
     { order_no: '100', order_date: '2026-04-15', phone: '9447001122', client_order_id: '' },
   ];
-  const responses = parseFeedbackSheet([
-    FEEDBACK_HEADER,
-    ['April 16, 2026', '1', '100', 'Chingkab', 'Excellent', 'Very Good', 'Good', 'Excellent', 'Good', 'Average', 'Very Good', 'Portion Size', ''],
-  ]).responses;
+  const responses = [
+    {
+      bill_number: '100',
+      response_date: '2026-04-16',
+      waiter: 'Chingkab',
+      overall: 5,
+      food_quality: 4,
+      taste: 3,
+      service: 5,
+      hospitality: 3,
+      waiting_time: 2,
+      would_visit_again: 'Very Good',
+      improvement_tags: ['Portion Size'],
+      comment: '',
+    },
+  ];
 
   const result = linkFeedbackToOrders(responses, orders);
   assert.equal(result.linked, 1);
@@ -586,38 +595,41 @@ await check('a feedback response joins the order whose day is nearest its own', 
 // The feedback form.
 // ---------------------------------------------------------------------------
 
-await check('the feedback sheet is read by heading', () => {
-  const rows = [
-    FEEDBACK_HEADER,
-    ['September 29, 2026', '1', '25001', 'Chingkab', 'Excellent', 'Very Good', 'Good', 'Excellent', 'Good', 'Average', 'Very Good', 'Portion Size, Cleanliness', 'Nice'],
-    ['October 2, 2026', '2', '25002', 'Along', 'Good', 'Good', 'Very Good', 'Good', 'Very Good', 'Good', 'Very Good', 'Waiting Time', ''],
-  ];
-  const result = parseFeedbackSheet(rows);
-  assert.equal(result.ok, true);
-  assert.equal(result.responses.length, 2);
-  assert.equal(result.responses[0].bill_number, '25001');
-  assert.equal(result.responses[0].overall, 5);
-  assert.equal(result.responses[0].food_quality, 4);
-  assert.equal(result.responses[0].taste, 3);
-  assert.equal(result.responses[0].service, 5);
-  assert.equal(result.responses[0].hospitality, 3);
-  assert.equal(result.responses[0].waiting_time, 2);
-  assert.equal(result.responses[0].waiter, 'Chingkab');
-  assert.equal(result.responses[0].response_date, '2026-09-29');
-  assert.deepEqual(result.responses[0].improvement_tags, ['Portion Size', 'Cleanliness']);
-  assert.equal(result.responses[0].comment, 'Nice');
-});
-
 await check('a feedback response is attached to its order by the bill number', () => {
   const orders = parseOrdersExport([
     ORDERS_COLUMNS,
     orderRow({ no: '25001', phone: '8590418886' }),
   ]).orders;
-  const responses = parseFeedbackSheet([
-    FEEDBACK_HEADER,
-    ['September 29, 2026', '1', '25001', 'Chingkab', 'Excellent', 'Very Good', 'Good', 'Excellent', 'Good', 'Average', 'Very Good', 'Portion Size', ''],
-    ['October 2, 2026', '2', '112233', 'Along', 'Good', 'Good', 'Very Good', 'Good', 'Very Good', 'Good', 'Very Good', 'Waiting Time', ''],
-  ]).responses;
+  const responses = [
+    {
+      bill_number: '25001',
+      response_date: '2026-09-29',
+      waiter: 'Chingkab',
+      overall: 5,
+      food_quality: 4,
+      taste: 3,
+      service: 5,
+      hospitality: 3,
+      waiting_time: 2,
+      would_visit_again: 'Very Good',
+      improvement_tags: ['Portion Size'],
+      comment: '',
+    },
+    {
+      bill_number: '112233',
+      response_date: '2026-10-02',
+      waiter: 'Along',
+      overall: 3,
+      food_quality: 3,
+      taste: 4,
+      service: 3,
+      hospitality: 4,
+      waiting_time: 3,
+      would_visit_again: 'Very Good',
+      improvement_tags: ['Waiting Time'],
+      comment: '',
+    },
+  ];
 
   const result = linkFeedbackToOrders(responses, orders);
   assert.equal(result.linked, 1);
@@ -869,6 +881,102 @@ await check('A key pasted with a stray space is still the right key', () => {
   // A line that is not a key line is not a key.
   assert.equal(env['not a key line'], undefined);
   assert.equal(env['# a comment line'], undefined);
+});
+
+// ---------------------------------------------------------------------------
+// The feedback form, filled in on the floor and written into the books.
+// ---------------------------------------------------------------------------
+
+await check('a response from the form is cleaned and kept', () => {
+  const result = cleanFeedbackResponse(
+    {
+      bill_number: ' 25319 ',
+      waiter: '  Chingkab Yaham ',
+      ratings: { overall: 5, food_quality: 4, taste: 3, service: 5, hospitality: 3, waiting_time: 2 },
+      would_visit_again: 4,
+      improvement_tags: ['Portion Size', 'Portion Size'],
+      other_tag: 'The music was loud',
+      comment: '  Very nice evening  ',
+      entered_by: 'Rishab',
+    },
+    { today: '2026-11-23' },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.response.bill_number, '25319');
+  assert.equal(result.response.waiter, 'Chingkab Yaham');
+  assert.equal(result.response.overall, 5);
+  assert.equal(result.response.food_quality, 4);
+  assert.equal(result.response.waiting_time, 2);
+  // The scale is stored as the word the form showed, so the answers mean the
+  // same thing as the ones the sheet used to hold.
+  assert.equal(result.response.would_visit_again, 'Very Good');
+  // The same tag twice is one tag, and what they named that was not on the
+  // list is kept as a tag of its own.
+  assert.deepEqual(result.response.improvement_tags, ['Portion Size', 'The music was loud']);
+  assert.equal(result.response.comment, 'Very nice evening');
+  assert.equal(result.response.entered_by, 'Rishab');
+  assert.equal(result.response.response_date, '2026-11-23');
+});
+
+await check('a response that cannot be answered is refused, with a reason', () => {
+  const today = '2026-11-23';
+  const base = {
+    bill_number: '25319',
+    waiter: 'Chingkab',
+    ratings: { overall: 5 },
+    would_visit_again: 4,
+  };
+
+  // No bill number — there is nothing to attach the response to.
+  assert.equal(cleanFeedbackResponse({ ...base, bill_number: '' }, { today }).ok, false);
+  // A bill number that is not a number.
+  assert.equal(cleanFeedbackResponse({ ...base, bill_number: 'abc' }, { today }).ok, false);
+  // No waiter.
+  assert.equal(cleanFeedbackResponse({ ...base, waiter: '' }, { today }).ok, false);
+  // No overall rating.
+  assert.equal(cleanFeedbackResponse({ ...base, ratings: {} }, { today }).ok, false);
+  // No "would you visit again".
+  assert.equal(cleanFeedbackResponse({ ...base, would_visit_again: '' }, { today }).ok, false);
+  // A day that has not happened yet.
+  assert.equal(
+    cleanFeedbackResponse({ ...base, response_date: '2026-11-24' }, { today }).ok,
+    false,
+  );
+
+  // The detail questions may be left out — a guest in a hurry is not made to
+  // answer all of them — and they are simply blank.
+  const partial = cleanFeedbackResponse({ ...base, ratings: { overall: 4 } }, { today });
+  assert.equal(partial.ok, true);
+  assert.equal(partial.response.food_quality, null);
+  assert.equal(partial.response.taste, null);
+});
+
+await check('the form offers the restaurant’s own words', () => {
+  // The scale is the sheet's own, word for word.
+  assert.deepEqual(
+    FEEDBACK_SCALE.map((step) => step.label),
+    ['Excellent', 'Very Good', 'Good', 'Average', 'Poor'],
+  );
+  // The tags are the ones that were on the sheet's dropdown, so nothing is
+  // renamed underneath anyone.
+  assert.equal(FEEDBACK_TAGS.includes('Portion Size'), true);
+  assert.equal(FEEDBACK_TAGS.includes('Nothing - everything was Great'), true);
+  assert.equal(FEEDBACK_TAGS.length, 9);
+});
+
+await check('the feedback link is written as a list of tuples', () => {
+  // The same shape as the review link, and for the same reason: one
+  // statement, not one request per row. The old sheet pull rewrote all 515
+  // customers one request at a time, and that is what made it time out.
+  const sql = feedbackLinkStatement([
+    { id: 12, order_no: '25319', phone: '9447001122', is_linked: true },
+    { id: 13, order_no: '', phone: '', is_linked: false },
+  ]);
+  assert.equal(sql.includes('values (12'), true);
+  assert.equal(sql.includes("(12,'25319','9447001122',true)"), true);
+  assert.equal(sql.includes("(13,'','','false')") || sql.includes("(13,'','',false)"), true);
+  assert.equal(sql.includes('update public.customer_feedback'), true);
 });
 
 console.log(`\n${passed} checks passed.`);

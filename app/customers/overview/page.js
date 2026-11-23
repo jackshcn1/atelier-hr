@@ -390,7 +390,7 @@ export default function CustomersPage() {
               </Link>
             </div>
             {f.responses === 0 ? (
-              <p className="note">No feedback form responses have been pulled in yet.</p>
+              <p className="note">No feedback has been recorded yet.</p>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">

@@ -277,6 +277,10 @@ function buildFeedbackPicture(feedback) {
       improvement_tags: row.improvement_tags || [],
       would_visit_again: row.would_visit_again,
       is_linked: row.is_linked,
+      // Who wrote it down, and where it came from. The waiter is who served
+      // the table; this is who held the pen.
+      entered_by: row.entered_by || '',
+      source: row.source || '',
     }));
 
   return { questionAverages, topTags, wouldVisit: wouldVisitList, waiters, linked, recent };

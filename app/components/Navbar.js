@@ -103,6 +103,9 @@ function isLinkActive(pathname, href) {
   if (pathOnly === '/customers/list') {
     return pathname === '/customers/list' || /^\/customers\/\d{10}$/.test(pathname || '');
   }
+  // "Feedback" is the answers; "Record Feedback" is the form. They are two
+  // different things, so only one of them is ever lit.
+  if (pathOnly === '/customers/feedback') return pathname === '/customers/feedback';
   return pathname === pathOnly || pathname?.startsWith(`${pathOnly}/`);
 }
 
@@ -255,10 +258,10 @@ export default function Navbar() {
     },
     customers: {
       admin: [
-        { label: 'Customers', links: [{ href: '/customers/overview', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }, { href: '/customers/reviews', label: 'Reviews' }, { href: '/customers/feedback', label: 'Feedback' }] },
+        { label: 'Customers', links: [{ href: '/customers/overview', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }, { href: '/customers/reviews', label: 'Reviews' }, { href: '/customers/feedback', label: 'Feedback' }, { href: '/customers/feedback/new', label: 'Record Feedback' }] },
       ],
       employee: [
-        { label: 'Customers', links: [{ href: '/customers/overview', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }, { href: '/customers/reviews', label: 'Reviews' }, { href: '/customers/feedback', label: 'Feedback' }] },
+        { label: 'Customers', links: [{ href: '/customers/overview', label: 'Overview' }, { href: '/customers/list', label: 'All Customers' }, { href: '/customers/reviews', label: 'Reviews' }, { href: '/customers/feedback', label: 'Feedback' }, { href: '/customers/feedback/new', label: 'Record Feedback' }] },
       ]
     }
   };
