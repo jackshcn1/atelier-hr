@@ -83,6 +83,11 @@ stands in** for it, so the column is never empty and the two are never mixed
 up. A **petty** entry carries neither — cash out of a drawer has no bank
 reference.
 
+**That fallback has one consequence to remember: the bank reference is on
+every sheet bill, paid or not.** So a page must not read it as proof of
+payment — the Bills page shows the payment line only for a bill that really
+is paid. See *Marking a bill paid* below.
+
 **The columns are found by NAME, not by position.** The Form may add a
 question, the accountant may add a column, and the columns may be moved. The
 reader looks each one up by what its heading says, and a heading is
@@ -263,6 +268,64 @@ Entry page. The endpoint still reads bills, and can still mark one paid.
 **Petty cash is not entered here.** It is a float with a balance of its own, so
 it lives on its own page — `/finance/invoice-entry/petty` — and writes
 straight to the petty ledger.
+
+### Marking a bill paid
+
+`/finance/bills` — the Bills page. **The payment is written into the sheet**,
+not into the database.
+
+**Why.** The Bills page used to `PATCH` the database. The sheet was never
+told, so the **next pull of the sheet marked the bill unpaid again** — the
+sheet still said it was not paid. The books and the record disagreed, and
+nobody could see what the sheet said.
+
+**What is asked for** — the three facts the sheet's own columns hold:
+
+- **the date it was paid**
+- **the form of payment** — UPI, cash, a transfer. The usual ones are offered
+  in a list; anything can be typed.
+- **the bank's reference for it** — the UTR. **Optional**, because cash out of
+  a drawer has no UTR.
+
+**Several bills at once.** Bills can be picked with a checkbox and marked paid
+together: **one date, one form of payment, one bank reference** for all of
+them, because they were closed under one transfer. The selection bar shows how
+many are picked and what they come to.
+
+**Marking a bill unpaid again** clears all three cells, so no trace of a
+payment is left on a bill that is not paid.
+
+**A bill from Petpooja is not marked here.** Its paid state is Petpooja's to
+say. The route **refuses it with 409** and names the reason; the page shows
+**"From Petpooja"** instead of a button, and says so in plain words above the
+list. Where Petpooja's paid state comes from: the **twice-weekly purchase
+refresh** re-reads the last 90 days of purchases and rewrites those bills with
+Petpooja's own payment column — see `memory/petpooja-purchase-refresh.md`.
+
+**The cells are found by heading**, like every other column
+(`paymentCellTargets()` in `lib/invoiceSheet.js`): the block's own *"Invoice
+Paid on"* column, plus Payment Mode and Bank Reference. The block matters — a
+fixed bill's paid-on cell is in the fixed block, a variable bill's in the
+variable block.
+
+**The sheet's columns count from 1; its row arrays count from 0.** A 0-based
+column number wrote the paid date into the **attachment** column and swapped
+the mode and the UTR — the books then showed the bill still unpaid. The cells
+are **1-based** and `writeSheetCells()` passes them straight to `columnLetter()`.
+
+**The cells are written one at a time** (`values.batchUpdate`, a single cell
+per entry), so a change cannot lose whatever else the accountant has in that
+row — they may have corrected a cell between the row being read and the change
+being written.
+
+**A bill is found by `id`, and refused on `source`.** A route that filtered by
+`source_key` would **404** a Petpooja bill (it has no `source_key`) instead of
+refusing it — and a 404 reads like a missing bill, not like a refusal.
+
+**One bug fixed on the way.** An **unpaid bill read "Paid"** under its number.
+The bank reference falls back to the invoice number when there is no UTR, so it
+was on every sheet bill, paid or not. The payment line now shows only for a
+bill that really is paid.
 
 ### Reading and writing the sheet from here
 
