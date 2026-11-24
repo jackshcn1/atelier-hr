@@ -412,7 +412,7 @@ export default function BillsPage() {
             The suppliers are paid together on one day, and the answer is wanted
             the same afternoon — so the same refresh the schedule runs can be
             asked for here. It reads the last 90 days of purchases from
-            Petpooja, so it takes about a minute. */}
+            Petpooja, so it takes a minute or two. */}
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           <button
             onClick={checkPetpooja}
@@ -422,8 +422,8 @@ export default function BillsPage() {
             {checking ? 'Checking Petpooja…' : 'Check Petpooja for payments'}
           </button>
           <p className="text-xs text-[#6b635c]">
-            Reads the last 90 days of purchases from Petpooja and puts the paid state right. About
-            a minute.
+            Reads the last 90 days of purchases from Petpooja and puts the paid state right. A minute
+            or two.
           </p>
         </div>
 
