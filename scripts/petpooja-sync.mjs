@@ -1335,9 +1335,18 @@ export async function runPetpoojaSync(options = {}) {
     ]);
 
     // The same bill can come back from both queries — it is counted once.
+    //
+    // The supplier name is **cleaned** on both sides before the key is made.
+    // Petpooja writes its exports with a bracketed tag that is not always the
+    // same one — the purchase report writes "[Supplier]" and the purchase list
+    // writes "[Vendor]" — and a tag on one side only would give the same bill
+    // two identities: it would be written into the books a second time, and
+    // the copy already there would be reported as missing from Petpooja and
+    // flagged for removal. That happened on 24 November 2026, and it put 649
+    // duplicate bills into the books.
     const existingByKey = new Map();
     for (const row of [...(byInvoice.data || []), ...(byVendor.data || [])]) {
-      const key = keyOf(row.vendor_name, row.invoice_number);
+      const key = keyOf(cleanVendorName(row.vendor_name), row.invoice_number);
       if (!existingByKey.has(key)) existingByKey.set(key, row);
     }
 

@@ -144,6 +144,23 @@ check('the supplier name loses its tag and its extra spaces', () => {
   assert.equal(cleanVendorName(null), '');
 });
 
+check('any tag is lost, not only the one we know about', () => {
+  // Petpooja does not always write the same tag: the purchase report writes
+  // "[Supplier]" and the purchase list writes "[Vendor]". A tag on one side
+  // only would give the same bill two identities — it would be written into
+  // the books twice, and the copy already there would be reported as missing
+  // from Petpooja and flagged for removal. That put 649 duplicate bills into
+  // the books on 24 November 2026.
+  assert.equal(cleanVendorName('A J AGENCIES [Vendor]'), 'A J AGENCIES');
+  assert.equal(cleanVendorName('Ambrosia - The Classic Bakehouse [supplier]'), 'Ambrosia - The Classic Bakehouse');
+  // A tag we have never seen is still noise.
+  assert.equal(cleanVendorName('Some Supplier [Distributor]'), 'Some Supplier');
+  // Only a tag at the end is a tag.
+  assert.equal(cleanVendorName('A [B] Trading'), 'A [B] Trading');
+  // A name that ends in brackets with nothing in them is left alone.
+  assert.equal(cleanVendorName('Some Supplier []'), 'Some Supplier');
+});
+
 check('a pull keeps the category a person set on a bill', () => {
   // Petpooja knows the facts of a bill, not how it is classified. A bill the
   // accountant filed as "Digital Marketing Retainer" must stay filed that way,
