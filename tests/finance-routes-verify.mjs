@@ -1239,5 +1239,48 @@ await check('the bills this test wrote are taken away again', async () => {
   if (left && left.length > 0) throw new Error(`${left.length} bills were left behind`);
 });
 
+// The button on the Bills page that checks Petpooja for payments.
+//
+// The run itself is not done here — it opens a browser on Petpooja and takes
+// about a minute, and it is the deployed site that can do that. What is
+// checked here is the part that would quietly do harm if it were wrong: the
+// window a refresh sets must not be left behind for the next request the
+// same serverless instance serves.
+const { snapshotEngineSettings, restoreEngineSettings } = await import(
+  '../lib/syncEngineSettings.js'
+);
+
+await check('a sync does not leave its window behind for the next request', async () => {
+  // The engine is told its window through the environment, and a serverless
+  // instance is reused — so a refresh that set the 90-day window would leave
+  // that window behind for the next request it served, and the next request
+  // may be the nightly pull, which must read the running cycle.
+  // A window that was set before the run.
+  process.env.SYNC_START_DATE = '2026-01-01';
+  process.env.SYNC_END_DATE = '2026-03-31';
+  const saved = snapshotEngineSettings();
+
+  // What the run leaves behind.
+  delete process.env.SYNC_START_DATE;
+  delete process.env.SYNC_END_DATE;
+  process.env.SYNC_PURCHASE_REFRESH = '1';
+
+  restoreEngineSettings(saved);
+
+  if (process.env.SYNC_START_DATE !== '2026-01-01') {
+    throw new Error(`the window came back as ${process.env.SYNC_START_DATE}`);
+  }
+  if (process.env.SYNC_END_DATE !== '2026-03-31') {
+    throw new Error(`the end of the window came back as ${process.env.SYNC_END_DATE}`);
+  }
+  // A setting that was not there before must not be left behind either.
+  if (process.env.SYNC_PURCHASE_REFRESH !== undefined) {
+    throw new Error('the refresh flag was left behind');
+  }
+
+  delete process.env.SYNC_START_DATE;
+  delete process.env.SYNC_END_DATE;
+});
+
 console.log(`\n${passed} check(s) passed`);
 if (process.exitCode) console.error('\nSome checks failed.');
