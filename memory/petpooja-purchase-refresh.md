@@ -27,16 +27,25 @@ It is a **separate workflow**, not a second cron on the nightly one — the
 nightly run must stay small and fast, and a failed refresh must not disturb
 it.
 
+**The refresh is what keeps the calendar month current.** The 20–19 cycle is
+for salaries; every bill belongs to the **calendar month** it is dated in. The
+nightly pull reads the purchase reports over the running cycle window, so the
+90-day refresh is what re-reads the bills of the current calendar month — and
+everything still outstanding behind it. The window is not an accounting
+decision.
+
 ## When a bill's paid state is actually found
 
 Two ways, and they cover different bills:
 
-1. **The nightly run** pulls the pay cycle that is running — the 20th to the
-   19th — so a bill dated inside the current cycle is looked at **every
-   night**.
-2. **The twice-weekly refresh** re-reads the **last 90 days**, so a bill that
-   has closed its cycle is looked at **twice a week**. Ninety days is the same
-   window Petpooja itself allows a bill to be edited in.
+1. **The twice-weekly refresh** re-reads the **last 90 days**, so a bill that
+   has closed its cycle is looked at **twice a week**, and every bill of the
+   calendar month with it. Ninety days is the same window Petpooja itself
+   allows a bill to be edited in.
+2. **The nightly run** re-reads the purchase reports over the running **cycle**
+   window (the 20th onwards), so a bill dated inside the current cycle is
+   looked at **every night**. That is a fact about the sync's window, not
+   about the month a bill belongs to.
 
 **The limit, stated plainly: a bill dated more than 90 days ago that is paid
 now is not picked up automatically.** It has to be corrected by hand.
@@ -115,3 +124,13 @@ reused — far inside the 300-second serverless cap. Two runs a week, no new
 infrastructure.
 
 The nightly run is left exactly as it was: the current pay cycle, every day.
+**The window it reads is not the accounting month** — the cycle belongs to
+payroll; finance is the calendar month, and the refresh is what keeps it
+current.
+
+**And on demand:** the Bills page has a **"Check Petpooja for payments"**
+button (`POST /api/finance/sync/purchases`). It runs the same 90-day refresh
+on the spot, so the list of what is outstanding can be brought up to date
+without waiting for the next scheduled run — which matters when the bills are
+paid together on one day and the answer is wanted the same afternoon. The
+route is for administrators only, and it says what the refresh found.

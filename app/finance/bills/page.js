@@ -66,6 +66,10 @@ export default function BillsPage() {
   const [paymentError, setPaymentError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // The check against Petpooja, asked for by hand.
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState(null);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -114,6 +118,32 @@ export default function BillsPage() {
       load();
     } else {
       setMessage(`Could not update the bill: ${json.error}`);
+    }
+  };
+
+  // Bring the bills up to date, now.
+  //
+  // The paid state of a Petpooja bill is Petpooja's to say, and it is read
+  // twice a week by the scheduled refresh. A restaurant pays its suppliers
+  // together on one day, so the answer is wanted the same afternoon — and
+  // this asks for that refresh on the spot.
+  const checkPetpooja = async () => {
+    setChecking(true);
+    setCheckResult(null);
+    try {
+      const res = await fetch('/api/finance/sync/purchases', { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        setCheckResult({ ok: true, lines: json.data?.lines || [] });
+        // The bills have changed, so the list is read again.
+        load();
+      } else {
+        setCheckResult({ ok: false, error: json.error || 'Petpooja could not be read.' });
+      }
+    } catch (error) {
+      setCheckResult({ ok: false, error: 'The check could not be finished.' });
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -370,12 +400,59 @@ export default function BillsPage() {
             marked paid in Petpooja; a bill on the accountant's sheet is
             marked paid here, and the payment is written into the sheet so
             the record and the books never disagree. */}
-        <p className="text-xs text-[#6b635c] mb-6 max-w-3xl">
+        <p className="text-xs text-[#6b635c] mb-4 max-w-3xl">
           A bill that came from <strong>Petpooja</strong> is marked paid in Petpooja — the books
-          read that from the purchase report, twice a week. A bill entered on the Invoice Entry
-          page or in the accountant&apos;s sheet is marked paid here, and the payment is written
-          into the sheet, which is what the books follow.
+          read that from the purchase report, twice a week, or the moment you ask for it below. A
+          bill entered on the Invoice Entry page or in the accountant&apos;s sheet is marked paid
+          here, and the payment is written into the sheet, which is what the books follow.
         </p>
+
+        {/* The check, asked for by hand.
+
+            The suppliers are paid together on one day, and the answer is wanted
+            the same afternoon — so the same refresh the schedule runs can be
+            asked for here. It reads the last 90 days of purchases from
+            Petpooja, so it takes about a minute. */}
+        <div className="flex items-center gap-3 mb-6 flex-wrap">
+          <button
+            onClick={checkPetpooja}
+            disabled={checking}
+            className="btn-secondary text-sm px-4 py-2 disabled:opacity-50"
+          >
+            {checking ? 'Checking Petpooja…' : 'Check Petpooja for payments'}
+          </button>
+          <p className="text-xs text-[#6b635c]">
+            Reads the last 90 days of purchases from Petpooja and puts the paid state right. About
+            a minute.
+          </p>
+        </div>
+
+        {checkResult && (
+          <div
+            className={`mb-6 panel border rounded-card px-5 py-4 ${
+              checkResult.ok
+                ? 'bg-white border-[#ebe8e4]'
+                : 'bg-[#fdf6f5] border-[#f0d9d4]'
+            }`}
+          >
+            {checkResult.ok ? (
+              <>
+                <p className="text-sm text-[#1e1812]">
+                  Checked Petpooja. The bills below are up to date.
+                </p>
+                {checkResult.lines.map((line) => (
+                  <p key={line} className="text-xs text-[#6b635c] mt-1">
+                    {line.replace(/^[^\w(]*/, '')}
+                  </p>
+                ))}
+              </>
+            ) : (
+              <p className="text-sm text-[#8b3a2e]">
+                Petpooja could not be read: {checkResult.error}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* The bills that are picked, and what can be done with them. */}
         {selectedBills.length > 0 && (

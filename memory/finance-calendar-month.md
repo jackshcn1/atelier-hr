@@ -14,6 +14,21 @@ finance dashboards and metrics use the plain calendar month, and the window
 rolls over on the 1st.** Both live side by side, and neither disturbs the
 other.
 
+**The owner's rule (24 Nov 2026): the 20–19 cycle is for salaries and nothing
+else. EVERYTHING in Finance is the calendar month — the first day to the last
+day of the month.** When a question is asked about "a month's bills", "this
+month's costs" or "what is outstanding this month", the month is the calendar
+month, and no cycle figure is the answer. The cycle belongs to payroll alone.
+
+**Where the cycle shows up in Finance, and why it is not the answer.** The
+*sync* happens to read the purchase reports over the running cycle window (the
+20th onwards), because that is the window the sync engine already has. That is
+a fact about the machinery, not about the accounting: a bill dated the 3rd of
+the month is a bill of **that calendar month** even though the nightly pull
+does not re-read it every night. What makes it current is the **twice-weekly
+refresh of the last 90 days**, which covers the whole calendar month and
+everything still outstanding behind it.
+
 ## Why a second revenue source was needed
 
 Revenue and the 20–19 cycle were the same thing: the Petpooja Executive Sales
@@ -258,17 +273,26 @@ is written into the sheet, which is then pulled into the books.
 
 **How often Petpooja's paid state is found — two ways:**
 
-1. **The nightly run** pulls the pay cycle that is running, so a bill dated
-   inside the current cycle is checked every night.
-2. **The twice-weekly purchase refresh** (`.github/workflows/petpooja-refresh.yml`,
+1. **The twice-weekly purchase refresh** (`.github/workflows/petpooja-refresh.yml`,
    Monday and Thursday at 05:00 IST, `?refresh=90`) re-reads the **last 90
    days** of purchases and rewrites those bills with Petpooja's own payment
-   column. So a bill dated within the last 90 days is checked twice a week.
-   The 90 days is the same window Petpooja itself allows a bill to be edited
-   in. See `memory/petpooja-purchase-refresh.md`.
+   column. It covers the whole calendar month and everything still
+   outstanding behind it. The 90 days is the same window Petpooja itself
+   allows a bill to be edited in. See `memory/petpooja-purchase-refresh.md`.
+2. **The nightly run** also re-reads the purchase reports, but over the running
+   **cycle** window (the 20th onwards) — so a bill dated inside the current
+   cycle is checked every night. **This is a fact about the sync's window, not
+   about the accounting month:** a bill dated the 3rd is a bill of that
+   calendar month, and it is kept current by the refresh above.
 
 **The limit, stated plainly:** a bill dated **more than 90 days ago** that is
 paid now is **not picked up automatically**. It has to be corrected by hand.
+
+**And on demand:** the Bills page has a **"Check Petpooja for payments"**
+button, which forces the same 90-day refresh and tells you what it found — so
+the list of what is outstanding can be brought up to date on the spot rather
+than waiting for the next scheduled run. See
+`memory/petpooja-purchase-refresh.md`.
 
 ## The dashboards say what is missing
 

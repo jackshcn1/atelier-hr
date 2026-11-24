@@ -62,9 +62,10 @@ the accountant's 20 sheet bills that Petpooja knows nothing about.
 
 A document **deleted outright** in Petpooja (not cancelled) leaves no trace in
 the report, so the sync cannot see it and the books keep it. One such bill was
-found (Ambrosia CBC-3751/26-27, ₹1,071, 31 Oct 2026). The nightly pull also
-only reads the running pay cycle, so a bill cancelled after its cycle has
-closed stays in the books until a backfill covers its month.
+found (Ambrosia CBC-3751/26-27, ₹1,071, 31 Oct 2026). The **twice-weekly
+refresh of the last 90 days** catches this now — a bill cancelled after its
+cycle closed is picked up by the refresh, not left in the books until a
+backfill covers its month.
 
 See `memory/finance-thousand-row-rule.md` for the other way the books can
 quietly understate what is owed.
