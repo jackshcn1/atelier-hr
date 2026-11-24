@@ -137,6 +137,14 @@ carry a rupee sign and thousands separators (`₹ 12,500.00`).
 4. **Salary is never typed.** It comes from HRMS, forecast then actual, so
    there is no "salary" type.
 
+**The sheet's duplicate check keys on the invoice number, not on the
+supplier's name.** So a bill here cannot be separated from itself by one
+export spelling the supplier differently — which is exactly the trap
+Petpooja's `[Supplier]` and `[Vendor]` tags set on 24 November 2026 (see
+`memory/petpooja-purchase-refresh.md`). The Petpooja path *did* key on the
+supplier's name, and that is where the duplicates came from. **A name that a
+third party can decorate must not be part of an identity.**
+
 ### Who wrote a row — the `source` column
 
 `expenses` and `petty_cash_ledger` both carry a `source` column:

@@ -6,8 +6,9 @@
  * Two things have to hold. A refresh may only ever touch the purchases —
  * never the sales report, never the pay periods, never the variable-pay
  * figures. And a bill that Petpooja no longer has is removed only after it
- * has been missing at two refreshes, because a deleted document leaves no
- * trace and a single odd export must never remove a good bill.
+ * has been missing at two refreshes **and** for three days, because a deleted
+ * document leaves no trace, a single odd export must never remove a good bill,
+ * and the Bills page can now ask for a refresh by hand.
  *
  * Run: npm run test:refresh
  */
@@ -15,8 +16,12 @@
 import assert from 'node:assert/strict';
 import {
   billKey,
+  daysSince,
   describeRefresh,
   isPetpoojaRow,
+  isReadyForRemoval,
+  MIN_DAYS_BEFORE_REMOVAL,
+  MISSES_BEFORE_REMOVAL,
   parseRefreshRequest,
   reconcilePurchases,
   valueOf,
@@ -179,6 +184,102 @@ await check('the refresh says what it found', () => {
   const text = lines.join('\n');
   if (!text.includes('1 bill(s) in Petpooja')) throw new Error('the counts were not said');
   if (!text.includes('1 extra')) throw new Error('the extra was not said');
+});
+
+await check('a bill seen missing once is only flagged, never removed', () => {
+  const now = new Date('2026-11-24T10:00:00Z');
+  if (isReadyForRemoval({ seenCount: 1, firstSeenAt: '2026-11-20T10:00:00Z', now })) {
+    throw new Error('a bill seen once was ready to be removed');
+  }
+});
+
+await check('a bill seen missing twice in a moment is not removed', () => {
+  // The button on the Bills page can be pressed twice minutes apart. That is
+  // one sighting read twice, not two pieces of evidence.
+  const now = new Date('2026-11-24T10:05:00Z');
+  const firstSeenAt = '2026-11-24T10:00:00Z';
+  if (isReadyForRemoval({ seenCount: 2, firstSeenAt, now })) {
+    throw new Error('two presses minutes apart were enough to remove a bill');
+  }
+});
+
+await check('a bill seen missing twice, two days apart, is still not removed', () => {
+  const now = new Date('2026-11-22T10:00:00Z');
+  const firstSeenAt = '2026-11-20T10:00:00Z';
+  if (isReadyForRemoval({ seenCount: 2, firstSeenAt, now })) {
+    throw new Error('two days was treated as enough');
+  }
+});
+
+await check('a bill missing for three days and seen twice is removed', () => {
+  const now = new Date('2026-11-23T10:00:00Z');
+  const firstSeenAt = '2026-11-20T10:00:00Z';
+  if (!isReadyForRemoval({ seenCount: 2, firstSeenAt, now })) {
+    throw new Error('a bill missing for three days was not ready to be removed');
+  }
+});
+
+await check('the days are counted from the first sighting, not the last', () => {
+  // A bill flagged on the 20th and read every day since: it is removed once
+  // the three days are up, whatever the sighting count has climbed to.
+  const now = new Date('2026-11-23T10:00:00Z');
+  const firstSeenAt = '2026-11-20T10:00:00Z';
+  if (!isReadyForRemoval({ seenCount: 4, firstSeenAt, now })) {
+    throw new Error('a bill missing for three days was not ready to be removed');
+  }
+  const tooSoon = new Date('2026-11-21T10:00:00Z');
+  if (isReadyForRemoval({ seenCount: 9, firstSeenAt, now: tooSoon })) {
+    throw new Error('the sighting count overrode the days');
+  }
+});
+
+await check('a flag with no first sighting is never ready', () => {
+  const now = new Date('2026-11-24T10:00:00Z');
+  if (isReadyForRemoval({ seenCount: 5, firstSeenAt: null, now })) {
+    throw new Error('a bill with no first sighting was ready to be removed');
+  }
+  if (isReadyForRemoval({ seenCount: 5, firstSeenAt: 'not a date', now })) {
+    throw new Error('a bill with an unreadable first sighting was ready to be removed');
+  }
+});
+
+await check('the days since the first sighting are counted', () => {
+  const now = new Date('2026-11-24T10:00:00Z');
+  if (daysSince('2026-11-24T10:00:00Z', now) !== 0) throw new Error('same day');
+  if (daysSince('2026-11-21T10:00:00Z', now) !== 3) throw new Error('three days');
+  if (daysSince('2026-11-25T10:00:00Z', now) !== 0) throw new Error('a day in the future is not days');
+  if (daysSince(null, now) !== 0) throw new Error('no stamp is not days');
+});
+
+await check('the rule is three days, and two sightings', () => {
+  if (MIN_DAYS_BEFORE_REMOVAL !== 3) throw new Error(`${MIN_DAYS_BEFORE_REMOVAL} days`);
+  if (MISSES_BEFORE_REMOVAL !== 2) throw new Error(`${MISSES_BEFORE_REMOVAL} sightings`);
+});
+
+await check('a flagged bill says how long it has been missing', () => {
+  const summary = reconcilePurchases(
+    [{ vendor_name: 'Ambrosia', invoice_number: 'CBC-1', invoice_date: '2026-05-28', amount: 910, payment_status: 'paid' }],
+    [],
+  );
+  const fresh = describeRefresh({
+    ...summary,
+    candidates: 0,
+    flagged: [{ row: { vendor_name: 'Ambrosia', invoice_number: 'CBC-9', invoice_date: '2026-05-18' }, seenCount: 1, daysMissing: 0 }],
+    removed: [],
+    cleared: [],
+  });
+  if (!fresh.join('\n').includes('after 3 days')) throw new Error('the waiting time was not said');
+
+  const waiting = describeRefresh({
+    ...summary,
+    candidates: 0,
+    flagged: [{ row: { vendor_name: 'Ambrosia', invoice_number: 'CBC-9', invoice_date: '2026-05-18' }, seenCount: 2, daysMissing: 1 }],
+    removed: [],
+    cleared: [],
+  });
+  const text = waiting.join('\n');
+  if (!text.includes('missing for 1 day')) throw new Error('the days missing were not said');
+  if (!text.includes('once 3 days have passed')) throw new Error('the rule was not said');
 });
 
 console.log(`\n${passed} check(s) passed`);

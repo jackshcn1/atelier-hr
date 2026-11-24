@@ -116,15 +116,17 @@ export async function POST(request) {
     restoreEngineSettings(saved);
   }
 
-  // The lines worth reading: what the refresh found, and anything it did not
-  // manage to match. The rest of the engine's chatter is left alone.
+  // The lines worth reading: what the refresh found, anything it did not
+  // manage to match, and anything it took out of the books. The rest of the
+  // engine's chatter is left alone.
   const lines = Array.isArray(body?.logs) ? body.logs : [];
   const summary = lines.filter(
     (line) =>
       typeof line === 'string' &&
       (line.includes('Refresh check') ||
         line.includes('do not match') ||
-        line.includes('Flagged')),
+        line.includes('Flagged') ||
+        line.includes('Removed:')),
   );
 
   if (!body?.ok) {
