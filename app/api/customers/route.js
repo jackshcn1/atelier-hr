@@ -30,7 +30,13 @@
 
 import { NextResponse } from 'next/server';
 import { getSupabase, readAllRows, selectRows } from '../../../lib/supabaseServer.js';
-import { maskPhone, FEEDBACK_QUESTIONS, LISTINGS, listingBucket } from '../../../lib/customerParsers.js';
+import {
+  maskPhone,
+  FEEDBACK_QUESTIONS,
+  LISTINGS,
+  listingBucket,
+  averageSince,
+} from '../../../lib/customerParsers.js';
 import { monthKeyOf, todayInIST } from '../../../lib/financePeriod.js';
 import { listingLabel } from '../../../lib/customerFormat.js';
 import { connectionStatus } from '../../../lib/googleConnections.js';
@@ -94,7 +100,7 @@ export async function GET(request) {
  *
  * @param {Array<object>} reviews
  * @param {object} official the rating each listing publishes, by listing key
- * @returns {{avgRating: number|null, listings: Array<object>, ratingTrend: Array<object>}}
+ * @returns {{avgRating: number|null, avgCount: number, listings: Array<object>, ratingTrend: Array<object>}}
  */
 function buildReviewPicture(reviews, official = {}) {
   const rows = reviews || [];
@@ -164,10 +170,20 @@ function buildReviewPicture(reviews, official = {}) {
     // does not reshuffle itself as the number of reviews changes.
     .sort((a, b) => listingOrder(a.listing) - listingOrder(b.listing) || b.count - a.count);
 
-  const scored = rows.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n) && n > 0);
-  const avgRating = scored.length
-    ? Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100) / 100
-    : null;
+  // **Our own average is worked out over a window, not over everything.**
+  //
+  // The owner set the window on 25 November 2026: the average counts the
+  // reviews written from 1 March 2026 onward. The Google listing goes back to
+  // 2010 and those early years were a different restaurant, and averaging
+  // sixteen years of history into one number made the business look worse
+  // than it is. The three marketplaces only have reviews from March 2026
+  // anyway, so it is the one window all four listings share.
+  //
+  // **Only this number uses the window.** Every review is still held, every
+  // listing's own average is still over every review that listing has, and
+  // the month-by-month trend still reaches back to the beginning. The window
+  // decides what the headline number is *averaged from*, not what is *shown*.
+  const { avgRating, count: avgCount } = averageSince(rows);
 
   // The rating each month, so a fall is visible as a fall.
   const ratingByMonth = {};
@@ -186,7 +202,7 @@ function buildReviewPicture(reviews, official = {}) {
     }))
     .sort((a, b) => a.month.localeCompare(b.month));
 
-  return { avgRating, listings, ratingTrend };
+  return { avgRating, avgCount, listings, ratingTrend };
 }
 
 /** A blank line for one listing. */
@@ -493,6 +509,7 @@ async function overview(supabase) {
       reviews: {
         count: reviews.length,
         avgRating: reviewPicture.avgRating,
+        avgCount: reviewPicture.avgCount,
         listings: reviewPicture.listings,
         ratingTrend: reviewPicture.ratingTrend,
         linked: reviews.filter((r) => r.is_linked).length,
@@ -658,6 +675,7 @@ async function reviewsView(supabase, params) {
     data: {
       count: rows.length,
       avgRating: picture.avgRating,
+      avgCount: picture.avgCount,
       listings: picture.listings,
       ratingTrend: picture.ratingTrend,
       linked: rows.filter((r) => r.is_linked).length,

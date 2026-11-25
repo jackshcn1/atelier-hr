@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   count, rating, ratingPill, formatDate, formatMonth, money, listingLabel,
 } from '../../../lib/customerFormat';
-import { UNLISTED_KEY, GOOGLE_LISTING_KEY } from '../../../lib/customerParsers';
+import { UNLISTED_KEY, GOOGLE_LISTING_KEY, AVERAGE_FROM_LABEL } from '../../../lib/customerParsers';
 
 /**
  * app/customers/reviews/page.js — what people said about us.
@@ -396,7 +396,12 @@ export default function CustomerReviewsPage() {
           <Stat
             label="Our average"
             value={rating(r.avgRating)}
-            sub="Out of five, over every review we hold"
+            // **This one number is worked out over a window, not over
+            // everything.** The listing goes back to 2010 and those early
+            // years were a different restaurant, so the average counts the
+            // reviews from 1 March 2026 onward — and says so, right here,
+            // under the figure. Every review is still held and still shown.
+            sub={`Out of five · ${count(r.avgCount)} reviews from ${AVERAGE_FROM_LABEL} onward`}
             accent
           />
           <Stat
