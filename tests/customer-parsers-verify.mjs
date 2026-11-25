@@ -54,8 +54,10 @@ import { findOurLocation, googleReviewRows } from '../lib/googleReviews.js';
 import {
   BUSINESS_SCOPE,
   DRIVE_SCOPE,
+  missingScopes,
   providerByKey,
   providerScopes,
+  scopeList,
 } from '../lib/googleConnections.js';
 import {
   monthChunks,
@@ -1286,6 +1288,41 @@ await check('the Business Profile is a connection of its own, apart from Drive',
   // And the Business Profile connection never asks for Drive — so agreeing
   // to read our listing cannot hand over the accountant's Drive.
   assert.ok(!providerScopes('google_business').includes(DRIVE_SCOPE));
+});
+
+await check('what a token says it can do is read in every shape Google answers in', async () => {
+  // One string, scopes separated by spaces.
+  assert.deepEqual(
+    scopeList('https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/business.manage'),
+    ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/business.manage'],
+  );
+  // A list of them.
+  assert.deepEqual(scopeList(['https://www.googleapis.com/auth/drive']), [
+    'https://www.googleapis.com/auth/drive',
+  ]);
+  // Separated by commas.
+  assert.deepEqual(scopeList('https://a/x,https://b/y'), ['https://a/x', 'https://b/y']);
+  // **Nothing at all** — which is what Google answers when it declines to
+  // say. This must read as an empty list and never as an error, because a
+  // check that reads one shape only will refuse a token that works.
+  assert.deepEqual(scopeList(undefined), []);
+  assert.deepEqual(scopeList(null), []);
+  assert.deepEqual(scopeList(''), []);
+
+  // And the difference between what was asked for and what was given.
+  assert.deepEqual(
+    missingScopes('https://www.googleapis.com/auth/drive', [
+      'https://www.googleapis.com/auth/drive',
+      'https://www.googleapis.com/auth/business.manage',
+    ]),
+    ['https://www.googleapis.com/auth/business.manage'],
+  );
+  assert.deepEqual(
+    missingScopes(['https://www.googleapis.com/auth/business.manage'], [
+      'https://www.googleapis.com/auth/business.manage',
+    ]),
+    [],
+  );
 });
 
 console.log(`\n${passed} checks passed.`);
