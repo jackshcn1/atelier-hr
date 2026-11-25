@@ -6,7 +6,7 @@ import {
   money, count, percent, rating, ratingPill, formatDate, formatMonth,
   listingLabel, customerName,
 } from '../../../lib/customerFormat';
-import { UNLISTED_KEY, GOOGLE_LISTING_KEY } from '../../../lib/customerParsers';
+import { UNLISTED_KEY, GOOGLE_LISTING_KEY, AVERAGE_FROM_LABEL } from '../../../lib/customerParsers';
 
 /**
  * app/customers/overview/page.js — the Customer section's overview.
@@ -172,7 +172,10 @@ export default function CustomersPage() {
           <Stat
             label="Average rating"
             value={rating(r.avgRating)}
-            sub={`${count(r.count)} reviews across ${count(pages.length)} listings`}
+            // The one number worked out over a window: the reviews from
+            // 1 March 2026 onward, which is what all four listings share.
+            // The count of every review we hold is said further down.
+            sub={`${count(r.avgCount)} reviews from ${AVERAGE_FROM_LABEL} onward, across ${count(pages.length)} listings`}
           />
         </div>
 

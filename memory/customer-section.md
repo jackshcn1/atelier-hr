@@ -336,6 +336,39 @@ platform's rating is **lifetime** — every review the platform has, going back
 years. The site's own average is over **the reviews Petpooja holds**, which
 start at March 2026. They will never agree, and the page says so.
 
+### Our own average — one window, from 1 March 2026
+
+**The owner set this on 25 November 2026, and the date is locked.** The
+headline "Our average" is worked out over the reviews written **from 1 March
+2026 onward** — `AVERAGE_FROM_DATE` in `lib/customerParsers.js`, and
+`averageSince()` does the arithmetic.
+
+**Why a window at all:** the Google listing goes back to **2 December 2010**,
+and those early years were a different restaurant. Averaging sixteen years of
+Google history into one number dragged the figure down to **4.0** and made the
+business look worse than it is. The three marketplaces only have reviews from
+March 2026 anyway, so **1 March 2026** is the one window **all four listings
+share**. On that window the figure is **4.1 over 1,451 reviews**.
+
+**Only this one number uses the window.** Everything else stays on the whole
+history, and **nothing is hidden** — the window decides what the headline
+number is *averaged from*, not what is *shown*:
+
+| | |
+|---|---|
+| Reviews on the books | **4,998** — every one, still counted and still shown |
+| Our average | **4.1** — over the **1,451** reviews from March 2026 onward |
+| each listing's own average | the **full history** — Google **4.01** over all **3,627** |
+| the month-by-month trend | **145 months**, still reaching back to **2010-12** |
+
+The page says which window it used, right under the figure: *"Out of five ·
+1,451 reviews from March 2026 onward"*.
+
+**A review with no day cannot be known to be inside the window**, so it is
+left out of the average — and the count that comes back with the average says
+how many it was really over, so a row that was left out can never be a silent
+one. The same count is on the page, so the two can never disagree.
+
 **Zomato's delivery rating is the one that counts** — the listing page also
 carries a DINING rating (3.1 from 24) and a JSON-LD aggregate that is the
 dining one. The scraper reads `rating_new` → `DELIVERY` → `"rating":"4.3"`
@@ -1058,9 +1091,13 @@ With the mask fixed, the pull ran clean on 25 Nov 2026:
 so 3,627 reviews is 73 requests. The route allows `maxDuration = 300` and the
 nightly workflow waits 600 seconds, so it fits with room to spare.
 
-**Our own average moved from 4.1 to 4.0**, because Google's 3,627 reviews are
-now in the books alongside the marketplaces' 1,371. That is the honest number:
-the two numbers are kept apart, and this is the average of what we hold.
+**Over every review we hold, our own average moved from 4.1 to 4.0**, because
+Google's 3,627 reviews are now in the books alongside the marketplaces' 1,371.
+**The owner then set the average over a window** — from 1 March 2026, which is
+what all four listings share — so the headline figure reads **4.1** again, over
+the **1,451** reviews in that window. The Google listing's *own* average stays
+on its full history (**4.01** over all **3,627**), so nothing about the old
+years is hidden. See "Our own average — one window, from 1 March 2026".
 
 **One Google review cannot be matched to an order** — nobody orders on Google,
 so a Google review has no order to sit on. The card says so: *"none of them

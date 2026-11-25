@@ -36,6 +36,9 @@ import {
   cleanFeedbackResponse,
   FEEDBACK_SCALE,
   FEEDBACK_TAGS,
+  AVERAGE_FROM_DATE,
+  AVERAGE_FROM_LABEL,
+  averageSince,
 } from '../lib/customerParsers.js';
 import {
   parseFeedbackSheet,
@@ -1414,6 +1417,46 @@ await check('what a token says it can do is read in every shape Google answers i
     ]),
     [],
   );
+});
+
+await check('our average counts the reviews from March 2026 onward, and says so', async () => {
+  // **This is the one number on the page that is averaged over a window.**
+  // The Google listing goes back to 2010 and those early years were a
+  // different restaurant, so the average is worked out from 1 March 2026 —
+  // the one window all four listings share.
+  assert.equal(AVERAGE_FROM_DATE, '2026-03-01');
+  assert.equal(AVERAGE_FROM_LABEL, 'March 2026');
+
+  const reviews = [
+    { review_date: '2026-04-01', rating: 5 },
+    { review_date: '2026-03-01', rating: 4 },
+    { review_date: '2026-02-28', rating: 1 }, // before the window — out
+    { review_date: '2010-12-02', rating: 1 }, // before the window — out
+  ];
+
+  const { avgRating, count } = averageSince(reviews);
+  assert.equal(count, 2, 'counts only the reviews inside the window');
+  assert.equal(avgRating, 4.5, 'averages only the reviews inside the window');
+
+  // The boundary is inclusive: a review written **on** 1 March 2026 is in.
+  assert.equal(averageSince([{ review_date: '2026-03-01', rating: 3 }]).count, 1);
+
+  // A review with no day cannot be known to be in the window, so it is left
+  // out — and the count says how many the average is really over, so a
+  // dropped row can never be a silent one.
+  assert.equal(averageSince([{ review_date: null, rating: 5 }]).count, 0);
+  assert.equal(averageSince([{ rating: 5 }]).count, 0);
+
+  // A row with no rating is not a rating either.
+  assert.equal(averageSince([{ review_date: '2026-04-01', rating: 0 }]).count, 0);
+
+  // And with nothing in the window there is no average to show.
+  assert.equal(averageSince([{ review_date: '2010-12-02', rating: 4 }]).avgRating, null);
+  assert.equal(averageSince([]).avgRating, null);
+
+  // **Only the average is windowed.** Every review is still held, so the
+  // count of what we hold is the whole count, not the window's.
+  assert.equal(reviews.length, 4);
 });
 
 console.log(`\n${passed} checks passed.`);
