@@ -19,6 +19,8 @@
  *   ?group=<n>   one report group. This is how the nightly workflow calls it —
  *                one request per group, each with its own serverless run.
  *   ?sheet=1     the accountant's invoice sheet on its own (no browser).
+ *   ?sheet=feedback  the customer feedback sheet on its own (no browser).
+ *   ?google=reviews  the Google Business Profile's reviews (no browser).
  *   finance=1    writes the finance figures only. WITHOUT it the run also
  *                writes the variable-pay metrics, which are paused.
  *
@@ -60,6 +62,7 @@ import {
   parseFeedbackSheet,
   syncFeedback,
 } from '../../../lib/feedbackSheet.js';
+import { pullGoogleReviews } from '../../../lib/googleReviews.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -176,6 +179,19 @@ async function handle(req) {
   // pull, for the rows that were typed into the sheet by hand.
   if (new URL(req.url).searchParams.get('sheet') === 'feedback') {
     return await pullFeedbackSheet(push, started);
+  }
+
+  // The Google reviews.
+  //
+  // They come from the Google Business Profile API, which reads the listing
+  // **as a manager of it** — so this needs the site's own Google connection,
+  // not the service account, and no browser at all.
+  //
+  // A listing that is not connected yet is **skipped**, not a failure: the
+  // nightly run has to keep working whether or not the Business Profile is
+  // set up.
+  if (new URL(req.url).searchParams.get('google') === 'reviews') {
+    return await pullGoogleReviewList(push, started);
   }
 
   // The sync engine writes its progress straight to the console. Tee it into
@@ -634,6 +650,63 @@ async function pullFeedbackSheet(push, started) {
   } catch (err) {
     const message = err?.message || String(err);
     push(`❌ The feedback sheet could not be pulled: ${message}`);
+    return NextResponse.json(
+      { ok: false, error: message, durationMs: Date.now() - started },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Pull the Google reviews and write them into the books.
+ *
+ * The listing is read **as a manager of it**, through the site's own Google
+ * connection. Nothing here is a Petpooja report, so there is no browser and
+ * no login.
+ *
+ * A Business Profile that is not connected is **skipped**: the nightly run
+ * must keep working whether or not it has been set up.
+ */
+async function pullGoogleReviewList(push, started) {
+  const supabase = getSupabase();
+
+  try {
+    push('⭐ Reading the Google reviews...');
+    const written = await pullGoogleReviews(supabase);
+
+    push(
+      `✓ Google: ${written.reviews} review(s) written — Google's own rating ` +
+        `${written.averageRating ?? '—'} from ${written.totalReviewCount ?? '—'} ratings ` +
+        `on "${written.listing}".`,
+    );
+    if (written.account) push(`   Read as the account "${written.account}".`);
+
+    // A review that could not be identified is **reported**, not quietly
+    // dropped and not quietly written again every night.
+    for (const row of written.refused || []) {
+      push(`↷ One review was not counted — ${row.reason}.`);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      durationMs: Date.now() - started,
+      ...written,
+    });
+  } catch (err) {
+    const message = err?.message || String(err);
+
+    // Not connected is not a failure — it is the same rule as the sheets.
+    if (err?.code === 'NOT_CONNECTED' || err?.code === 'NO_BUSINESS_SCOPE') {
+      push(`↷ The Google reviews were not pulled — ${message}`);
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: message,
+        durationMs: Date.now() - started,
+      });
+    }
+
+    push(`❌ The Google reviews could not be pulled: ${message}`);
     return NextResponse.json(
       { ok: false, error: message, durationMs: Date.now() - started },
       { status: 500 },

@@ -4,7 +4,7 @@ description: "The Customer section — who a customer is (a real contact number)
 metadata:
   node_type: memory
   type: project
-  modified: 2026-11-23T15:30:00.000Z
+  modified: 2026-11-25T09:40:00.000Z
 ---
 
 # The Customer section
@@ -292,7 +292,7 @@ not name the customer either.
 | Order value | Petpooja's **All Orders export**, a month at a time | — |
 | Reviews | The **Ratings & Reviews** endpoint (`online_review_data/428501`), 5409 = Zomato, 6736 = Swiggy | the **platform order id** (`Client OrderID`) |
 | Feedback | **The app's own form**, on the floor — written into the **Customer Feedback Form sheet**, which is then pulled into the books | the **bill number** — the phone comes from the order it names |
-| Google reviews | **Not in Petpooja.** They need the Google Business Profile API | — |
+| Google reviews | The **Google Business Profile API**, read as a manager of the listing | — (nobody orders on Google, so a Google review cannot be given to an order) |
 | Google rating | **Places API** — an API key only, no approval | the Place ID |
 
 ### The platform is read, never guessed
@@ -329,7 +329,7 @@ says which of the two Swiggy pages it was left on.
 | Zomato | **4.3** from 4,404 ratings (delivery) | 4.08 ★ over 917 reviews |
 | Swiggy — Atelier | **4.4** (2.6K+) | 4.17 ★ over 192 reviews |
 | Swiggy — Ambrosia | **4.5** (10K+) | 4.16 ★ over 222 reviews |
-| Google | **4.0** from 3,628 ratings | none held yet — see "The Google gap" |
+| Google | **4.0** from 3,628 ratings | read from the Business Profile API — see below |
 
 The two numbers answer different questions and are shown side by side. The
 platform's rating is **lifetime** — every review the platform has, going back
@@ -529,25 +529,123 @@ That path is separate and is **dormant** — variable pay is paused, and a
 finance-only run never pulls it. Moving it to the app would be a change to
 variable pay, and that is the owner's decision.
 
-## The Google gap
+## The Google reviews, read from Google's own API (25 Nov 2026)
 
 Google reviews are not in Petpooja — Petpooja's "Google Business" is only a
 marketing channel tile. They come from the **Google Business Profile API**,
-which needs access granted by Google after an application at
-<https://support.google.com/business/contact/api_default> (**7–14 working
-days**; the project shows 0 QPM until it is approved). A **manager** of the
-listing can read and reply to reviews — the only thing missing is Google's
-approval for this app.
+which Google approved for this project on **25 Nov 2026** (case
+`6-7727000042503`, quota 300 QPM). The approval was for **Basic API Access**:
+read the listing, and reply to reviews.
 
-**Applied on 23 Nov 2026 — case `6-7727000042503`, quoted at 7–10 business
-days.** See the runbook at the end of this note for the exact click path and
-the quota check.
+> **The reply half is deliberately not built.** The owner's digital marketing
+> team answers guests from Google's own My Business screen, and the site only
+> **shows** what people wrote. So the permission is asked for because Google's
+> API has no read-only form of it, and **not one write call is made from this
+> code**.
 
-`customer_reviews.platform` already accepts `google`, so the connector slots
-in when the access arrives. The page shows the gap as a gap, rather than
-hiding it.
+### The API is split across three hosts
 
-### But the rating does not have to wait — 22 Nov 2026
+Google moved this API around, and the pieces are in different places. Measured
+on 25 Nov 2026 by calling each host with the service account's token:
+
+| What | Where | Answered |
+|---|---|---|
+| the accounts | `mybusinessaccountmanagement.googleapis.com/v1/accounts` | 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT` — enabled |
+| the locations | `mybusinessbusinessinformation.googleapis.com/v1/{account}/locations` | 403 — enabled |
+| **the reviews** | `mybusiness.googleapis.com/v4/{account}/{location}/reviews` | 403 — enabled |
+| the v4 **accounts** | `mybusiness.googleapis.com/v4/accounts` | **404 — retired** |
+| the v4 **locations** | `mybusiness.googleapis.com/v4/{account}/locations` | **404 — retired** |
+
+So: accounts and locations from **v1**, reviews from **v4**, and only the
+reviews survive in v4. The ids are the same ids in both — an account's name is
+`accounts/{id}`, a location's is `locations/{id}`, and the v4 review path is
+built from those two names.
+
+**`SERVICE_DISABLED` vs `ACCESS_TOKEN_SCOPE_INSUFFICIENT` is how you check
+whether an API is switched on** without the Service Usage API (which answers
+*permission denied* for this project's service account — it is a "consumer
+container"). A 403 about **scope** means the service is on; a 404 means the
+method is gone.
+
+### It has to be a person, not the service account
+
+The service account **cannot** use this API at all — it answers
+`ACCESS_TOKEN_SCOPE_INSUFFICIENT` however the token is made — because a
+listing can only be read **as somebody who manages it**. So the token comes
+from the site's own Google connection, and the account that signs in has to be
+a manager of the listing.
+
+**Two connections, apart from each other** (`lib/googleConnections.js`):
+
+| Connection | Asks for | Row |
+|---|---|---|
+| `google` | `…/auth/drive` | `google_drive_tokens`, `provider='google'` |
+| `google_business` | `…/auth/business.manage`, `…/auth/userinfo.email` | the same table, `provider='google_business'` |
+
+They are apart on purpose: the Business Profile permission is sensitive and a
+person can agree to the sign-in and leave it unticked, and that must never
+take the invoice uploads with it. The **same redirect URI** serves both
+(`/api/google-drive/callback`) — which connection a sign-in belongs to is
+read from the **state cookie**, not from the address.
+
+**The scope the API's own reference pages list is `business.manage`**, and the
+scope Google's own Business Profile setup guide names is the same one. The
+`businessprofile` scope is the newer one for the v1 APIs; `business.manage`
+covers all of them and is what this site asks for.
+
+### How a Google review is identified — the one real trap
+
+A Google review has **no order id** — nobody orders on Google — so the
+marketplace's key, `(platform, platform order id, day)`, has nothing to put in
+the middle. **Google's own review id goes there instead**:
+
+| Column | For a Google review |
+|---|---|
+| `platform` | `google` |
+| `client_order_id` | Google's review id |
+| `review_date` | the day it was written |
+
+Without that, **two guests reviewing us on the same day would be one row**, and
+one of them would be silently lost — the unique index on
+`(platform, client_order_id, review_date)` would treat them as the same
+review. No migration was needed: the column is there, and the id that goes in
+it is the platform's own id for the review.
+
+**Nothing is deleted.** The pull adds and updates; it never removes a row on
+the strength of its own inference. A guest who deletes their review on Google
+leaves a row behind — a small inaccuracy, said out loud on the page, rather
+than a row deleted by mistake and simply gone.
+
+### The two numbers are kept apart
+
+| Number | Where it comes from | What it is |
+|---|---|---|
+| the rating Google publishes | the API's own `averageRating` and `totalReviewCount` | every rating the listing has ever had — written to `platform_listings`, `source='business_profile'` |
+| the average of the reviews we hold | the rows in `customer_reviews` | only what we have read |
+
+They are different questions and the page never shows one as the other. A
+pull that could not read them does **not** put a blank over a number that was
+there.
+
+### How it is pulled
+
+`lib/googleBusinessProfile.js` reads the API; `lib/googleReviews.js` writes
+the books. The listing is found by its **Place ID** — never by its name; an
+account can hold many listings, and a name is not an identity.
+
+| Path | What it does |
+|---|---|
+| `POST /api/sync?google=reviews` | the pull, the same one the nightly run makes |
+| `POST /api/customers/google` | the same pull, asked for by hand (admin only) |
+| `GET /api/google-drive/connect?provider=google_business` | starts the sign-in |
+
+A listing that is **not connected is skipped, not a failure** — the nightly
+run has to keep working whether or not the Business Profile has been set up.
+
+The **nightly workflow** asks for it after the other pulls, and a `skipped`
+answer does not fail the run.
+
+### The rating does not have to wait — 22 Nov 2026
 
 The 12-day wait is on the **reviews**. The **rating** is a different door:
 the **Places API** answers for any place by its Place ID with nothing but an
@@ -753,51 +851,50 @@ restrictions → Restrict key → Places API (New)**. The key is only ever used
 by the local sync script, so an IP restriction on the office connection can
 be added too.
 
-### 2. The Business Profile API application (the 12-day one)
+### 2. The Business Profile API — approved, and one thing left to do
 
-**Status: APPLIED on 23 Nov 2026.** Google opened a support case:
-**`6-7727000042503`**, quoted at **7–10 business days**. Keep that case ID —
-it is what a follow-up to Google must quote, and what Google will quote back.
+**Status: APPROVED on 25 Nov 2026.** Google opened support case
+**`6-7727000042503`**; the project's quota is **300 QPM**, which is how
+approval shows. The APIs are already switched on (measured 25 Nov 2026 — see
+the table above).
 
-This is the one that gives the **reviews** — every review the listing has
-ever received, dated, with the right to reply to them.
+**What is left is the owner's own Google sign-in**, because a listing can only
+be read as somebody who manages it. There are two things to do, and both are
+one-time.
 
-Google asks for four things, and the restaurant already has all four:
+#### 2a. Add the two scopes to the consent screen
 
-| Google asks for | We have |
-|---|---|
-| a verified, active Business Profile, 60+ days old | the restaurant's own Google Maps listing, rated for years |
-| a business website | theambrosia.com (it is on the listing) |
-| a Google Cloud project | `atelier-hr-drive` |
-| an email that is an owner/manager of the listing | the owner's own Gmail, **as long as it is the one that manages the listing** |
+**APIs & Services → OAuth consent screen** in the `atelier-hr-drive` project.
 
-The steps:
+1. Open **Data Access**.
+2. **ADD OR REMOVE SCOPES**, and add:
+   - `https://www.googleapis.com/auth/business.manage`
+   - `https://www.googleapis.com/auth/userinfo.email`
+3. **SAVE**.
 
-1. Open the project in the Cloud Console and read the **Project number**
-   off the **Project info** card on the Dashboard. The application form asks
-   for it.
-2. Open <https://support.google.com/business/contact/api_default>, choose
-   **"Application for Basic API Access"**, and fill the form in with the
-   project number, the business name, the website, the APIs wanted
-   (Business Profile API and My Business Account Management API), and the
-   reason: *"Read the customer reviews of our own restaurant and reply to
-   them, from our in-house management system."* Use an email address that is
-   an owner or manager of the listing — Google checks this.
-3. Wait. Google reviews the application within **14 days**.
-4. **To check whether it was approved**: Cloud Console → **APIs & Services →
-   Quotas** → filter for `mybusiness` → **0 QPM means not approved yet;
-   300 QPM means approved.** The project's number is **187302776196**
-   (`atelier-hr-drive`). *This has to be read in the console by hand* — the
-   service account in `scripts/google-service-account.json` is a Sheets/Drive
-   account, not a project admin, and the Cloud Resource Manager, IAM and
-   Service Usage APIs are all switched off on the project, so it answers
-   "Permission denied" to every attempt to read the quota from here.
-5. Once approved, the work left is: enable the Business Profile APIs,
-   create an OAuth client (Web application, scope
-   `https://www.googleapis.com/auth/business.manage`), and build the sync
-   and the reply button. The `customer_reviews` table already accepts
-   `platform = 'google'`, and `google_atelier` is already a listing, so the
-   connector drops in without a schema change.
+**Check the publishing status while you are there.** If the screen says
+**"Testing"**, Google expires the refresh token **after seven days** — and the
+Drive connection was made on 19 Nov 2026, so it would die on or about
+**26 Nov 2026**. Set it to **"Production"** and the expiry stops. (The status
+cannot be read from here: `serviceusage`, `clientauthconfig` and the consent
+screen APIs are all closed to this project's service account.)
+
+#### 2b. Sign in once, as a manager of the listing
+
+On the live site, signed in as an administrator, open
+**`/customers/reviews`** and press **"Connect the Google listing"**. Google
+asks to sign in — use the account that **manages the listing**
+(`apirishab@gmail.com`) — and then **Allow**.
+
+The sign-in comes back to `/customers/reviews?business=connected`, and the
+token is written into `google_drive_tokens` under
+`provider='google_business'`. **The Drive connection is a separate row and is
+not touched.**
+
+The redirect URI is **unchanged** — `https://atelier-hr-inky.vercel.app/api/google-drive/callback`
+— because the same OAuth client serves both connections and the **state
+cookie** says which one a sign-in belongs to. Nothing has to be added to the
+client's redirect URI list.
 
 **One project, not two.** Access is granted **per Cloud project**, and the
 project that gets allowlisted must be the one holding the OAuth client —
@@ -808,7 +905,11 @@ NNNNN") must not be used for this, and the Places API key goes in
 `atelier-hr-drive` too, so that every Google credential stays in the one
 dedicated project.
 
-**Use a separate OAuth client** for this, not the Drive one in
-`scripts/google-oauth-client.json`. Different scopes, and the Drive token
-must never be granted `business.manage`.
+**One OAuth client, two connections.** The client in
+`scripts/google-oauth-client.json` serves both, because a second client would
+need a second redirect URI added in the console — and the console cannot be
+reached from here. What is kept apart is the **connection**: two rows, two
+permission sets. The Drive connection's token never carries
+`business.manage`, and the Business Profile connection is never handed the
+accountant's Drive.
 

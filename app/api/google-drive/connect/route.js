@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { randomBytes } from 'node:crypto';
 import { consentUrl, oauthConfigured } from '../../../../lib/googleUserDrive.js';
+import { providerByKey } from '../../../../lib/googleConnections.js';
 import { currentProfile, isAdmin } from '../../../../lib/sessionUser.js';
 
 // Connect a Google account to the site.
@@ -10,8 +11,14 @@ import { currentProfile, isAdmin } from '../../../../lib/sessionUser.js';
 // account instead. This route sends the person to Google's sign-in, and
 // Google sends them back to `/api/google-drive/callback`.
 //
-// Only an administrator may do it: the connection can read and write the
-// whole of that account's Drive.
+// **There are two connections**, and this route starts either of them:
+// `?provider=google` (the default) asks for Drive, and
+// `?provider=google_business` asks for our Business Profile listing. They
+// are apart on purpose — see `lib/googleConnections.js`.
+//
+// Only an administrator may do it: the Drive connection can read and write
+// the whole of that account's Drive, and the Business Profile connection can
+// read our listing's reviews.
 
 const STATE_COOKIE = 'gdrive_oauth_state';
 const STATE_MINUTES = 10;
@@ -48,10 +55,14 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const next = safeNext(searchParams.get('next'));
+  const provider = providerByKey(searchParams.get('provider'));
 
   // The state is what proves the person who came back is the person who
   // left. It is kept in a cookie for ten minutes and checked on the way back.
-  const state = `${randomBytes(16).toString('hex')}.${next}`;
+  //
+  // It carries **which connection** this is, because the callback has to
+  // know where to put the token it is given.
+  const state = `${randomBytes(16).toString('hex')}.${provider}.${next}`;
 
   const jar = await cookies();
   jar.set(STATE_COOKIE, state, {
@@ -62,5 +73,5 @@ export async function GET(request) {
     maxAge: STATE_MINUTES * 60,
   });
 
-  return Response.redirect(consentUrl(state));
+  return Response.redirect(consentUrl(state, provider));
 }

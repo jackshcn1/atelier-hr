@@ -301,10 +301,11 @@ export default function CustomersPage() {
             </div>
             {r.count > 0 ? (
               <p className="note mb-6">
-                {count(r.count)} reviews on the books, from March 2026.{' '}
-                {count(r.reachedCustomer)} of them reached a customer by name — a platform order usually
-                carries no contact number, because the platform holds the customer's number and not
-                Petpooja. The rest are still counted, rated and shown.
+                {count(r.count)} reviews on the books — the marketplace ones from March 2026, and
+                the Google ones from the day the listing was set up.{' '}
+                {count(r.reachedCustomer)} of them reached a customer by name — a platform order
+                usually carries no contact number, because the platform holds the customer&apos;s
+                number and not Petpooja. The rest are still counted, rated and shown.
               </p>
             ) : null}
             {r.listings.length === 0 ? (
@@ -314,10 +315,11 @@ export default function CustomersPage() {
             ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {r.listings.map((line) => {
-                // Google holds no reviews of ours yet, so "0 reviews" would
-                // read as if nobody had ever reviewed us there. It is a page
-                // with 3,628 ratings behind it.
+                // Google is a page with 3,628 ratings behind it, so while we
+                // hold none of its reviews "0 reviews" would read as if
+                // nobody had ever reviewed us there.
                 const isGoogle = line.listing === GOOGLE_LISTING_KEY;
+                const holdsReviews = line.count > 0;
                 return (
                 <div key={line.listing} className="border border-rule-soft rounded-card p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -333,7 +335,7 @@ export default function CustomersPage() {
                     )}
                   </div>
                   <p className="text-sm text-ink-muted mt-1">
-                    {isGoogle
+                    {isGoogle && !holdsReviews
                       ? 'The reviews behind this rating are not held yet.'
                       : `${count(line.count)} reviews · ${count(line.linked)} matched to an order`}
                   </p>

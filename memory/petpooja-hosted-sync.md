@@ -442,6 +442,13 @@ second request hijack the first one's capture.
   120-second limit; the replacement is one statement, **1.3 seconds** for the
   whole pull. See `memory/customer-section.md`.
 
+- The **Google reviews pull** (25 Nov 2026) is `?google=reviews`, the same
+  run the Reviews page's button makes. It reads the Google Business Profile
+  listing — which needs the site's **own Google connection**, read **as a
+  manager of the listing**, and no browser and no Petpooja login. A listing
+  that is **not connected answers "skipped"**, and the nightly step does not
+  fail over it. See `memory/customer-section.md`.
+
 - The Google service-account key **is** on the server now, so the
   **accountant's invoice sheet** pull (`?sheet=1`) runs in the hosted run and
   writes bills into the books. The key is held as PEM **content**, which is

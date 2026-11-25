@@ -318,6 +318,45 @@ jobs:
             exit 1
           fi
 
+      # The Google reviews.
+      #
+      # Our Google Business Profile listing's reviews are read from Google's
+      # own API, as a manager of the listing. It needs no browser and no
+      # Petpooja login — it is its own request.
+      #
+      # A listing that is not connected yet answers "skipped", and a run must
+      # not fail over it: the nightly job has to keep working whether or not
+      # the Business Profile has been set up.
+      - name: Pull the Google reviews
+        env:
+          SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
+          SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
+        run: |
+          set -u
+          if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
+            echo "::error::VERCEL_SYNC_URL and VERCEL_SYNC_SECRET must be configured as repository secrets."
+            exit 1
+          fi
+
+          GOOGLE_STATUS=$(curl -sS -o "response-google.json" -w '%{http_code}' -X POST "$SYNC_URL?google=reviews" \
+            -H "x-sync-secret: $SYNC_SECRET" \
+            -H 'Content-Type: application/json' \
+            --max-time 600) || GOOGLE_STATUS="000"
+
+          echo "HTTP $GOOGLE_STATUS"
+          tail -c 4000 "response-google.json" || true
+          echo ""
+
+          if [ "$GOOGLE_STATUS" != "200" ]; then
+            echo "::error::The Google review pull failed with HTTP $GOOGLE_STATUS"
+            exit 1
+          fi
+          if ! grep -q '"ok":true' "response-google.json"; then
+            echo "::error::The Google review pull did not report ok:true"
+            exit 1
+          fi
+          # "skipped" means the listing is not connected — not a failure.
+
       - name: Publish run summary
         if: always()
         run: |
@@ -325,7 +364,7 @@ jobs:
             echo "### Petpooja daily sync"
             echo
             echo "- Finished: $(date -u '+%Y-%m-%d %H:%M UTC')"
-            for f in response-group-*.json response-sheet.json response-feedback.json; do
+            for f in response-group-*.json response-sheet.json response-feedback.json response-google.json; do
               [ -e "$f" ] || continue
               echo ""
               echo "#### ${f%.json}"
