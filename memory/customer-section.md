@@ -593,6 +593,45 @@ scope Google's own Business Profile setup guide names is the same one. The
 `businessprofile` scope is the newer one for the v1 APIs; `business.manage`
 covers all of them and is what this site asks for.
 
+### How the listing is found — the place id is under `metadata`
+
+Our listing is found by its **place id** (`ChIJ2dZj-yO7BTsR3dRz2zTaMjg`) and
+never by its name. **The place id is not at the top level of the location.**
+
+The v1 Business Information API answers with it under `metadata`:
+
+```json
+{ "name": "locations/6092570298190308654",
+  "title": "Ambrosia - Atelier",
+  "metadata": { "placeId": "ChIJ2dZj-yO7BTsR3dRz2zTaMjg",
+                "mapsUri": "https://maps.google.com/maps?cid=4049538935514453213" } }
+```
+
+**And one field the API does not know fails the whole call.** Measured on
+25 Nov 2026, field by field:
+
+| `readMask` | Answer |
+|---|---|
+| `name` | 200 |
+| `title` | 200 |
+| `storefrontAddress`, `websiteUri`, `phoneNumbers`, `categories`, `metadata` | 200 |
+| `placeId` | **400** — *"Invalid field mask provided"* |
+| `mapsUri` | **400** — *"Invalid field mask provided"* |
+| `businessType`, `businessStatus`, `geoData`, `etag` | **400** |
+| `*` | **400** |
+| *(no mask at all)* | **400** — *"Field is required"* |
+
+So the mask **`name,title,metadata`** is the one that works, and
+`parseLocation()` in `lib/googleBusinessProfile.js` reads the place id out of
+`metadata`.
+
+**This is what made the pull fail with *"Request contains an invalid
+argument."*** The code asked for `name,title,placeId,mapsUri` — a mask Google
+refuses outright — so the listing was never found and the whole pull died on a
+400 whose message says nothing about a field mask. **The field mask is the one
+argument a Google API will refuse without naming the offending field**; every
+other answer names it.
+
 ### How a Google review is identified — the one real trap
 
 A Google review has **no order id** — nobody orders on Google — so the
@@ -857,13 +896,13 @@ be added too.
 **`6-7727000042503`**; the project's quota is **300 QPM**, which is how
 approval shows.
 
-**What is left is switching the three APIs on** (see 2a) — the owner's sign-in
-is **done** (see 2c). Both are one-time steps.
+**What is left is nothing** — both one-time steps are **done** (see 2a and
+2c), and the reviews are **on the books** (see below).
 
-#### 2a. The three Business Profile APIs are SWITCHED OFF — that is the blocker
+#### 2a. The three Business Profile APIs were SWITCHED OFF — DONE on 25 Nov 2026
 
 **Measured on 25 Nov 2026, with a token that carries `business.manage`.** All
-three of the APIs this site calls answer **`SERVICE_DISABLED`**:
+three of the APIs this site calls answered **`SERVICE_DISABLED`**:
 
 | API | Host |
 |---|---|
@@ -992,4 +1031,38 @@ reached from here. What is kept apart is the **connection**: two rows, two
 permission sets. The Drive connection's token never carries
 `business.manage`, and the Business Profile connection is never handed the
 accountant's Drive.
+
+### 2d. The pull, run — the reviews are on the books (25 Nov 2026)
+
+The owner switched the three APIs on and pressed **"Read the Google reviews"**.
+The pull failed with Google's *"Request contains an invalid argument."* — the
+**field mask** was wrong (see above), not the token and not the connection.
+
+With the mask fixed, the pull ran clean on 25 Nov 2026:
+
+```json
+{"ok":true,"durationMs":91393,"reviews":3627,"refused":[],
+ "averageRating":4,"totalReviewCount":3627,
+ "listing":"Ambrosia - Atelier","account":"Rishab API"}
+```
+
+| | |
+|---|---|
+| Google reviews written | **3,627** — every one the listing has, back to **2 Dec 2010** |
+| refused | **0** |
+| Google's own rating | **4.0** from **3,627** ratings (`source='business_profile'`) |
+| the books now hold | **4,998** reviews — 3,627 Google, 941 Zomato, 430 Swiggy |
+| duplicate keys | **0** |
+
+**The pull takes about 91 seconds** — Google answers fifty reviews at a time,
+so 3,627 reviews is 73 requests. The route allows `maxDuration = 300` and the
+nightly workflow waits 600 seconds, so it fits with room to spare.
+
+**Our own average moved from 4.1 to 4.0**, because Google's 3,627 reviews are
+now in the books alongside the marketplaces' 1,371. That is the honest number:
+the two numbers are kept apart, and this is the average of what we hold.
+
+**One Google review cannot be matched to an order** — nobody orders on Google,
+so a Google review has no order to sit on. The card says so: *"none of them
+can be matched to an order."*
 

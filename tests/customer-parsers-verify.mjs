@@ -49,6 +49,7 @@ import { parsePlacesRating, parseEnvText } from '../scripts/sync-platform-rating
 import {
   starRating,
   parseBusinessReview,
+  parseLocation,
   serviceDisabledMessage,
 } from '../lib/googleBusinessProfile.js';
 import { findOurLocation, googleReviewRows } from '../lib/googleReviews.js';
@@ -1266,6 +1267,42 @@ await check('the switched-off message works even when Google gives no link', asy
     ),
     'still builds the links',
   );
+});
+
+await check("the place id is read out of the location's metadata, not the top level", async () => {
+  // **The place id is not at the top level.** It comes back under `metadata`,
+  // and asking for it at the top level is refused outright — one bad field
+  // in the read mask fails the whole call, so asking for the one field that
+  // mattered lost the call and the pull failed with Google's "Request
+  // contains an invalid argument."
+  const location = parseLocation({
+    name: 'locations/6092570298190308654',
+    title: 'Ambrosia - Atelier',
+    metadata: {
+      placeId: 'ChIJ2dZj-yO7BTsR3dRz2zTaMjg',
+      mapsUri: 'https://maps.google.com/maps?cid=4049538935514453213',
+    },
+  });
+  assert.equal(location.placeId, 'ChIJ2dZj-yO7BTsR3dRz2zTaMjg', 'reads the place id');
+  assert.equal(location.name, 'locations/6092570298190308654');
+  assert.equal(location.title, 'Ambrosia - Atelier');
+
+  // And it is found by that id — never by its name, which any listing can
+  // share and any listing can change.
+  const found = findOurLocation([location], 'ChIJ2dZj-yO7BTsR3dRz2zTaMjg');
+  assert.equal(found?.name, 'locations/6092570298190308654');
+  // The same listing under a different name is still found — the id is what
+  // matches.
+  const renamed = findOurLocation(
+    [{ ...location, title: 'Atelier by Ambrosia' }],
+    'ChIJ2dZj-yO7BTsR3dRz2zTaMjg',
+  );
+  assert.equal(renamed?.name, 'locations/6092570298190308654');
+  // And a listing with a different id is not ours.
+  assert.equal(findOurLocation([location], 'ChIJ-somebody-else'), null);
+  // A location with no place id at all cannot be matched — and must not be
+  // matched on its name.
+  assert.equal(findOurLocation([{ name: 'locations/1', title: 'Ambrosia - Atelier' }]), null);
 });
 
 await check('two Google reviews written on the same day stay two rows', async () => {
