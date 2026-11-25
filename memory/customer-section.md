@@ -862,47 +862,52 @@ the table above).
 be read as somebody who manages it. There are two things to do, and both are
 one-time.
 
-#### 2a. The scopes DO have to be declared — and the picker does not have them
+#### 2a. The three Business Profile APIs are SWITCHED OFF — that is the blocker
 
-**Measured on 25 Nov 2026 — the first sign-in was refused.** The callback
-refused the token because the scope the token carried was not the one that was
-asked for, and nothing was saved (the Drive connection was untouched).
+**Measured on 25 Nov 2026, with a token that carries `business.manage`.** All
+three of the APIs this site calls answer **`SERVICE_DISABLED`**:
 
-**The first attempt at this was wrong, and the note said so.** A probe of
-Google's **authorization endpoint** showed `business.manage` being accepted,
-and the runbook was written to say the scopes did not need declaring. **That
-probe only reached the authorization endpoint, which checks the scope's
-syntax — not the declaration, which is enforced at the grant.** The scope has
-to be **declared on the consent screen's Data Access page**, and without that
-Google grants the other scopes and quietly leaves this one out.
+| API | Host |
+|---|---|
+| My Business Account Management API | `mybusinessaccountmanagement.googleapis.com` |
+| My Business Business Information API | `mybusinessbusinessinformation.googleapis.com` |
+| Google My Business API (the v4 one, for the reviews) | `mybusiness.googleapis.com` |
 
-**What Google's own help page says** ("Manage App Data Access"):
+Google's own message says it plainly: *"My Business Account Management API
+has not been used in project 187302776196 before or it is disabled."*
 
-> Only scopes for **enabled** APIs are listed in the scopes table. To add a
-> missing scope to the list of scopes, find and **enable the API in the Google
-> API Library** or use the text box in the **"Manually add scopes"** section
-> of the page to add a new unlisted scope.
+**The fix is to enable them** — APIs & Services → **Library** → search
+**"My Business"** → **Enable** on each. Google prints the exact link in the
+error message:
 
-So there are **two ways in**, and the second is the one to use:
+```
+https://console.developers.google.com/apis/api/mybusinessaccountmanagement.googleapis.com/overview?project=187302776196
+```
 
-1. **Manually add scopes.** Data Access → **ADD OR REMOVE SCOPES** → the
-   **"Manually add scopes"** text box → paste
-   `https://www.googleapis.com/auth/business.manage` → **UPDATE**.
-2. **Enable the API first**, which puts its scopes in the picker. The API is
-   called **"Business Profile Account Management API"** and **"Business Profile
-   Business Information API"** (the v1 ones this site calls), and **"My Business
-   API"** for the v4 reviews.
+**Enabling the APIs is also what puts their scopes into the consent screen's
+picker**, because *"only scopes for enabled APIs are listed in the scopes
+table"*. So one visit to the Library fixes both.
 
-`userinfo.email` is worth adding too, if it is not there — it is what tells
-the page **whose** account is connected.
+#### 2a-bis. What the first refusal actually was — my code, not Google
 
-The scope is a **sensitive** one, so it lands in the consent screen's
-**"Your sensitive scopes"** section.
+The first sign-in was **refused by the callback**, and the note first blamed
+the consent screen. **That was wrong, twice.** The truth, measured on 25 Nov
+2026:
 
-**`businessprofile` is not a real scope.** It was tried and Google answered
-`invalid_scope` for it. All three endpoints this site needs — the v1 accounts,
-the v1 locations and the v4 reviews — document `business.manage` and nothing
-else.
+- The token that came back **did** carry
+  `https://www.googleapis.com/auth/business.manage` (with `drive`,
+  `userinfo.email` and `openid`). The scope was never the problem.
+- The callback read `tokens.scope` in **one shape only**. Google's answer
+  came back in another, so the check found the scope "missing" and refused a
+  token that was perfectly good. **The API is now the judge** — the callback
+  asks it, one request, and only keeps the token if it says yes.
+
+**And the probe that started it was measuring the wrong thing.** A request
+made with a token that lacked the scope answers `ACCESS_TOKEN_SCOPE_INSUFFICIENT`
+— and that is checked **before** the service is, so it says nothing about
+whether the service is switched on. The correct probe is a token **with** the
+scope, which then answers `SERVICE_DISABLED` for a service that is off. See
+the lesson in the agent memory.
 
 #### 2b. The publishing status — CHECKED, and it is fine
 

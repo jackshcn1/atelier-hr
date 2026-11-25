@@ -96,6 +96,10 @@ export async function GET(request) {
     // scopes separated by spaces, or a list of them — so all of them are
     // read, and the answer is written down where it can be looked at.
     const granted = scopeList(tokens.scope);
+    // Set when the listing could not be reached, though the account is
+    // connected. The page has to say so: "connected" and "can be read" are
+    // two different things.
+    let apiWarning = '';
     console.log(
       `Google ${provider}: asked for [${setup.scopes.join(', ')}] — granted [${granted.join(', ') || 'nothing'}]`,
     );
@@ -116,9 +120,13 @@ export async function GET(request) {
         );
       }
       if (!check.ok) {
-        // Something else went wrong — a network, a hiccup. The token may be
-        // perfectly good, so it is kept, and the failure is said out loud.
+        // Something else went wrong — most often a Google API that is
+        // **switched off on the project**. The token is still perfectly good,
+        // so it is kept, and the reason is carried back to the page: the
+        // person has to be told whether to press the button again or to go
+        // and turn something on in the Cloud Console.
         console.warn(`Google ${provider}: the listing could not be reached — ${check.error}`);
+        apiWarning = check.error || 'the Google API could not be reached';
       }
     }
 
@@ -136,7 +144,11 @@ export async function GET(request) {
       connectedBy: profile.user.id,
     });
 
-    return back(`?${flag}=connected`);
+    return back(
+      apiWarning
+        ? `?${flag}=connected&warn=${encodeURIComponent(apiWarning)}`
+        : `?${flag}=connected`,
+    );
   } catch (error) {
     console.error(`Google ${provider} connection failed:`, error?.message);
     return back(`?${flag}=failed&reason=exchange`);

@@ -244,7 +244,15 @@ export default function CustomerReviewsPage() {
     const said = params.get('business');
     if (!said) return;
     if (said === 'connected') {
-      setConnectNote('Google is connected. The reviews can now be read.');
+      const warning = params.get('warn');
+      // **Connected is not the same as readable.** The account can be
+      // connected while the Google API is switched off on the project, and
+      // then there is nothing to read — so the page says which one it is.
+      setConnectNote(
+        warning
+          ? `Google is connected, but the Google API could not be reached: ${warning}`
+          : 'Google is connected. The reviews can now be read.',
+      );
     } else if (said === 'declined') {
       setConnectNote('The Google sign-in was turned away, so nothing was connected.');
     } else {
