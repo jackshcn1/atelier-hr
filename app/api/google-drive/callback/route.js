@@ -7,7 +7,8 @@ import {
   oauthConfigured,
   userinfoEmail,
 } from '../../../../lib/googleUserDrive.js';
-import { PROVIDERS, providerByKey } from '../../../../lib/googleConnections.js';
+import { PROVIDERS, providerByKey, scopeList } from '../../../../lib/googleConnections.js';
+import { checkCanRead } from '../../../../lib/googleBusinessProfile.js';
 import { currentProfile } from '../../../../lib/sessionUser.js';
 
 // Google sends the person back here after they sign in.
@@ -89,14 +90,36 @@ export async function GET(request) {
       return back(`?${flag}=failed&reason=no-refresh-token`);
     }
 
-    // What Google actually agreed to. A person can untick a permission on the
-    // consent screen, and the API then turns the request away with a sentence
-    // that means nothing to the person reading it — so it is checked here,
-    // where the answer can be said plainly.
-    const granted = String(tokens.scope || '').split(/\s+/).filter(Boolean);
-    const missing = setup.scopes.filter((scope) => !granted.includes(scope));
-    if (missing.length > 0) {
-      return back(`?${flag}=failed&reason=scope`);
+    // What Google actually agreed to.
+    //
+    // Google answers this in more than one shape — one string with the
+    // scopes separated by spaces, or a list of them — so all of them are
+    // read, and the answer is written down where it can be looked at.
+    const granted = scopeList(tokens.scope);
+    console.log(
+      `Google ${provider}: asked for [${setup.scopes.join(', ')}] — granted [${granted.join(', ') || 'nothing'}]`,
+    );
+
+    // **The Business Profile permission is checked by asking the API, not by
+    // reading the token's own claim about itself.**
+    //
+    // A token says what permissions it has; an API call says what it is
+    // *allowed* to do, and only the second one is the truth. The cost is one
+    // request. The saving is a connection that is never saved and cannot do
+    // the job — which is worse than no connection at all, because the page
+    // would then say it is connected.
+    if (provider === 'google_business') {
+      const check = await checkCanRead(tokens.access_token);
+      if (!check.ok && check.code === 'NO_BUSINESS_SCOPE') {
+        return back(
+          `?${flag}=failed&reason=scope&granted=${encodeURIComponent(granted.join(' '))}`,
+        );
+      }
+      if (!check.ok) {
+        // Something else went wrong — a network, a hiccup. The token may be
+        // perfectly good, so it is kept, and the failure is said out loud.
+        console.warn(`Google ${provider}: the listing could not be reached — ${check.error}`);
+      }
     }
 
     // Which account signed in. Drive's own "about" call needs the Drive

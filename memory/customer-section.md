@@ -862,36 +862,47 @@ the table above).
 be read as somebody who manages it. There are two things to do, and both are
 one-time.
 
-#### 2a. The scopes do NOT have to be added to the consent screen — and the picker does not have them
+#### 2a. The scopes DO have to be declared — and the picker does not have them
 
-**Measured on 25 Nov 2026.** Google's authorization endpoint was asked for the
-exact request the site's button makes, scope by scope:
+**Measured on 25 Nov 2026 — the first sign-in was refused.** The callback
+refused the token because the scope the token carried was not the one that was
+asked for, and nothing was saved (the Drive connection was untouched).
 
-| Scope asked for | Google's answer |
-|---|---|
-| `…/auth/drive` | accepted |
-| `…/auth/business.manage` | **accepted** |
-| `…/auth/userinfo.email` | accepted |
-| `…/auth/business.manage` + `…/auth/userinfo.email` | **accepted** |
-| `…/auth/businessprofile` | **refused — `invalid_scope`** |
-| all three together | accepted |
+**The first attempt at this was wrong, and the note said so.** A probe of
+Google's **authorization endpoint** showed `business.manage` being accepted,
+and the runbook was written to say the scopes did not need declaring. **That
+probe only reached the authorization endpoint, which checks the scope's
+syntax — not the declaration, which is enforced at the grant.** The scope has
+to be **declared on the consent screen's Data Access page**, and without that
+Google grants the other scopes and quietly leaves this one out.
 
-So the sign-in works with the scopes as they are. **The consent screen's scope
-list is not what blocks it**, and the scope picker's list is not where these
-live: `business.manage` belongs to the **My Business API**, which is an
-allowlisted service for approved Business Profile applications and does not
-appear in the ordinary API Library for this project — so its scopes are not in
-the picker to be found.
+**What Google's own help page says** ("Manage App Data Access"):
 
-**`businessprofile` is deliberately not used.** It is refused for this client,
-and every one of the three endpoints we need (the v1 accounts, the v1
-locations and the v4 reviews) documents `business.manage` anyway.
+> Only scopes for **enabled** APIs are listed in the scopes table. To add a
+> missing scope to the list of scopes, find and **enable the API in the Google
+> API Library** or use the text box in the **"Manually add scopes"** section
+> of the page to add a new unlisted scope.
 
-**If they want to declare it anyway** (it is what an OAuth verification would
-look at): in **Data Access → ADD OR REMOVE SCOPES**, paste the full string
-`https://www.googleapis.com/auth/business.manage` into the picker's search
-box — searching for "business" does not find it. If it is not there, that is
-fine.
+So there are **two ways in**, and the second is the one to use:
+
+1. **Manually add scopes.** Data Access → **ADD OR REMOVE SCOPES** → the
+   **"Manually add scopes"** text box → paste
+   `https://www.googleapis.com/auth/business.manage` → **UPDATE**.
+2. **Enable the API first**, which puts its scopes in the picker. The API is
+   called **"Business Profile Account Management API"** and **"Business Profile
+   Business Information API"** (the v1 ones this site calls), and **"My Business
+   API"** for the v4 reviews.
+
+`userinfo.email` is worth adding too, if it is not there — it is what tells
+the page **whose** account is connected.
+
+The scope is a **sensitive** one, so it lands in the consent screen's
+**"Your sensitive scopes"** section.
+
+**`businessprofile` is not a real scope.** It was tried and Google answered
+`invalid_scope` for it. All three endpoints this site needs — the v1 accounts,
+the v1 locations and the v4 reviews — document `business.manage` and nothing
+else.
 
 #### 2b. The publishing status — CHECKED, and it is fine
 

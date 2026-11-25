@@ -240,7 +240,8 @@ export default function CustomerReviewsPage() {
   const [connectNote, setConnectNote] = useState('');
 
   useEffect(() => {
-    const said = new URLSearchParams(window.location.search).get('business');
+    const params = new URLSearchParams(window.location.search);
+    const said = params.get('business');
     if (!said) return;
     if (said === 'connected') {
       setConnectNote('Google is connected. The reviews can now be read.');
@@ -255,8 +256,12 @@ export default function CustomerReviewsPage() {
         scope: 'Google did not give the site permission to read the Business Profile',
         exchange: 'the sign-in could not be finished — try again',
       };
-      const why = reasons[new URLSearchParams(window.location.search).get('reason')] || 'it did not work';
-      setConnectNote(`The Google connection was not made — ${why}.`);
+      const why = reasons[params.get('reason')] || 'it did not work';
+      const granted = params.get('granted');
+      setConnectNote(
+        `The Google connection was not made — ${why}.` +
+          (granted ? ` Google granted: ${granted || 'nothing at all'}.` : ''),
+      );
     }
   }, []);
 
