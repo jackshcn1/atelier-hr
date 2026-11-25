@@ -893,17 +893,33 @@ look at): in **Data Access → ADD OR REMOVE SCOPES**, paste the full string
 box — searching for "business" does not find it. If it is not there, that is
 fine.
 
-#### 2b. Check the publishing status — this one DOES matter
+#### 2b. The publishing status — CHECKED, and it is fine
 
-While on the same screen, check the **publishing status**. If it says
-**"Testing"**, Google expires the refresh token **after seven days** — and the
-Drive connection was made on 19 Nov 2026, so it would die on or about
-**26 Nov 2026**, taking the invoice uploads with it. Set it to **"Production"**
-and the expiry stops.
+**Read on 25 Nov 2026 in the console (Google Auth Platform → Audience for
+`atelier-hr-drive`):**
+
+| | |
+|---|---|
+| Publishing status | **In production** |
+| User type | **External** |
+| OAuth user cap | 1 user / 100 (lifetime, cannot be reset) |
+
+**So the seven-day refresh-token expiry does not apply** — that rule is for a
+consent screen left in **Testing**. The Drive connection, made on 19 Nov 2026,
+is safe; it was not about to die on 26 Nov.
 
 (The status cannot be read from here: `serviceusage`, `clientauthconfig` and
 the consent screen APIs are all closed to this project's service account, so it
 has to be looked at in the console by hand.)
+
+**Expect the "unverified app" screen on the sign-in.** `business.manage` is a
+sensitive scope this app has not had verified, and Google's own note on that
+page says so: *"If your users are seeing the 'unverified app' screen, it is
+because your OAuth request includes additional scopes that haven't been
+approved."* It is expected, it is the same screen the Drive sign-in showed,
+and the person presses Continue. The **user cap** is counted for it — 1 of 100
+used, and the cap is for the whole life of the project, so one more is of no
+consequence.
 
 #### 2c. Sign in once, as a manager of the listing
 
