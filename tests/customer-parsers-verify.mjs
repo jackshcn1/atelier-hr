@@ -47,6 +47,17 @@ import {
 import { listingLabel } from '../lib/customerFormat.js';
 import { parsePlacesRating, parseEnvText } from '../scripts/sync-platform-ratings.mjs';
 import {
+  starRating,
+  parseBusinessReview,
+} from '../lib/googleBusinessProfile.js';
+import { findOurLocation, googleReviewRows } from '../lib/googleReviews.js';
+import {
+  BUSINESS_SCOPE,
+  DRIVE_SCOPE,
+  providerByKey,
+  providerScopes,
+} from '../lib/googleConnections.js';
+import {
   monthChunks,
   splitRange,
   customerWindowFor,
@@ -1151,6 +1162,130 @@ await check('an order with no phone number makes nobody a customer', async () =>
   // ...but that order carried no contact number, so the guest is not a
   // customer of ours, and the page must not say they are.
   assert.equal(outcome.has_phone, false);
+});
+
+// ---------------------------------------------------------------------------
+// The Google Business Profile — the listing's own reviews.
+// ---------------------------------------------------------------------------
+
+await check('Google answers its rating as a word, and it is read as a number', async () => {
+  assert.equal(starRating('FIVE'), 5);
+  assert.equal(starRating('FOUR'), 4);
+  assert.equal(starRating('THREE'), 3);
+  assert.equal(starRating('TWO'), 2);
+  assert.equal(starRating('ONE'), 1);
+  // Sometimes it answers with the word wrapped in an object.
+  assert.equal(starRating({ rating: 'FIVE' }), 5);
+  assert.equal(starRating({ value: 4 }), 4);
+  // And "no rating" must be zero, never a five.
+  assert.equal(starRating('STAR_RATING_UNSPECIFIED'), 0);
+  assert.equal(starRating(null), 0);
+  assert.equal(starRating(undefined), 0);
+});
+
+await check('a Google review is read into the shape the books use', async () => {
+  const parsed = parseBusinessReview({
+    reviewId: 'AbCdEf123',
+    starRating: 'FIVE',
+    comment: 'The best cheesecake in Kerala.',
+    createTime: '2026-11-20T04:15:00Z',
+    reviewer: { displayName: 'A Guest' },
+  });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.reviewId, 'AbCdEf123');
+  assert.equal(parsed.rating, 5);
+  assert.equal(parsed.comment, 'The best cheesecake in Kerala.');
+  assert.equal(parsed.reviewDate, '2026-11-20');
+});
+
+await check('a Google review that cannot be identified is refused, not written', async () => {
+  // No id: it cannot be told apart from another review with no id.
+  assert.equal(parseBusinessReview({ starRating: 'FIVE', createTime: '2026-11-20T00:00:00Z' }).ok, false);
+  // No rating: a zero would read as "no rating given" on a five-star review.
+  assert.equal(parseBusinessReview({ reviewId: 'x', createTime: '2026-11-20T00:00:00Z' }).ok, false);
+  // No day: the day is half of the row's key, and a blank key never
+  // conflicts with itself — so the row would be written again every night.
+  assert.equal(parseBusinessReview({ reviewId: 'x', starRating: 'FIVE' }).ok, false);
+  assert.equal(
+    parseBusinessReview({ reviewId: 'x', starRating: 'FIVE', createTime: 'not a date' }).ok,
+    false,
+  );
+});
+
+await check('two Google reviews written on the same day stay two rows', async () => {
+  // This is the trap. The books' key for a marketplace review is (platform,
+  // platform order id, day) — and a Google review has no platform order id,
+  // so Google's own review id goes there. Without it, two guests reviewing
+  // us on the same day would be one row, and one of them would be lost.
+  const { rows, refused } = googleReviewRows([
+    {
+      reviewId: 'First',
+      starRating: 'FIVE',
+      comment: 'Wonderful.',
+      createTime: '2026-11-20T04:15:00Z',
+    },
+    {
+      reviewId: 'Second',
+      starRating: 'ONE',
+      comment: 'Slow.',
+      createTime: '2026-11-20T18:30:00Z',
+    },
+  ]);
+
+  assert.equal(refused.length, 0);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].client_order_id, 'First');
+  assert.equal(rows[1].client_order_id, 'Second');
+  assert.equal(rows[0].review_date, '2026-11-20');
+  assert.equal(rows[1].review_date, '2026-11-20');
+  // The key is what tells them apart.
+  assert.notEqual(
+    `${rows[0].platform}|${rows[0].client_order_id}|${rows[0].review_date}`,
+    `${rows[1].platform}|${rows[1].client_order_id}|${rows[1].review_date}`,
+  );
+  // And a Google review is never matched to an order — nobody orders there.
+  assert.equal(rows[0].is_linked, false);
+  assert.equal(rows[0].order_no, '');
+  assert.equal(rows[0].listing, 'google_atelier');
+  assert.equal(rows[0].platform, 'google');
+});
+
+await check('a Google review that cannot be identified is reported, not dropped quietly', async () => {
+  const { rows, refused } = googleReviewRows([
+    { reviewId: 'Good', starRating: 'FOUR', createTime: '2026-11-20T04:15:00Z' },
+    { starRating: 'FOUR', createTime: '2026-11-20T04:15:00Z' },
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(refused.length, 1);
+  assert.ok(refused[0].reason);
+});
+
+await check('our Google listing is found by its place id, never by its name', async () => {
+  const locations = [
+    { name: 'locations/1', title: 'Ambrosia Bakery', placeId: 'OtherPlace' },
+    { name: 'locations/2', title: 'Atelier by Ambrosia', placeId: GOOGLE_PLACE_ID },
+  ];
+  // The name matches the other one; the place id is the only thing that
+  // identifies a listing.
+  assert.equal(findOurLocation(locations, GOOGLE_PLACE_ID).name, 'locations/2');
+  assert.equal(findOurLocation(locations, 'SomeOtherPlace'), null);
+  assert.equal(findOurLocation([], GOOGLE_PLACE_ID), null);
+});
+
+await check('the Business Profile is a connection of its own, apart from Drive', async () => {
+  assert.equal(providerByKey('google_business'), 'google_business');
+  assert.equal(providerByKey('google'), 'google');
+  // An unknown name falls back to the Drive connection rather than making
+  // one up.
+  assert.equal(providerByKey('nonsense'), 'google');
+  assert.equal(providerByKey(undefined), 'google');
+
+  // Each connection asks for its own permissions.
+  assert.deepEqual(providerScopes('google'), [DRIVE_SCOPE]);
+  assert.ok(providerScopes('google_business').includes(BUSINESS_SCOPE));
+  // And the Business Profile connection never asks for Drive — so agreeing
+  // to read our listing cannot hand over the accountant's Drive.
+  assert.ok(!providerScopes('google_business').includes(DRIVE_SCOPE));
 });
 
 console.log(`\n${passed} checks passed.`);

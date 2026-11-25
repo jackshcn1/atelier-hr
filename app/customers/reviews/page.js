@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   count, rating, ratingPill, formatDate, formatMonth, money, listingLabel,
@@ -20,8 +20,9 @@ import { UNLISTED_KEY, GOOGLE_LISTING_KEY } from '../../../lib/customerParsers';
  * count and every average on this page is **per listing**.
  *
  * Google is the odd one out: it is a page people review us on, but nobody
- * orders there, so it carries no reviews of its own until the Business
- * Profile API is connected. It shows Google's own rating, which is bigger
+ * orders there, so a Google review can never be matched to an order — and
+ * never to a person. Its reviews come from Google's own Business Profile
+ * API, read as a manager of the listing, and Google's own rating is bigger
  * than either marketplace's.
  *
  * ## Two ratings, side by side, each labelled
@@ -109,6 +110,7 @@ function officialCount(official) {
 function sourceLabel(source) {
   if (source === 'places_api') return 'Google’s Places API';
   if (source === 'maps_page') return 'the Google Maps listing';
+  if (source === 'business_profile') return 'Google’s Business Profile API';
   if (source === 'platform_page') return 'the platform’s own page';
   return '';
 }
@@ -116,11 +118,12 @@ function sourceLabel(source) {
 /** One listing: the platform's rating beside ours, and the reviews behind it. */
 function ListingCard({ listing }) {
   const official = listing.official;
-  // Google is the one listing that is not a marketplace. Petpooja holds no
-  // Google review at all, so "the reviews we hold" is not a number for it —
-  // saying "0 reviews" would read as if nobody had reviewed us on Google,
-  // which is the opposite of the truth.
+  // Google is the one listing that is not a marketplace. Nobody orders there,
+  // so a Google review cannot be matched to an order — and while we hold
+  // none of them, "0 reviews" would read as if nobody had reviewed us on
+  // Google, which is the opposite of the truth.
   const isGoogle = listing.listing === GOOGLE_LISTING_KEY;
+  const holdsReviews = listing.count > 0;
 
   return (
     <div className="border border-rule-soft rounded-card p-4 flex flex-col">
@@ -167,17 +170,16 @@ function ListingCard({ listing }) {
       ) : null}
 
       {/* ---- Our own average over the reviews we hold -------------------- */}
-      {isGoogle ? (
+      {isGoogle && !holdsReviews ? (
         <div className="mt-3">
           <p className="text-2xs uppercase tracking-wide text-ink-muted">The reviews themselves</p>
           <p className="text-sm text-ink-muted mt-2">
-            Google reviews are not in Petpooja, so we do not hold any of them yet — this rating
-            is Google's own and it covers every rating the listing has ever had.
+            We do not hold the Google reviews yet — so this rating is Google&apos;s own and it covers
+            every rating the listing has ever had.
           </p>
           <p className="text-sm text-ink-muted mt-2">
-            They come from the Google Business Profile API, which needs access granted by Google
-            (7–14 working days). A manager of the listing can then read every review and reply to
-            it — the only thing missing is Google's approval for this app to read them.
+            They come from the Google Business Profile API, which reads the listing as a manager of
+            it. Once one is connected, every review on it can be read here.
           </p>
         </div>
       ) : (
@@ -188,8 +190,16 @@ function ListingCard({ listing }) {
             <span className="text-base text-ink-muted ml-2 font-sans">★</span>
           </p>
           <p className="text-sm text-ink-muted mt-1">
-            {count(listing.count)} review{listing.count === 1 ? '' : 's'} since March 2026 ·{' '}
-            {count(listing.linked)} matched to an order
+            {count(listing.count)} review{listing.count === 1 ? '' : 's'}{' '}
+            {isGoogle ? (
+              // Nobody orders on Google, so a Google review cannot be given
+              // to an order — and so it cannot be given to a person.
+              <>we hold · none of them can be matched to an order</>
+            ) : (
+              <>
+                since March 2026 · {count(listing.linked)} matched to an order
+              </>
+            )}
           </p>
           <div className="mt-2">
             <Bar
@@ -224,28 +234,81 @@ export default function CustomerReviewsPage() {
   const [trendListing, setTrendListing] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [pulling, setPulling] = useState(false);
+  const [pullResult, setPullResult] = useState(null);
+  // What Google's sign-in said when it sent the person back.
+  const [connectNote, setConnectNote] = useState('');
 
   useEffect(() => {
-    let alive = true;
+    const said = new URLSearchParams(window.location.search).get('business');
+    if (!said) return;
+    if (said === 'connected') {
+      setConnectNote('Google is connected. The reviews can now be read.');
+    } else if (said === 'declined') {
+      setConnectNote('The Google sign-in was turned away, so nothing was connected.');
+    } else {
+      const reasons = {
+        state: 'the sign-in could not be matched to this browser — try again',
+        signin: 'you were not signed in when Google sent you back',
+        'not-configured': 'the Google sign-in is not set up on the server yet',
+        'no-refresh-token': 'Google did not give the site a lasting permission — try again',
+        scope: 'Google did not give the site permission to read the Business Profile',
+        exchange: 'the sign-in could not be finished — try again',
+      };
+      const why = reasons[new URLSearchParams(window.location.search).get('reason')] || 'it did not work';
+      setConnectNote(`The Google connection was not made — ${why}.`);
+    }
+  }, []);
+
+  // Read the reviews afresh.
+  const load = useCallback(() => {
     const params = new URLSearchParams({ view: 'reviews' });
     if (listing) params.set('listing', listing);
 
-    fetch(`/api/customers?${params.toString()}`)
+    return fetch(`/api/customers?${params.toString()}`)
       .then((res) => res.json())
       .then((json) => {
-        if (!alive) return;
         if (json.success) setData(json.data);
         else setError(json.error || 'The reviews could not be loaded.');
       })
       .catch(() => {
-        if (alive) setError('The reviews could not be loaded.');
+        setError('The reviews could not be loaded.');
       })
       .finally(() => {
-        if (alive) setLoading(false);
+        setLoading(false);
       });
-
-    return () => { alive = false; };
   }, [listing]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // The Google listing's reviews.
+  //
+  // They come from Google's own Business Profile API, which reads the
+  // listing **as a manager of it** — so the reading needs the site's own
+  // Google connection, and it is pulled on a schedule like everything else.
+  // This asks for that same pull by hand, the way the Bills page asks
+  // Petpooja for its paid state on the spot.
+  const pullGoogle = async () => {
+    setPulling(true);
+    setPullResult(null);
+    try {
+      const res = await fetch('/api/customers/google', { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        setPullResult({ ok: true, ...json.data });
+        // The reviews have changed, so the list is read again.
+        load();
+      } else {
+        setPullResult({ ok: false, error: json.error || 'The Google reviews could not be read.' });
+      }
+    } catch {
+      setPullResult({ ok: false, error: 'The pull could not be finished.' });
+    } finally {
+      setPulling(false);
+    }
+  };
 
   // The month-by-month rating, for the listing being read or for all of them.
   const trend = useMemo(() => {
@@ -281,6 +344,8 @@ export default function CustomerReviewsPage() {
 
   const r = data;
   const listings = r.listings || [];
+  // Whether the Google listing is connected, and whose reviews would be read.
+  const google = r.google || { reviewsConnected: false, email: null, note: '' };
   // The pages we are on, and the one bucket for the reviews that are
   // not on a page of ours.
   const ourPages = listings.filter((line) => line.listing !== UNLISTED_KEY);
@@ -318,7 +383,7 @@ export default function CustomerReviewsPage() {
           <Stat
             label="Our average"
             value={rating(r.avgRating)}
-            sub="Out of five, over the reviews we hold since March 2026"
+            sub="Out of five, over every review we hold"
             accent
           />
           <Stat
@@ -340,6 +405,72 @@ export default function CustomerReviewsPage() {
               title="By listing"
               note="We are on four pages. Each has its own rating and its own reviews, so each is counted on its own."
             />
+
+            {/* ---- The Google reviews ------------------------------------- */}
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
+              {google.reviewsConnected ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={pullGoogle}
+                    disabled={pulling}
+                    className="btn-secondary text-sm px-4 py-2 disabled:opacity-50"
+                  >
+                    {pulling ? 'Reading Google…' : 'Read the Google reviews'}
+                  </button>
+                  <p className="text-xs text-[#6b635c]">
+                    Reads every review on our Google listing, as {google.email}. The nightly sync
+                    brings them in too.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <a
+                    href="/api/google-drive/connect?provider=google_business&next=/customers/reviews"
+                    className="btn-secondary text-sm px-4 py-2 inline-flex items-center"
+                  >
+                    Connect the Google listing
+                  </a>
+                  <p className="text-xs text-[#6b635c]">
+                    The Google reviews are read as a manager of the listing, so one has to sign in
+                    with Google once. Only an administrator can do it.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {connectNote ? (
+              <div className="mb-6 panel border rounded-card px-5 py-4 bg-white border-[#ebe8e4]">
+                <p className="text-sm text-[#1e1812]">{connectNote}</p>
+              </div>
+            ) : null}
+
+            {pullResult ? (
+              <div
+                className={`mb-6 panel border rounded-card px-5 py-4 ${
+                  pullResult.ok ? 'bg-white border-[#ebe8e4]' : 'bg-[#fdf6f5] border-[#f0d9d4]'
+                }`}
+              >
+                {pullResult.ok ? (
+                  <>
+                    <p className="text-sm text-[#1e1812]">
+                      Read {count(pullResult.reviews)} Google review
+                      {pullResult.reviews === 1 ? '' : 's'}. They are on the books now.
+                    </p>
+                    {(pullResult.lines || []).map((line) => (
+                      <p key={line} className="text-xs text-[#6b635c] mt-1">
+                        {line.replace(/^[^\w(]*/, '')}
+                      </p>
+                    ))}
+                  </>
+                ) : (
+                  <p className="text-sm text-[#8b3a2e]">
+                    The Google reviews could not be read: {pullResult.error}
+                  </p>
+                )}
+              </div>
+            ) : null}
+
             {listings.length === 0 ? (
               <p className="note">No reviews have been pulled in yet. The nightly sync brings them in.</p>
             ) : (
@@ -547,8 +678,9 @@ export default function CustomerReviewsPage() {
             <p className="note mt-6">
               {count(r.reachedCustomer)} of {count(r.count)} reviews could be given to a customer by
               their contact number. The rest are still counted and rated — a platform order usually
-              carries no number on it, because the platform holds the customer's number and not
-              Petpooja. Closing that gap is a job for the counter, not for the app.
+              carries no number on it, because the platform holds the customer&apos;s number and not
+              Petpooja, and a Google review has no order at all, because nobody orders on Google.
+              Closing that gap is a job for the counter, not for the app.
             </p>
           </div>
         </section>

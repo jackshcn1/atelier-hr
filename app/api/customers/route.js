@@ -33,6 +33,7 @@ import { getSupabase, readAllRows, selectRows } from '../../../lib/supabaseServe
 import { maskPhone, FEEDBACK_QUESTIONS, LISTINGS, listingBucket } from '../../../lib/customerParsers.js';
 import { monthKeyOf, todayInIST } from '../../../lib/financePeriod.js';
 import { listingLabel } from '../../../lib/customerFormat.js';
+import { connectionStatus } from '../../../lib/googleConnections.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -535,16 +536,28 @@ async function overview(supabase) {
         daysSince: entry.daysSince,
       })),
       atRiskCount: atRisk.length,
-      google: {
-        // The rating is read from the Places API and needs no approval. The
-        // **reviews** are the thing still waiting on Google.
-        reviewsConnected: false,
-        note:
-          'Google reviews are not in Petpooja. They come from the Google Business Profile API, which needs access granted by Google (7–14 working days). A manager of the listing can then read every review and reply to it.',
-      },
+      google: await googleStatus(),
       generatedAt: todayInIST(),
     },
   });
+}
+
+/**
+ * Is the Google Business Profile connected?
+ *
+ * The listing's reviews are read **as a manager of it**, so the answer is
+ * whether the site's own Google connection carries that permission — not
+ * whether the service account can reach the API, which it never can.
+ */
+async function googleStatus() {
+  const connection = await connectionStatus('google_business');
+  return {
+    reviewsConnected: Boolean(connection.connected),
+    email: connection.email || null,
+    note: connection.connected
+      ? `The listing's reviews are read from Google as ${connection.email}.`
+      : 'The Google reviews are not connected yet. A manager of the listing has to sign in with Google once, and then every review on it can be read here.',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -651,6 +664,7 @@ async function reviewsView(supabase, params) {
       reachedCustomer: rows.filter((r) => r.phone).length,
       withComment: rows.filter((r) => r.comment).length,
       filter: listing,
+      google: await googleStatus(),
       rows: filtered.map((review) => ({
         id: review.id,
         // The bucket the review is counted under — its own page, or the one
