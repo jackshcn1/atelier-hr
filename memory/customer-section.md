@@ -862,24 +862,50 @@ the table above).
 be read as somebody who manages it. There are two things to do, and both are
 one-time.
 
-#### 2a. Add the two scopes to the consent screen
+#### 2a. The scopes do NOT have to be added to the consent screen — and the picker does not have them
 
-**APIs & Services → OAuth consent screen** in the `atelier-hr-drive` project.
+**Measured on 25 Nov 2026.** Google's authorization endpoint was asked for the
+exact request the site's button makes, scope by scope:
 
-1. Open **Data Access**.
-2. **ADD OR REMOVE SCOPES**, and add:
-   - `https://www.googleapis.com/auth/business.manage`
-   - `https://www.googleapis.com/auth/userinfo.email`
-3. **SAVE**.
+| Scope asked for | Google's answer |
+|---|---|
+| `…/auth/drive` | accepted |
+| `…/auth/business.manage` | **accepted** |
+| `…/auth/userinfo.email` | accepted |
+| `…/auth/business.manage` + `…/auth/userinfo.email` | **accepted** |
+| `…/auth/businessprofile` | **refused — `invalid_scope`** |
+| all three together | accepted |
 
-**Check the publishing status while you are there.** If the screen says
+So the sign-in works with the scopes as they are. **The consent screen's scope
+list is not what blocks it**, and the scope picker's list is not where these
+live: `business.manage` belongs to the **My Business API**, which is an
+allowlisted service for approved Business Profile applications and does not
+appear in the ordinary API Library for this project — so its scopes are not in
+the picker to be found.
+
+**`businessprofile` is deliberately not used.** It is refused for this client,
+and every one of the three endpoints we need (the v1 accounts, the v1
+locations and the v4 reviews) documents `business.manage` anyway.
+
+**If they want to declare it anyway** (it is what an OAuth verification would
+look at): in **Data Access → ADD OR REMOVE SCOPES**, paste the full string
+`https://www.googleapis.com/auth/business.manage` into the picker's search
+box — searching for "business" does not find it. If it is not there, that is
+fine.
+
+#### 2b. Check the publishing status — this one DOES matter
+
+While on the same screen, check the **publishing status**. If it says
 **"Testing"**, Google expires the refresh token **after seven days** — and the
 Drive connection was made on 19 Nov 2026, so it would die on or about
-**26 Nov 2026**. Set it to **"Production"** and the expiry stops. (The status
-cannot be read from here: `serviceusage`, `clientauthconfig` and the consent
-screen APIs are all closed to this project's service account.)
+**26 Nov 2026**, taking the invoice uploads with it. Set it to **"Production"**
+and the expiry stops.
 
-#### 2b. Sign in once, as a manager of the listing
+(The status cannot be read from here: `serviceusage`, `clientauthconfig` and
+the consent screen APIs are all closed to this project's service account, so it
+has to be looked at in the console by hand.)
+
+#### 2c. Sign in once, as a manager of the listing
 
 On the live site, signed in as an administrator, open
 **`/customers/reviews`** and press **"Connect the Google listing"**. Google
