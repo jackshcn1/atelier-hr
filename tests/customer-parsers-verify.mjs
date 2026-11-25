@@ -49,6 +49,7 @@ import { parsePlacesRating, parseEnvText } from '../scripts/sync-platform-rating
 import {
   starRating,
   parseBusinessReview,
+  serviceDisabledMessage,
 } from '../lib/googleBusinessProfile.js';
 import { findOurLocation, googleReviewRows } from '../lib/googleReviews.js';
 import {
@@ -1211,6 +1212,59 @@ await check('a Google review that cannot be identified is refused, not written',
   assert.equal(
     parseBusinessReview({ reviewId: 'x', starRating: 'FIVE', createTime: 'not a date' }).ok,
     false,
+  );
+});
+
+await check('an API that is switched off is said in words the owner can act on', async () => {
+  // Google's own answer names the project and prints the console link, but
+  // the sentence around them is written for developers. The person reading
+  // this is the restaurant owner, so the two useful facts are said again
+  // plainly and the link is kept — Google's own link, so it cannot point at
+  // the wrong project.
+  const message = serviceDisabledMessage(
+    'My Business Account Management API has not been used in project 187302776196 before ' +
+      'or it is disabled. Enable it by visiting ' +
+      'https://console.developers.google.com/apis/api/mybusinessaccountmanagement.googleapis.com/overview?project=187302776196 ' +
+      'then retry.',
+  );
+  assert.ok(message.includes('187302776196'), 'names the project');
+  assert.ok(
+    message.includes(
+      'console.developers.google.com/apis/api/mybusinessaccountmanagement.googleapis.com/overview?project=187302776196',
+    ),
+    'keeps Google\'s own console link',
+  );
+  // And it must not read like a developer's message.
+  assert.ok(!/has not been used in project/i.test(message), 'not Google\'s raw sentence');
+
+  // **All three** have to be switched on, and one of them is not enough —
+  // the accounts and the locations come from two v1 APIs and the reviews
+  // from the v4 one, so a message naming only the first would send the
+  // owner round the console three times.
+  for (const host of [
+    'mybusinessaccountmanagement.googleapis.com',
+    'mybusinessbusinessinformation.googleapis.com',
+    'mybusiness.googleapis.com',
+  ]) {
+    assert.ok(
+      message.includes(`console.developers.google.com/apis/api/${host}/overview?project=187302776196`),
+      `names ${host}`,
+    );
+  }
+});
+
+await check('the switched-off message works even when Google gives no link', async () => {
+  // Google does not always print the console link. The project is found in
+  // the message text instead, so the links can still be built.
+  const message = serviceDisabledMessage(
+    'My Business Account Management API has not been used in project 187302776196 before or it is disabled.',
+  );
+  assert.ok(message.includes('(187302776196)'), 'names the project');
+  assert.ok(
+    message.includes(
+      'console.developers.google.com/apis/api/mybusiness.googleapis.com/overview?project=187302776196',
+    ),
+    'still builds the links',
   );
 });
 
