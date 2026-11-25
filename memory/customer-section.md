@@ -855,12 +855,10 @@ be added too.
 
 **Status: APPROVED on 25 Nov 2026.** Google opened support case
 **`6-7727000042503`**; the project's quota is **300 QPM**, which is how
-approval shows. The APIs are already switched on (measured 25 Nov 2026 — see
-the table above).
+approval shows.
 
-**What is left is the owner's own Google sign-in**, because a listing can only
-be read as somebody who manages it. There are two things to do, and both are
-one-time.
+**What is left is switching the three APIs on** (see 2a) — the owner's sign-in
+is **done** (see 2c). Both are one-time steps.
 
 #### 2a. The three Business Profile APIs are SWITCHED OFF — that is the blocker
 
@@ -887,6 +885,24 @@ https://console.developers.google.com/apis/api/mybusinessaccountmanagement.googl
 **Enabling the APIs is also what puts their scopes into the consent screen's
 picker**, because *"only scopes for enabled APIs are listed in the scopes
 table"*. So one visit to the Library fixes both.
+
+**The page says all this in plain words now.** When the pull fails because an
+API is off, the Reviews page says:
+
+> Google has not switched on the Business Profile API for this project
+> (187302776196), so the listing cannot be read yet. All three of these have
+> to be switched on in the Google Cloud console:
+> • My Business Account Management API (for the accounts): <link>
+> • My Business Business Information API (for the listing): <link>
+> • Google My Business API (for the reviews): <link>
+> It can take a minute or two to take effect.
+
+Google's own sentence is written for developers, and the person reading it is
+the restaurant owner. **All three are named at once**, because switching on
+only the first moves the failure to the next — the accounts and the locations
+come from two v1 APIs and the reviews from the v4 one. `serviceDisabledMessage()`
+in `lib/googleBusinessProfile.js` does this, and the page renders it with
+`whitespace-pre-line` so the links sit on their own lines.
 
 #### 2a-bis. What the first refusal actually was — my code, not Google
 
@@ -937,12 +953,18 @@ and the person presses Continue. The **user cap** is counted for it — 1 of 100
 used, and the cap is for the whole life of the project, so one more is of no
 consequence.
 
-#### 2c. Sign in once, as a manager of the listing
+#### 2c. Sign in once, as a manager of the listing — DONE on 25 Nov 2026
 
 On the live site, signed in as an administrator, open
 **`/customers/reviews`** and press **"Connect the Google listing"**. Google
 asks to sign in — use the account that **manages the listing**
 (`apirishab@gmail.com`) — and then **Allow**.
+
+**Done.** The owner completed the full sign-in on 25 Nov 2026 and the token is
+in `google_drive_tokens` under `provider='google_business'`, with
+`account_email='apirishab@gmail.com'`. **No new sign-in is needed** once the
+three APIs are switched on — the token is stored, and the owner only presses
+**"Read the Google reviews"**.
 
 The sign-in comes back to `/customers/reviews?business=connected`, and the
 token is written into `google_drive_tokens` under

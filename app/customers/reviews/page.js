@@ -454,7 +454,7 @@ export default function CustomerReviewsPage() {
 
             {connectNote ? (
               <div className="mb-6 panel border rounded-card px-5 py-4 bg-white border-[#ebe8e4]">
-                <p className="text-sm text-[#1e1812]">{connectNote}</p>
+                <p className="text-sm text-[#1e1812] whitespace-pre-line">{connectNote}</p>
               </div>
             ) : null}
 
@@ -477,7 +477,7 @@ export default function CustomerReviewsPage() {
                     ))}
                   </>
                 ) : (
-                  <p className="text-sm text-[#8b3a2e]">
+                  <p className="text-sm text-[#8b3a2e] whitespace-pre-line">
                     The Google reviews could not be read: {pullResult.error}
                   </p>
                 )}
