@@ -182,6 +182,52 @@ half-closed:
 export happened to spell its supplier. **Clean the name before comparing it,
 on both sides** — the row from Petpooja and the row in the books.
 
+## The vendor list had the same disease
+
+**The Suppliers page joins two tables by a name.** `vendors` says who the
+restaurant buys from; `expenses` carries the supplier's name on every bill.
+The join was **the text as typed**, on both sides — so one supplier written
+two ways was **two rows**, and the money split between them.
+
+On 27 November 2026 the vendor list held **60 rows for 54 suppliers on the
+bills**, with three pairs of twins:
+
+| Kept | Folded in | Why it is the same supplier |
+|---|---|---|
+| `Wholegrains - The Baker's Hub` | `WHOLE GRAINS - THE BAKER S HUB` | the same shop, spacing and a missing apostrophe |
+| `Ambrosia - The Classic Bakehouse` | `Ambrisia - The Classic Bakehouse` | a typo in the second one |
+| `COCHIN LIMRA SALES` | `COCHIN LIMRA SALES-TVM [BR]` | the branch tag the rule already strips |
+
+**What it cost.** Each twin held **no bills and no assets** — the money was
+already on the other row — so the totals were not wrong. But the twins were
+**rows a certificate could be filed against and never be seen**, which is the
+whole point of the compliance register that is being built.
+
+**The fix, in three places**, because any one alone would leave it half-closed:
+
+- **`lib/vendorName.js`** — one way to name a vendor. `vendorNameKey()` is the
+  name cleaned of a trailing bracketed tag, case, punctuation and a trailing
+  legal form (`& CO`, `private limited`). The common Indian trade words —
+  `ENTERPRISES`, `STORES`, `TRADERS` — are **not** stripped: they are part of
+  the name. The rule is deliberately conservative: **a missing apostrophe is
+  not folded** (`Baker's` vs `Bakers`), because that is a judgement, not a
+  rule. Those pairs were merged by hand.
+- **`app/api/finance/vendors/route.js`** — the bills are joined to the vendor
+  list **by the key, on both sides**, and **adding** a vendor whose key
+  matches one already on the list is **refused by name** — the same way the
+  invoice entry refuses a bill that is already on the sheet.
+- **`scripts/merge-vendor-duplicates.mjs`** — the pairs are listed **in the
+  script, on purpose**, because which two names are the same company is the
+  owner's judgement. It moves the bills, the assets and the petty-cash
+  entries over to the vendor being kept, then deletes the twin. It writes a
+  record beside the backups.
+
+**The lesson.** The same one, on the other side of the join: **a name is an
+identity only if there is one way to write it.** The bracketed tag that was
+stripped from a bill has to be stripped from a vendor row too — and where
+the rule cannot decide, the merge is written down by hand rather than
+guessed at.
+
 ## What it costs
 
 A 90-day pull is one browser login plus two exports: **84 seconds** end to end

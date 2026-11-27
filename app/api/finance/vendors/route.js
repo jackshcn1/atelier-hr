@@ -1,5 +1,6 @@
 import { getSupabase, readAllRows } from '../../../../lib/supabaseServer.js';
 import { normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js';
+import { findDuplicateVendor, vendorNameKey } from '../../../../lib/vendorName.js';
 
 // The supplier list.
 //
@@ -7,9 +8,12 @@ import { normalizePaymentStatus, PAID } from '../../../../lib/expenseHelpers.js'
 // are the truth about who the restaurant buys from. This route joins the two:
 // the vendor list, and what each vendor on it is owed.
 //
-// GET returns every vendor with its bills summarised — how much is still
-// unpaid, how much has been paid, how many bills there are, and the date of
-// the newest one.
+// The join is by the vendor's NORMALISED name (see `lib/vendorName.js`), not
+// by the text as typed. One supplier can be spelled more than one way — a
+// branch tag in brackets, a missing apostrophe — and a bill that arrives
+// under the other spelling belongs to the same row. Joining on the exact
+// text split that supplier's money across two rows, and showed a row as
+// owing nothing while its bills sat elsewhere.
 export async function GET(request) {
   try {
     const supabase = getSupabase();
@@ -33,14 +37,21 @@ export async function GET(request) {
     if (vendorResult.error) throw vendorResult.error;
     const vendors = vendorResult.data || [];
 
-    // What each supplier's bills add up to.
+    // What each supplier's bills add up to. Keyed by the normalised name, so
+    // every spelling of one supplier lands on one row. The label kept beside
+    // it is the name as written on the bill, which is what a person reads.
     const summary = new Map();
+    const labelByKey = new Map();
     for (const bill of bills || []) {
       const name = (bill.vendor_name || '').trim();
       if (!name) continue;
 
+      const key = vendorNameKey(name);
+      if (!key) continue;
+      if (!labelByKey.has(key)) labelByKey.set(key, name);
+
       const amount = Number(bill.amount || 0) - Number(bill.debit_note || 0);
-      const line = summary.get(name) || {
+      const line = summary.get(key) || {
         unpaid: 0,
         paid: 0,
         billCount: 0,
@@ -59,11 +70,11 @@ export async function GET(request) {
         line.lastBillDate = bill.invoice_date;
       }
 
-      summary.set(name, line);
+      summary.set(key, line);
     }
 
     const rows = (vendors || []).map((vendor) => {
-      const line = summary.get(vendor.name) || {
+      const line = summary.get(vendorNameKey(vendor.name)) || {
         unpaid: 0,
         paid: 0,
         billCount: 0,
@@ -82,8 +93,10 @@ export async function GET(request) {
 
     // Suppliers that have bills but are not on the list yet. They are shown
     // so a bill is never invisible because its supplier was never added.
-    const known = new Set(rows.map((vendor) => vendor.name.toLowerCase()));
-    const missing = [...summary.keys()].filter((name) => !known.has(name.toLowerCase()));
+    const known = new Set(rows.map(vendor => vendorNameKey(vendor.name)));
+    const missing = [...summary.keys()]
+      .filter(key => !known.has(key))
+      .map(key => labelByKey.get(key));
 
     const filtered = search
       ? rows.filter((vendor) => vendor.name.toLowerCase().includes(search))
@@ -110,6 +123,27 @@ export async function POST(request) {
     const name = String(body.name || '').trim();
     if (!name) {
       return Response.json({ success: false, error: 'A vendor needs a name.' }, { status: 400 });
+    }
+
+    // A supplier can be spelled more than one way, and two spellings of one
+    // supplier are two rows — the money splits, and a certificate filed
+    // against one is invisible on the other. So the same supplier is
+    // refused here, and the one already on the list is named.
+    const { data: existing, error: readError } = await supabase
+      .from('vendors')
+      .select('id, name');
+    if (readError) throw readError;
+
+    const twin = findDuplicateVendor(existing || [], name);
+    if (twin) {
+      return Response.json(
+        {
+          success: false,
+          error: `"${twin.name}" is already on the list — that is the same supplier. Edit that one instead of adding a second.`,
+          duplicate: twin,
+        },
+        { status: 409 }
+      );
     }
 
     const { data, error } = await supabase
@@ -145,6 +179,27 @@ export async function PATCH(request) {
       if (column in body) {
         const value = String(body[column] ?? '').trim();
         updates[column] = value === '' ? null : value;
+      }
+    }
+
+    // A rename must not turn one vendor into two either.
+    if (updates.name) {
+      const { data: existing, error: readError } = await supabase
+        .from('vendors')
+        .select('id, name')
+        .neq('id', id);
+      if (readError) throw readError;
+
+      const twin = findDuplicateVendor(existing || [], updates.name);
+      if (twin) {
+        return Response.json(
+          {
+            success: false,
+            error: `"${twin.name}" is already on the list — that is the same supplier. Rename this one to "${twin.name}" only after the two are merged.`,
+            duplicate: twin,
+          },
+          { status: 409 }
+        );
       }
     }
 
