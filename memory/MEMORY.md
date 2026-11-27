@@ -16,3 +16,5 @@
 - [Maintenance Module Status](maintenance-module-status.md) — architecture, access/link details, and mandatory workflow rules (browser verify, GATES.md ledger, plain-English steps) — local-only, contains credentials
 - [Maintenance Module Framework](maintenance-module-framework.md) — locked: derived-status + rejected revert + completed picker + save guard + POC picker (filter/search/add-with-dup-guard) + migrations
 - [Maintenance Module Lock](../maintenance-lock-summary.txt) — job POC section (stage picker + bin icon + single-line flex), DB migrations applied (join table + stage col on pocs + stage col on join), deploy Ready (atelier-hr-inky.vercel.app)
+- [The Code Graph](code-graph.md) — the project has a knowledge graph of itself: the code, the database schema, the business rules and these notes together; how to query it, when to refresh it, and what it cannot tell you
+- [The Compliance Register](compliance-register.md) — what we must legally hold, our suppliers' certificates and the duties that repeat, in one table; when each is "due"; and the daily checks read from the checklists — which have not run since 7 October 2026
