@@ -64,7 +64,10 @@ if [ ! -f "$PASS_FILE" ]; then
   exit 1
 fi
 
-PASS=$(tr -d '\r\n\r' < "$PASS_FILE")
+# Google shows an app password as four groups of four — "abcd efgh ijkl mnop" —
+# and the spaces are pasted along with it. They are not part of the password,
+# so they are stripped with the line endings.
+PASS=$(tr -d '\r\n\r \t' < "$PASS_FILE")
 if [ -z "$PASS" ]; then
   echo "✗ $PASS_FILE is empty."
   exit 1
