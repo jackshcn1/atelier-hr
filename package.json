@@ -25,7 +25,9 @@
     "test:compliance": "node tests/compliance-verify.mjs",
     "test:compliance-page": "node tests/compliance-page-verify.mjs",
     "test:compliance-reminders": "node tests/compliance-reminders-verify.mjs",
-    "test:compliance-reminders-live": "node tests/compliance-reminders-live.mjs"
+    "test:compliance-reminders-live": "node tests/compliance-reminders-live.mjs",
+    "test:assets": "node tests/assets-verify.mjs",
+    "test:assets-page": "node tests/assets-page-verify.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
