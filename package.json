@@ -19,7 +19,8 @@
     "verify:invoice": "node scripts/verify-invoice-upload.mjs",
     "test:forecast": "node tests/finance-forecast-verify.mjs",
     "test:bills": "node tests/finance-bills-verify.mjs",
-    "test:customers": "node tests/customer-parsers-verify.mjs"
+    "test:customers": "node tests/customer-parsers-verify.mjs",
+    "test:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
