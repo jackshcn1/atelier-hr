@@ -70,7 +70,11 @@ jobs:
           # next run. So a run that could not send the mail is NOT a failed
           # run, and it must not fail the workflow. It is reported, though:
           # a mail server that is down is worth knowing about.
-          if grep -q '"emailed":false' "response-reminders.json"; then
+          #
+          # The warning is for a mail that was **needed and did not go out** —
+          # `emailError` carries the reason, and it is null when there was
+          # nothing to send in the first place.
+          if grep -q '"emailError":"' "response-reminders.json"; then
             echo "::warning::The reminders ran, but the mail did not go out — the items stay on the list for the next run."
           fi
 
