@@ -99,6 +99,8 @@ function isLinkActive(pathname, href) {
   // The Customer section is a module with a landing page of its own, so the
   // landing must not stay lit while one of its sub-pages is open.
   if (pathOnly === '/customers') return pathname === '/customers';
+  // The Operations section has a landing page too — the four blocks.
+  if (pathOnly === '/operations') return pathname === '/operations';
   // "All Customers" also stands for one customer's own page.
   if (pathOnly === '/customers/list') {
     return pathname === '/customers/list' || /^\/customers\/\d{10}$/.test(pathname || '');
@@ -224,11 +226,11 @@ export default function Navbar() {
     },
     operations: {
       admin: [
-        { label: 'Operations', links: [{ href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/maintenance-pocs', label: 'Maintenance POCs' }, { href: '/operations/compliance', label: 'Compliance' }] },
+        { label: 'Operations', links: [{ href: '/operations', label: 'Overview' }, { href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/maintenance-pocs', label: 'Maintenance POCs' }, { href: '/operations/compliance', label: 'Compliance' }] },
         { label: 'Settings', links: [{ href: '/settings/assets-config', label: 'Asset Config' }, { href: '/operations/vendors', label: 'Vendors' }] },
       ],
       employee: [
-        { label: 'Operations', links: [{ href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/maintenance-pocs', label: 'Maintenance POCs' }, { href: '/operations/compliance', label: 'Compliance' }] },
+        { label: 'Operations', links: [{ href: '/operations', label: 'Overview' }, { href: '/operations/assets', label: 'Assets' }, { href: '/operations/maintenance', label: 'Maintenance' }, { href: '/operations/maintenance-pocs', label: 'Maintenance POCs' }, { href: '/operations/compliance', label: 'Compliance' }] },
         { label: 'Settings', links: [{ href: '/settings/assets-config', label: 'Asset Config' }] },
       ]
     },

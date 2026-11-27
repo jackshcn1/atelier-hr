@@ -4,6 +4,10 @@ export default function CompliancePage() {
   return (
     <main className="min-h-screen bg-[#f6f4f2] text-[#1e1812]">
       <div className="max-w-shell mx-auto px-6 py-16 lg:py-24">
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/operations" className="btn-secondary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">← Operations</Link>
+          <span className="text-[#8b6f4e] text-sm">Operations / Compliance</span>
+        </div>
         <div className="page-head mb-10">
           <h1 className="page-title font-serif text-4xl lg:text-5xl">Compliance</h1>
           <p className="page-purpose text-[#6b635c] text-base lg:text-lg mt-3">License tracking, certification expiry alerts, and inspection records</p>

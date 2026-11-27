@@ -35,6 +35,12 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 2. **Operations**
    - Checklists (`/checklists`) — Daily opening/closing and hygiene checklists
    - Tasks (`/tasks`) — Delegated accountability tasks and assignments
+   - **Operations (`/operations`) — the module's landing page: four cards, like Finance and Customers.** Clicking Operations opens this page and **not** a sub-page — it used to land straight on Assets, so the other three were one click out of sight.
+     - Assets (`/operations/assets`) — the inventory: asset number, condition, status, and which employee holds it
+     - Maintenance (`/operations/maintenance`) — the work orders: who reported it, which technician is on it, where the job stands
+     - Maintenance POCs (`/operations/maintenance-pocs`) — the people we call: their speciality, contact, and the work they did for us
+     - Compliance (`/operations/compliance`) — licences, certifications and inspection records
+     - Vendors (`/operations/vendors`) — the maintenance vendors (the Settings dropdown group, administrators only)
 
 3. **Payroll**
    - Payroll (`/payroll`) — Attendance processing & monthly calculation
@@ -110,6 +116,7 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - `lib/purchaseRefresh.js` - The 90-day purchase refresh: the window it may pull, the bill it may pull, the bill's identity (supplier, invoice number, day), the two-strikes-and-three-days rule that protects a bill from being deleted by accident, and the lines it says out loud
 - `lib/invoiceSheet.js` - The accountant's sheet: reading it by heading, `paymentCellTargets()` (the cells a payment is written into), and the pull into the books
 - `app/customers/page.js` - The Customer module's landing page: four cards, one per sub-module
+- `app/operations/page.js` - The Operations module's landing page: four cards — Assets, Maintenance, Maintenance POCs, Compliance
 - `app/api/customers/route.js` - The Customer section's reads, dispatched on `view`: overview, list, detail, reviews, feedback. The reviews and the feedback are worked out once, in `buildReviewPicture()` and `buildFeedbackPicture()`, so the overview and their own pages can never disagree
 - `lib/customerParsers.js` - Reading Petpooja's orders and ratings exports and the feedback sheet, the phone rule, and the two joins; `AVERAGE_FROM_DATE` (the locked 1 March 2026 window for the one windowed number, "Our average") and `averageSince()`
 - `lib/customerSync.js` - The nightly pull: a month of orders at a time, a day of reviews at a time, each chunk checked against the source's own count before it is written
@@ -126,7 +133,10 @@ Navigation is grouped into 4 functional dropdown families + standalone links:
 - `SUPABASE_SERVICE_ROLE_KEY` — Protected server-side secret key (used strictly in backend routes and local sync scripts)
 - `GOOGLE_PLACES_API_KEY` — Google's Places API key, in `.env.local` only. It reads the rating our Google Maps listing publishes — nothing else. It belongs to the **`atelier-hr-drive`** project, which holds nothing sensitive.
 
-**Last Updated**: 2026-11-25 — Completed:
+**Last Updated**: 2026-11-27 — Completed:
+- **Operations Opens on Its Own Front Door, Not on Assets**: the Operations module has four sub-sections — Assets, Maintenance, Maintenance POCs and Compliance — but clicking Operations went **straight to the assets page**, so three of the four were a click out of sight, and the module had no page of its own to speak of. `/operations` is now a **landing page of four cards**, built the way `/customers` is: the same two-column grid, the same title / subtitle / description card, the same "Open Sub-module →". **Why it matters**: a module belongs in one place, and a door belongs in front of it. The old landing page is gone — it had three cards, no Maintenance POCs, and three **hard-coded numbers** ("42 assets", "8 open orders", "3 pending renewals") that were typed in by hand and had nothing to do with the books. The new cards say what each sub-section is for and nothing more, so no figure can quietly go out of date. Two pointers now lead to the landing: the **home page's Operations card** (it pointed at `/operations/assets`) and the **Operations dropdown**, which gained an **Overview** entry so the landing is reachable from inside the module. `isLinkActive()` needed its own case for it — the landing must **not** stay lit while one of the four sub-pages is open, the same rule the Customer landing follows. Each of the four sub-pages now carries a **"← Operations"** back button instead of "← Home" (the Compliance page had no way back at all), so the landing is always one click away. **The production build passes.**
+
+**Previously Updated**: 2026-11-25 — Completed:
 - **Our Average Is Counted From 1 March 2026**: the owner set a **locked window** for the one number that is averaged over a window rather than over everything — `AVERAGE_FROM_DATE` in `lib/customerParsers.js`, with `averageSince()` doing the arithmetic. **Why**: the Google listing goes back to **2 December 2010** and those early years were a different restaurant, so averaging sixteen years of history dragged the figure down to **4.0** and made the business look worse than it is. The three marketplaces only have reviews from March 2026 anyway, so **1 March 2026** is the one window **all four listings share** — the headline figure is **4.1 over 1,451 reviews**. **Only this one number uses the window**: every review is still held and still shown (**4,998** on the books), each listing's own average is still over its **full history** (Google **4.01** over all **3,627**), and the month-by-month trend still reaches back to **2010-12**. The window decides what the headline number is *averaged from*, not what is *shown*. The page says which window it used, right under the figure: *"Out of five · 1,451 reviews from March 2026 onward"*. **A review with no day cannot be known to be inside the window**, so it is left out of the average — and the count that comes back with the average says how many it was really over, so a dropped row can never be a silent one. The Overview page's "Average rating" follows the same window and says so. **73 customer checks pass.** See `memory/customer-section.md`.
 
 **Previously Updated**: 2026-11-25 — Completed:
