@@ -45,16 +45,13 @@ const CADENCES = [
 // a suggestion, not a record with a made-up date.
 const START_HERE = [
   { name: 'FSSAI Food Licence', category: 'Regulatory', authority: 'Food Safety & Standards Authority' },
-  { name: 'FoSTaC Certificate — food safety supervisor', category: 'Food safety', authority: 'FSSAI' },
   { name: 'Fire NOC', category: 'Fire safety', authority: 'State Fire Services' },
   { name: 'Trade Licence (Shops & Establishments)', category: 'Regulatory' },
   { name: 'Municipal / Corporation Licence', category: 'Regulatory' },
   { name: 'Legal Metrology Registration', category: 'Statutory' },
   { name: 'Pollution Control Board Consent', category: 'Environment' },
-  { name: 'Fire & Public Liability Insurance', category: 'Insurance' },
   { name: 'Pest Control Contract', category: 'Vendor', recurring: true, cadence: 'monthly' },
   { name: 'Fire Extinguisher Servicing', category: 'Fire safety', recurring: true, cadence: 'annual' },
-  { name: 'Deep Kitchen Cleaning — ducts & hoods', category: 'Food safety', recurring: true, cadence: 'half_yearly' },
   { name: 'Thermometer & Scale Calibration', category: 'Equipment', recurring: true, cadence: 'annual' },
 ];
 
@@ -401,6 +398,11 @@ export default function CompliancePage() {
       <div>
         <div className="text-xs">{item.kind === 'recurring' ? formatDate(item.next_due_on) : formatDate(item.expires_on)}</div>
         <div className={`text-xs ${s.status === 'expired' ? 'text-[#A41B1B]' : 'text-[#7A7168]'}`}>{s.label}</div>
+        {/* The reminder: once the row is inside the 90-day window, the
+            reminder job writes a task for it and says so here. */}
+        {item.reminder_task_id && (
+          <div className="text-xs text-[#7A7168]">Reminder task #{item.reminder_task_id}</div>
+        )}
       </div>
     );
   };

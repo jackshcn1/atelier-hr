@@ -1,0 +1,88 @@
+name: Compliance Reminders
+
+# Looks 90 days ahead in the compliance register and reminds.
+#
+# A licence that expires in three months is a problem in three months, so the
+# register looks ahead: anything due inside the 90-day window gets a task in
+# the Tasks hub, and the owner is told about it — once, when it enters the
+# window, again if the date moves, and weekly once it is overdue.
+#
+# It is its own workflow on purpose. The Petpooja sync fails now and then —
+# a login that is refused, a report that does not come — and the paperwork
+# does not wait for the bills to sync. A licence that runs out is a licence
+# that runs out whether the finance run worked or not.
+#
+# Schedule is UTC (GitHub cron is always UTC):
+#   22:15 UTC = 03:45 IST  ->  cron: '15 22 * * *'
+#
+# The work happens on Vercel, not here: this workflow only schedules the
+# request and collects the result. The same two secrets as the Petpooja
+# workflow — no new ones.
+on:
+  schedule:
+    - cron: '15 22 * * *'
+
+  # Manual trigger from the Actions tab.
+  workflow_dispatch:
+
+# Never let two runs overlap — they would race on the same rows.
+concurrency:
+  group: compliance-reminders
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Ask the server for the reminders
+        env:
+          SYNC_URL: ${{ secrets.VERCEL_SYNC_URL }}
+          SYNC_SECRET: ${{ secrets.VERCEL_SYNC_SECRET }}
+        run: |
+          set -u
+          if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
+            echo "::error::VERCEL_SYNC_URL and VERCEL_SYNC_SECRET must be configured as repository secrets."
+            exit 1
+          fi
+
+          STATUS=$(curl -sS -o "response-reminders.json" -w '%{http_code}' -X POST "$SYNC_URL?compliance=reminders" \
+            -H "x-sync-secret: $SYNC_SECRET" \
+            -H 'Content-Type: application/json' \
+            --max-time 300) || STATUS="000"
+
+          echo "HTTP $STATUS"
+          tail -c 4000 "response-reminders.json" || true
+          echo ""
+
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::The compliance reminders failed with HTTP $STATUS"
+            exit 1
+          fi
+          if ! grep -q '"ok":true' "response-reminders.json"; then
+            echo "::error::The compliance reminders did not report ok:true"
+            exit 1
+          fi
+
+          # The mail is best effort — the tasks are written whatever happens,
+          # and an item that could not be mailed stays on the list for the
+          # next run. So a run that could not send the mail is NOT a failed
+          # run, and it must not fail the workflow. It is reported, though:
+          # a mail server that is down is worth knowing about.
+          if grep -q '"emailed":false' "response-reminders.json"; then
+            echo "::warning::The reminders ran, but the mail did not go out — the items stay on the list for the next run."
+          fi
+
+      - name: Publish run summary
+        if: always()
+        run: |
+          {
+            echo "### Compliance reminders"
+            echo
+            echo "- Finished: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo
+            echo '```json'
+            tail -c 3000 "response-reminders.json" 2>/dev/null || echo "(no response)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

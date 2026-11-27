@@ -63,6 +63,8 @@ import {
   syncFeedback,
 } from '../../../lib/feedbackSheet.js';
 import { pullGoogleReviews } from '../../../lib/googleReviews.js';
+import { runReminders } from '../../../lib/complianceReminders.js';
+import { sendMail } from '../../../lib/notificationService.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -192,6 +194,19 @@ async function handle(req) {
   // set up.
   if (new URL(req.url).searchParams.get('google') === 'reviews') {
     return await pullGoogleReviewList(push, started);
+  }
+
+  // The compliance reminders.
+  //
+  // A licence that expires in three months is a problem in three months, so
+  // the register looks 90 days ahead: anything inside that window gets a task
+  // in the Tasks hub, and the owner is told about it once.
+  //
+  // It is its own request on purpose. It touches neither Petpooja nor a
+  // browser, and it has to keep working on a morning when the finance run
+  // has failed — the paperwork does not wait for the bills to sync.
+  if (new URL(req.url).searchParams.get('compliance') === 'reminders') {
+    return await runComplianceReminders(push, started);
   }
 
   // The sync engine writes its progress straight to the console. Tee it into
@@ -803,6 +818,67 @@ async function pullInvoiceSheet(push, started) {
   } catch (err) {
     const message = err?.message || String(err);
     push(`❌ The invoice sheet could not be pulled: ${message}`);
+    return NextResponse.json(
+      { ok: false, error: message, durationMs: Date.now() - started },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Look 90 days ahead in the compliance register and remind.
+ *
+ * Anything due inside the window gets a task in the Tasks hub, and the owner
+ * is told about it — once, when it enters the window, again if the date
+ * moves, and weekly once it is overdue.
+ *
+ * The mail is **best effort**: the tasks are written whatever happens, and a
+ * mail that could not be sent leaves the item on the list so the next run
+ * tries again. A reminder that stops reminding because the mail server was
+ * down would be the worst kind of reminder.
+ */
+async function runComplianceReminders(push, started) {
+  const supabase = getSupabase();
+
+  try {
+    push('🔔 Looking 90 days ahead in the compliance register...');
+    const result = await runReminders({
+      supabase,
+      sendMail: (message) => sendMail(message),
+    });
+
+    push(
+      `🔔 ${result.due} item(s) inside the window — ` +
+        `${result.created} task(s) made, ${result.updated} moved, ${result.reopened} reopened.`,
+    );
+
+    if (result.toTell.length) {
+      for (const entry of result.toTell) {
+        push(`   ↳ ${entry.name} — ${entry.days} day(s) away (${entry.reason}).`);
+      }
+    }
+
+    if (result.emailed) {
+      push(`📧 The owner was told about ${result.toTell.length} item(s).`);
+    } else if (result.toTell.length) {
+      push(
+        `⚠️  The mail did not go out: ${result.emailError || 'the mail server refused it.'}`,
+      );
+      push('   The tasks are still written, and the items stay on the list for the next run.');
+    }
+
+    for (const problem of result.problems || []) {
+      push(`⚠️  ${problem.name}: ${problem.error}`);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      durationMs: Date.now() - started,
+      ...result,
+    });
+  } catch (err) {
+    const message = err?.message || String(err);
+    push(`❌ The compliance reminders could not be run: ${message}`);
     return NextResponse.json(
       { ok: false, error: message, durationMs: Date.now() - started },
       { status: 500 },

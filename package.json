@@ -23,7 +23,9 @@
     "test:live": "node scripts/verify-live.mjs",
     "test:vendor-name": "node tests/vendor-name-verify.mjs",
     "test:compliance": "node tests/compliance-verify.mjs",
-    "test:compliance-page": "node tests/compliance-page-verify.mjs"
+    "test:compliance-page": "node tests/compliance-page-verify.mjs",
+    "test:compliance-reminders": "node tests/compliance-reminders-verify.mjs",
+    "test:compliance-reminders-live": "node tests/compliance-reminders-live.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",

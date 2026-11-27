@@ -52,6 +52,49 @@ does not get to rewrite the licence register.
   `maintenance_jobs`. Copying them would make two truths that disagree.
 - **People compliance (training, FoSTaC, medical fitness) was left out on
   purpose** (27 November 2026) — not required.
+- **Three suggestions were taken back out of the empty state's list** (27
+  November 2026, the same day): **FoSTaC Certificate**, **Fire & Public
+  Liability Insurance** and **Deep Kitchen Cleaning**. The list is a
+  suggestion, and a suggestion the owner does not want is a suggestion that
+  should not be there. What is left: FSSAI Food Licence, Fire NOC, Trade
+  Licence, Municipal / Corporation Licence, Legal Metrology Registration,
+  Pollution Control Board Consent, Pest Control Contract, Fire Extinguisher
+  Servicing, Thermometer & Scale Calibration.
+
+## The 90-day reminder
+
+A licence that expires in three months is a problem in three months, so the
+register looks **90 days ahead**.
+
+- **`lib/complianceReminders.js`** — the planning is pure (`planReminders()`,
+  `taskFor()`, `buildDigest()`), so it can be tested without a database. The
+  doing is `runReminders()`.
+- **One task per item.** The task's id is written back onto the row
+  (`compliance_items.reminder_task_id`), so the second morning does not make a
+  second task. A task deleted by hand is made again.
+- **Told once.** When the owner was last told is written back too
+  (`reminder_notified_at`), and the owner is told again only if the date
+  moves, the task was closed by hand, or the item has been **overdue for a
+  week** (`OVERDUE_NAG_DAYS`). The row is marked as told **only when the mail
+  actually went out** — otherwise a failed mail would silence the reminder
+  for good.
+- **The task says what it is**: "Renew:" for a licence, "Do:" for a recurring
+  duty, and the closer the date the louder the task (urgent / high / normal).
+- **The mail is one digest** for the whole run — a morning with three
+  expiries in it is one mail with three lines, not three mails.
+
+**Where it runs.** `GET/POST /api/sync?compliance=reminders`, guarded by
+`SYNC_SECRET` like every other branch of that route, and called every day at
+**03:45 IST** by `.github/workflows/compliance-reminders.yml` — **its own
+workflow**, because a Petpooja sync that fails must not be able to silence
+the paperwork. The same two secrets are used; no new ones.
+
+**The mail needs `SMTP_PASS` on Vercel.** `SMTP_USER` is set but the password
+is not, so on the hosted run the mail is **skipped** — the tasks are still
+written, and the items stay on the list so the next run tries again. The
+password is a 16-character Google *app password*; `scripts/setup-smtp-alerts.sh`
+puts it on Vercel from `~/.atelier-smtp-pass` without it ever appearing in a
+command line.
 
 ## The page
 
@@ -63,10 +106,11 @@ does not get to rewrite the licence register.
   `checklist_runs`, because a hygiene check that was missed is a compliance
   fact too.
 - **The empty state** offers the licences a restaurant normally holds
-  (FSSAI, FoSTaC, Fire NOC, trade, municipal, metrology, pollution, insurance,
-  pest control, extinguishers, deep cleaning, calibration) as **suggestions
-  with no dates** — a register that starts empty is a list to fill in, not a
-  page of made-up figures.
+  (FSSAI, Fire NOC, trade, municipal, metrology, pollution, pest control,
+  extinguishers, calibration) as **suggestions with no dates** — a register
+  that starts empty is a list to fill in, not a page of made-up figures.
+- A row that the reminder has taken care of says **"Reminder task #…"**
+  under its date.
 
 ## The truth it tells today
 
