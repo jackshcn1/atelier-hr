@@ -401,10 +401,22 @@ export async function PATCH(req) {
       created_at: new Date().toISOString(),
     }));
   if (historyRows.length) {
-    await supabase.from('asset_audit_log').insert(historyRows);
+    const { error: historyErr } = await supabase.from('asset_audit_log').insert(historyRows);
+    if (historyErr) {
+      // A change that was saved but not recorded is worse than a change that
+      // was refused — the record would lie. So it is said out loud, and the
+      // change itself is still saved.
+      console.error(`The change was saved but its history was not written: ${historyErr.message}`);
+      return NextResponse.json({
+        asset: updated,
+        changed: Object.keys(changes),
+        historyWritten: false,
+        historyError: historyErr.message,
+      });
+    }
   }
 
-  return NextResponse.json({ asset: updated, changed: Object.keys(changes) });
+  return NextResponse.json({ asset: updated, changed: Object.keys(changes), historyWritten: true });
 }
 
 /**
