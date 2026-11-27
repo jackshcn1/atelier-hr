@@ -197,11 +197,21 @@ bills**, with three pairs of twins:
 | `Wholegrains - The Baker's Hub` | `WHOLE GRAINS - THE BAKER S HUB` | the same shop, spacing and a missing apostrophe |
 | `Ambrosia - The Classic Bakehouse` | `Ambrisia - The Classic Bakehouse` | a typo in the second one |
 | `COCHIN LIMRA SALES` | `COCHIN LIMRA SALES-TVM [BR]` | the branch tag the rule already strips |
+| `KR Agency` | `K R Agency` | one agency — **the only pair where the money was split** |
+| `THOMSON TRADING AGENCIES` | `Thompson Traders` | one supplier, two spellings |
+
+`SREE ANJANEYA ENTERPRISES` was looked at too and **left alone** — it is a
+supplier of its own, with its own bill. **What the rule cannot decide, the
+owner decides.**
 
 **What it cost.** Each twin held **no bills and no assets** — the money was
 already on the other row — so the totals were not wrong. But the twins were
 **rows a certificate could be filed against and never be seen**, which is the
 whole point of the compliance register that is being built.
+
+**Three bills had no supplier at all** — `ANANDAM HOME CATERING`, `S IBRAHIM
+& CO` and `More Retail private limited`. They were added to the list, so the
+yellow panel on the Suppliers page is gone: **every bill now has a supplier**.
 
 **The fix, in three places**, because any one alone would leave it half-closed:
 

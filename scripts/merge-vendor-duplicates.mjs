@@ -33,6 +33,12 @@ const PAIRS = [
   { keep: 34, twin: 122 },
   // The same supplier, with a branch tag in brackets on the second one.
   { keep: 23, twin: 114 },
+  // The same agency, written two ways: "KR Agency" vs "K R Agency". This is
+  // the one pair where the money was actually split — the owner's call, on
+  // 27 November 2026.
+  { keep: 75, twin: 119 },
+  // The same supplier: "Thompson Traders" is "THOMSON TRADING AGENCIES".
+  { keep: 33, twin: 117 },
 ];
 
 // Rows that are not vendors at all — a test row someone left behind.
