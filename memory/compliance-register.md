@@ -89,12 +89,28 @@ register looks **90 days ahead**.
 workflow**, because a Petpooja sync that fails must not be able to silence
 the paperwork. The same two secrets are used; no new ones.
 
-**The mail needs `SMTP_PASS` on Vercel.** `SMTP_USER` is set but the password
-is not, so on the hosted run the mail is **skipped** — the tasks are still
-written, and the items stay on the list so the next run tries again. The
-password is a 16-character Google *app password*; `scripts/setup-smtp-alerts.sh`
-puts it on Vercel from `~/.atelier-smtp-pass` without it ever appearing in a
-command line.
+**The mail is switched on.** The sending account is **`apirishab@gmail.com`**
+(a dedicated address, not the owner's personal one) and the mail lands at
+**`atelier.trivandrum@gmail.com`** — the sender and the receiver are two
+separate settings (`SMTP_USER` and `NOTIFICATION_EMAIL`), because the app
+lets them differ. On Vercel production: `SMTP_USER`, `SMTP_PASS` and
+`NOTIFICATION_EMAIL` are set as secrets.
+
+`scripts/setup-smtp-alerts.sh` puts them there, reading the app password from
+`~/.atelier-smtp-pass` and handing it to Vercel through stdin, so it never
+appears in a command line, in the shell history, or in a screenshot. **The
+script strips spaces** — Google shows an app password as four groups of four
+(`abcd efgh ijkl mnop`), and pasting it brings the three spaces along. Without
+that, the server is sent a 19-character password and Gmail refuses it.
+
+A brand-new Gmail account needs **2-Step Verification switched on** before
+Google will make an app password, and the password can take a few minutes to
+start working. The first mail from a new address often lands in the spam
+folder.
+
+**Proven in production** (27 Nov 2026): a test licence put in the register,
+the scheduled run called, the task written, `emailed: true`, and the row
+marked as told — then everything cleaned up.
 
 ## The page
 
